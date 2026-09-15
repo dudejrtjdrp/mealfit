@@ -70,7 +70,8 @@ describe('judgeMenu', () => {
   it('가벼운 메뉴는 좋음', () => {
     const j = judgeMenu(menu({ id: 'am', nutrients: { kcal: 10, carbs: 2, protein: 1, fat: 0 } }), REMAINING, ctx);
     expect(j.verdict).toBe('good');
-    expect(j.score).toBe(100);
+    // kcal 100×0.7 + 강조(탄100·단45.5·지100 평균 81.8)×0.3 = 94.5 → 30 kcal 미만 상한 85
+    expect(j.score).toBe(85);
     expect(j.unknown).toBe(false);
     expect(j.reasons[0]).toBe('여유분 안에서 가볍게 들어가요');
   });
@@ -89,27 +90,89 @@ describe('judgeMenu', () => {
     expect(j.reasons[1]).toBe('내일 다시 채워져요');
   });
 
-  it('식단 유형·강조 영양소 반영 + 시럽 가이드', () => {
-    const sugarCtx: JudgeContext = {
-      profile: { primaryGoal: 'blood_sugar', secondaryGoals: [], diet: { type: 'low_sugar', evidence: [], source: 'rule' } },
-    };
-    const rem = { ...REMAINING, kcal: 400, sugar: 20 };
-    const j = judgeMenu(vanillaLatte, rem, sugarCtx);
-    // 50 + kcal 25 + sugar -20 + carbs 15 + protein 0 + 저당 -15 = 55
-    expect(j.score).toBe(55);
+  it('연속형 점수 (음료 상한 전)', () => {
+    const food = menu({ ...vanillaLatte, id: 'food', category: 'snack', options: undefined });
+    const j = judgeMenu(food, { ...REMAINING, kcal: 450 }, ctx);
+    // r=0.422 → kcal 35.6×0.7=24.9 · 강조(탄100·단72.7·지100)=90.9×0.3=27.3 → 52
+    expect(j.score).toBe(52);
     expect(j.verdict).toBe('ok');
-    expect(j.reasons[0]).toBe('당이 조금 있지만 전체 여유분 안에서 무난해요');
-    expect(j.guide).toBe('시럽 빼면 좋음이 돼요');
+  });
 
-    const noSyrup = judgeMenu(vanillaLatte, rem, { ...sugarCtx, selectedOptions: { syrup: '시럽 빼기' } });
-    expect(noSyrup.verdict).toBe('good');
-    expect(noSyrup.guide).toBeUndefined();
+  it('시럽 가이드: 음료는 상한 때문에 pass → ok 로 올라간다', () => {
+    const rem = { ...REMAINING, kcal: 350 };
+    const j = judgeMenu(vanillaLatte, rem, ctx);
+    expect(j.verdict).toBe('pass');
+    expect(j.guide).toBe('시럽 빼면 괜찮음이 돼요');
+    const noSyrup = judgeMenu(vanillaLatte, rem, { ...ctx, selectedOptions: { syrup: '시럽 빼기' } });
+    expect(noSyrup.verdict).toBe('ok');
+    expect(noSyrup.reasons).toEqual(['우유가 들어가지만 전체 여유분 안에서 무난해요', '평소처럼 드셔도 좋아요']);
+  });
+
+  it('음료 상한: 80 kcal 이상 음료는 최대 괜찮음(69), 단백질 10 g 이상은 예외', () => {
+    const latte = judgeMenu(menu({ id: 'l', name: '아이스 카페 라떼', nutrients: { kcal: 110, carbs: 9, protein: 6, fat: 6 } }), REMAINING, ctx);
+    expect(latte.score).toBe(69);
+    expect(latte.verdict).toBe('ok');
+    expect(latte.reasons).toEqual(['우유가 들어가지만 전체 여유분 안에서 무난해요', '평소처럼 드셔도 좋아요']);
+    const tea = judgeMenu(menu({ id: 't', name: '자몽 허니 블랙 티', nutrients: { kcal: 125, carbs: 31, protein: 0, fat: 0 } }), REMAINING, ctx);
+    expect(tea.verdict).toBe('ok');
+    expect(tea.reasons[0]).toBe('달콤한 음료는 여유분 안에서 가볍게 즐겨요');
+    const shake = judgeMenu(menu({ id: 's', name: '프로틴 음료', nutrients: { kcal: 120, carbs: 9, protein: 16, fat: 2 } }), REMAINING, ctx);
+    expect(shake.verdict).toBe('good');
+    expect(shake.score).toBeGreaterThan(69);
+    // 음료가 아니면 상한 없음
+    const food = judgeMenu(menu({ id: 'f', category: 'snack', nutrients: { kcal: 110, carbs: 9, protein: 6, fat: 6 } }), REMAINING, ctx);
+    expect(food.verdict).toBe('good');
+  });
+
+  it('초저칼로리 상한 85: 아메리카노가 식사보다 위에 서지 않는다', () => {
+    const americano = menu({ id: 'am', nutrients: { kcal: 10, carbs: 2, protein: 1, fat: 0 } });
+    const salad = menu({ id: 'salad', category: 'salad', nutrients: { kcal: 180, carbs: 10, protein: 18, fat: 7 } });
+    expect(judgeMenu(americano, REMAINING, ctx).score).toBe(85);
+    expect(rankMenus([americano, salad], REMAINING, ctx).map((x) => x.menu.id)).toEqual(['salad', 'am']);
+  });
+
+  it('"단백질도 챙길 수 있어요" 는 단백질 10 g 이상일 때만', () => {
+    const low = judgeMenu(menu({ id: 'a', category: 'snack', nutrients: { kcal: 150, carbs: 10, protein: 9, fat: 3 } }), REMAINING, ctx);
+    expect(low.verdict).toBe('good');
+    expect(low.reasons.join(' ')).not.toContain('단백질');
+    const high = judgeMenu(menu({ id: 'b', category: 'snack', nutrients: { kcal: 150, carbs: 10, protein: 12, fat: 3 } }), REMAINING, ctx);
+    expect(high.reasons[1]).toBe('단백질도 챙길 수 있어요');
+  });
+
+  it('식단 유형·목적 보정은 총점에 가감', () => {
+    const rem = { ...REMAINING, sugar: 1000, sodium: 5000 };
+    const base = { kcal: 300, carbs: 60, protein: 8, fat: 15, satFat: 4, sugar: 19, sodium: 300 };
+    const scoreOf = (n: typeof base, profile: JudgeContext['profile']) =>
+      judgeMenu(menu({ id: 'x', category: 'meal', nutrients: n }), rem, { profile }).score;
+    const diet = (type: 'low_sugar' | 'balanced') => ({ type, evidence: [], source: 'rule' as const });
+
+    const bs = { ...PROFILE, primaryGoal: 'blood_sugar' as const };
+    expect(scoreOf(base, bs) - scoreOf({ ...base, sugar: 20 }, bs)).toBe(15);
+    const ch = { ...PROFILE, primaryGoal: 'cholesterol' as const };
+    expect(scoreOf(base, ch) - scoreOf({ ...base, satFat: 5 }, ch)).toBe(10);
+    // satFat 값이 없으면 보정하지 않음
+    const { satFat: _omit, ...noSat } = base;
+    expect(scoreOf(noSat as typeof base, ch)).toBe(scoreOf(base, ch));
+    expect(scoreOf({ ...base, sugar: 15 }, { ...PROFILE, diet: diet('balanced') }) - scoreOf({ ...base, sugar: 15 }, { ...PROFILE, diet: diet('low_sugar') })).toBe(15);
+  });
+
+  it('점수 곡선', () => {
+    const { kcalScore, nutrientShareScore } = jest.requireActual('../judge');
+    expect(kcalScore(0.3)).toBe(100);
+    expect(kcalScore(0.4)).toBeCloseTo(40);
+    expect(kcalScore(0.6)).toBeCloseTo(0);
+    expect(kcalScore(1.2)).toBe(0);
+    expect(nutrientShareScore('carbs', 0.25)).toBe(100);
+    expect(nutrientShareScore('carbs', 0.525)).toBeCloseTo(50);
+    expect(nutrientShareScore('sodium', 0.9)).toBe(0);
+    expect(nutrientShareScore('protein', 0)).toBe(40);
+    expect(nutrientShareScore('protein', 0.3)).toBe(100);
   });
 
   it('사이즈 가이드: Venti 가 패스면 "Tall로 하면"', () => {
     const j = judgeMenu(vanillaLatte, REMAINING, { ...ctx, selectedOptions: { size: 'Venti' } });
     expect(j.verdict).toBe('pass');
-    expect(j.guide).toBe('Tall로 하면 좋음이 돼요');
+    expect(j.guide).toBe('Tall로 하면 괜찮음이 돼요');
   });
 
   it('고단백 증량형은 단백질 20 g 이상 가산', () => {

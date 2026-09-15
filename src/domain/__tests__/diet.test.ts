@@ -54,4 +54,31 @@ describe('classifyDietByRules', () => {
   it('공백 표기가 달라도 잡는다', () => {
     expect(classifyDietByRules('단거적게 먹어요').type).toBe('low_sugar');
   });
+
+  it('시안 B6: 약한 신호만 있으면 균형형, 근거는 시안 톤', () => {
+    const r = classifyDietByRules('아침은 가볍게 먹고, 점심은 든든하게 먹는 편이에요. 커피를 자주 마셔요.');
+    expect(r.type).toBe('balanced');
+    expect(r.evidence.map((e) => e.title)).toEqual(['가볍고 깔끔한 메뉴 선호', '카페 메뉴도 자주 선택', '단백질 균형 중요']);
+  });
+
+  it('균형형을 이기려면 키워드 2개 이상 또는 강한 키워드 1개', () => {
+    expect(classifyDietByRules('가볍게 먹어요').type).toBe('balanced');
+    expect(classifyDietByRules('가볍게, 조금씩 나눠 먹어요').type).toBe('light_eater');
+    expect(classifyDietByRules('소식해요').type).toBe('light_eater');
+    expect(classifyDietByRules('닭가슴살 좋아해요').type).toBe('balanced');
+    expect(classifyDietByRules('닭가슴살이랑 두부 위주').type).toBe('low_carb_high_protein');
+    expect(classifyDietByRules('밥 줄이는 중').type).toBe('low_carb_high_protein');
+    expect(classifyDietByRules('저염식 해요').type).toBe('low_sodium');
+    expect(classifyDietByRules('혈당 신경 써요').type).toBe('low_sugar');
+    expect(classifyDietByRules('증량하고 싶어요').type).toBe('high_protein_bulk');
+    expect(classifyDietByRules('커피 자주 마셔요').type).toBe('balanced');
+  });
+
+  it('균형형 + 커피 서술이면 "카페 메뉴도 자주 선택" 이 들어간다', () => {
+    const r = classifyDietByRules('골고루 먹고 채소도 챙기고 커피는 매일');
+    expect(r.type).toBe('balanced');
+    expect(r.evidence).toHaveLength(3);
+    expect(r.evidence.map((e) => e.title)).toContain('카페 메뉴도 자주 선택');
+    expect(r.evidence[0].title).toBe('골고루 먹는 편이에요');
+  });
 });
