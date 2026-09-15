@@ -66,6 +66,35 @@ export const colors = {
   shadow: 'rgba(30, 36, 48, 0.06)',
 } as const;
 
+/**
+ * 브랜드 타일(D1·D3) 색 — 사진 대신 쓰는 이니셜 타일. fg 글자색 · bg 연한 바탕.
+ * 로고를 흉내 내지 않고 브랜드 계열색만 연하게 쓴다.
+ */
+export const brandColors: Record<string, { fg: string; bg: string }> = {
+  gs25: { fg: '#1C8FD8', bg: '#E3F2FC' },
+  cu: { fg: '#7A3FA0', bg: '#F1E8F7' },
+  seven_eleven: { fg: '#E8702A', bg: '#FDEEE3' },
+  starbucks: { fg: '#1E7A50', bg: '#E1F2E9' },
+  mega: { fg: '#B8860B', bg: '#FBF3D9' },
+  ediya: { fg: '#2B4C8C', bg: '#E6ECF7' },
+  compose: { fg: '#C49A1A', bg: '#FBF3D9' },
+  subway: { fg: '#2E8B3E', bg: '#FFF6CC' },
+  salady: { fg: '#4E9A3A', bg: '#EAF5E3' },
+  paris_baguette: { fg: '#1F4E9A', bg: '#E6EDF8' },
+  bonjuk: { fg: '#A0522D', bg: '#F7ECE3' },
+  mom_touch: { fg: '#D9442F', bg: '#FCE9E6' },
+  _default: { fg: '#5C6675', bg: '#EEF0F3' },
+};
+
+/** 메뉴 카테고리 타일 바탕 */
+export const menuTileColors = {
+  drink: '#F5EDE4',
+  meal: '#FEF3E6',
+  snack: '#FBEFE9',
+  salad: '#E8F5EC',
+  side: '#EDF0F5',
+} as const;
+
 export const spacing = {
   xs: 4,
   sm: 8,

@@ -42,17 +42,21 @@ export interface KcalRingProps {
   target?: number;
   size?: number;
   stroke?: number;
+  /** 링 채움 색 (기본 연초록, 넘겼을 때 호박색 등) */
+  color?: string;
+  /** 가운데 숫자 크기 (기본 40) */
+  numberSize?: number;
   style?: StyleProp<ViewStyle>;
 }
 
 /** E1 원형 칼로리 링 */
-export function KcalRing({ value, progress, target, size = 150, stroke = 14, style }: KcalRingProps) {
+export function KcalRing({ value, progress, target, size = 150, stroke = 14, color, numberSize, style }: KcalRingProps) {
   return (
     <View style={[styles.ringWrap, style]}>
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <Ring size={size} stroke={stroke} progress={progress} />
+        <Ring size={size} stroke={stroke} progress={progress} color={color} />
         <MaterialCommunityIcons name="fire" size={22} color={colors.kcal} />
-        <Text variant="number" style={styles.ringNumber}>
+        <Text variant="number" style={[styles.ringNumber, numberSize ? { fontSize: numberSize, lineHeight: Math.round(numberSize * 1.15) } : null]}>
           {formatNumber(value)}
         </Text>
         <Text variant="h3" color="ink2" style={styles.ringUnit}>
@@ -69,11 +73,11 @@ export function KcalRing({ value, progress, target, size = 150, stroke = 14, sty
 }
 
 /** D3 상단 미니 링 + "842 kcal 남음" */
-export function MiniKcalGauge({ remaining, progress, caption = '오늘 남은 칼로리', style }: { remaining: number; progress: number; caption?: string; style?: StyleProp<ViewStyle> }) {
+export function MiniKcalGauge({ remaining, progress, caption = '오늘 남은 칼로리', color, style }: { remaining: number; progress: number; caption?: string; color?: string; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[styles.mini, style]}>
       <View style={styles.miniRing}>
-        <Ring size={64} stroke={8} progress={progress} />
+        <Ring size={64} stroke={8} progress={progress} color={color} />
         <MaterialCommunityIcons name="fire" size={26} color={colors.kcal} />
       </View>
       <View style={styles.miniText}>
@@ -127,31 +131,37 @@ export interface NutrientBarProps {
   max: number;
   /** 라벨 교체 */
   label?: string;
+  /** 좁은 칸(링 옆)용 작은 글자·아이콘 */
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
 /** 아이콘 원 + 라벨 + "122 / 250 g" + 바 (E1) */
-export function NutrientBar({ nutrient, value, max, label, style }: NutrientBarProps) {
+export function NutrientBar({ nutrient, value, max, label, compact, style }: NutrientBarProps) {
   const m = NUTRIENT_META[nutrient];
   const progress = value == null ? 1 : max > 0 ? value / max : 0;
+  const strong = compact ? 'captionMedium' : 'bodyMedium';
+  const weak = compact ? 'caption' : 'body';
   return (
     <View style={[styles.nbRow, style]}>
-      <NutrientIcon nutrient={nutrient} size={36} />
-      <View style={styles.nbBody}>
+      <NutrientIcon nutrient={nutrient} size={compact ? 32 : 36} />
+      <View style={[styles.nbBody, compact && styles.nbBodyCompact]}>
         <View style={styles.nbTop}>
-          <Text variant="bodyMedium">{label ?? m.label}</Text>
-          <Text variant="bodyMedium">
+          <Text variant={strong} numberOfLines={1} style={styles.nbLabel}>
+            {label ?? m.label}
+          </Text>
+          <Text variant={strong} numberOfLines={1}>
             {value != null ? (
               <>
                 {formatNumber(value)}
-                <Text variant="body" color="ink3">
+                <Text variant={weak} color="ink3">
                   {' '}/ {formatNumber(max)} {m.unit}
                 </Text>
               </>
             ) : (
               <>
                 {formatNumber(max)}
-                <Text variant="body" color="ink3">
+                <Text variant={weak} color="ink3">
                   {' '}
                   {m.unit}
                 </Text>
@@ -180,6 +190,8 @@ const styles = StyleSheet.create({
   miniUnit: {},
   nbRow: { flexDirection: 'row', alignItems: 'center' },
   nbBody: { flex: 1, marginLeft: spacing.md },
+  nbBodyCompact: { marginLeft: spacing.sm },
+  nbLabel: { flexShrink: 1, marginRight: 4 },
   nbTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 },
   nbTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.gaugeTrack, overflow: 'hidden' },
   nbFill: { height: 8, borderRadius: radius.pill },

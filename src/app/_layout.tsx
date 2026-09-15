@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ToastHost } from '@/components';
+import { useBootstrap } from '@/state/bootstrap';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -18,6 +19,8 @@ export default function RootLayout() {
     'Pretendard-SemiBold': require('@/assets/fonts/Pretendard-SemiBold.otf'),
     'Pretendard-Bold': require('@/assets/fonts/Pretendard-Bold.otf'),
   });
+
+  useBootstrap();
 
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync().catch(() => {});
@@ -33,6 +36,14 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(onboarding)" />
           <Stack.Screen name="login" />
+          <Stack.Screen name="store/[id]" />
+          <Stack.Screen name="menu/[id]" />
+          <Stack.Screen name="log/add" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="my/body" />
+          <Stack.Screen name="my/goal" />
+          <Stack.Screen name="my/diet" />
+          <Stack.Screen name="my/settings" />
+          <Stack.Screen name="my/premium" />
         </Stack>
         <ToastHost />
       </SafeAreaProvider>
