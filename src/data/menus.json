@@ -1,0 +1,6112 @@
+[
+  {
+    "id": "starbucks-iced-americano",
+    "brandId": "starbucks",
+    "name": "아이스 카페 아메리카노",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 4700,
+    "nutrients": {
+      "kcal": 10,
+      "carbs": 2,
+      "protein": 1,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 5,
+      "caffeine": 150
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 3.3,
+              "carbs": 0.7,
+              "protein": 0.3,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 1.7,
+              "caffeine": 49.5
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 6.7,
+              "carbs": 1.3,
+              "protein": 0.7,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 3.4,
+              "caffeine": 100.5
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "깔끔하고 진한 에스프레소를 시원하게 즐기는 대표 메뉴예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-americano",
+    "brandId": "starbucks",
+    "name": "카페 아메리카노",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 4700,
+    "nutrients": {
+      "kcal": 10,
+      "carbs": 2,
+      "protein": 1,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 5,
+      "caffeine": 150
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 3.3,
+              "carbs": 0.7,
+              "protein": 0.3,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 1.7,
+              "caffeine": 49.5
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 6.7,
+              "carbs": 1.3,
+              "protein": 0.7,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 3.4,
+              "caffeine": 100.5
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "진한 에스프레소에 따뜻한 물을 더한 기본 커피예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-iced-latte",
+    "brandId": "starbucks",
+    "name": "아이스 카페 라떼",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5200,
+    "nutrients": {
+      "kcal": 110,
+      "carbs": 9,
+      "protein": 6,
+      "fat": 6,
+      "satFat": 3.5,
+      "sugar": 8,
+      "sodium": 75,
+      "caffeine": 75
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 36.3,
+              "carbs": 3,
+              "protein": 2,
+              "fat": 2,
+              "satFat": 1.2,
+              "sugar": 2.6,
+              "sodium": 24.8,
+              "caffeine": 24.8
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 73.7,
+              "carbs": 6,
+              "protein": 4,
+              "fat": 4,
+              "satFat": 2.3,
+              "sugar": 5.4,
+              "sodium": 50.3,
+              "caffeine": 50.3
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "부드러운 우유와 에스프레소의 조화가 좋은 대표 메뉴예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-latte",
+    "brandId": "starbucks",
+    "name": "카페 라떼",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5200,
+    "nutrients": {
+      "kcal": 180,
+      "carbs": 14,
+      "protein": 10,
+      "fat": 7,
+      "satFat": 5,
+      "sugar": 13,
+      "sodium": 115,
+      "caffeine": 75
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 59.4,
+              "carbs": 4.6,
+              "protein": 3.3,
+              "fat": 2.3,
+              "satFat": 1.7,
+              "sugar": 4.3,
+              "sodium": 38,
+              "caffeine": 24.8
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 120.6,
+              "carbs": 9.4,
+              "protein": 6.7,
+              "fat": 4.7,
+              "satFat": 3.4,
+              "sugar": 8.7,
+              "sodium": 77.1,
+              "caffeine": 50.3
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "따뜻한 우유와 에스프레소가 부드럽게 어우러져요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-iced-vanilla-latte",
+    "brandId": "starbucks",
+    "name": "아이스 바닐라 라떼",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5700,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 28,
+      "protein": 6,
+      "fat": 5,
+      "satFat": 4,
+      "sugar": 26,
+      "sodium": 90,
+      "caffeine": 75
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 62.7,
+              "carbs": 9.2,
+              "protein": 2,
+              "fat": 1.7,
+              "satFat": 1.3,
+              "sugar": 8.6,
+              "sodium": 29.7,
+              "caffeine": 24.8
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 127.3,
+              "carbs": 18.8,
+              "protein": 4,
+              "fat": 3.4,
+              "satFat": 2.7,
+              "sugar": 17.4,
+              "sodium": 60.3,
+              "caffeine": 50.3
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "syrup",
+        "label": "시럽",
+        "choices": [
+          {
+            "label": "기본",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "시럽 빼기",
+            "delta": {
+              "kcal": -40,
+              "carbs": -10,
+              "sugar": -10
+            }
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "바닐라 시럽의 은은한 단맛이 더해진 라떼예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-caramel-macchiato",
+    "brandId": "starbucks",
+    "name": "카라멜 마키아또",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 200,
+      "carbs": 28,
+      "protein": 8,
+      "fat": 6,
+      "satFat": 4,
+      "sugar": 22,
+      "sodium": 130,
+      "caffeine": 75
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 66,
+              "carbs": 9.2,
+              "protein": 2.6,
+              "fat": 2,
+              "satFat": 1.3,
+              "sugar": 7.3,
+              "sodium": 42.9,
+              "caffeine": 24.8
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 134,
+              "carbs": 18.8,
+              "protein": 5.4,
+              "fat": 4,
+              "satFat": 2.7,
+              "sugar": 14.7,
+              "sodium": 87.1,
+              "caffeine": 50.3
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "syrup",
+        "label": "시럽",
+        "choices": [
+          {
+            "label": "기본",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "시럽 빼기",
+            "delta": {
+              "kcal": -40,
+              "carbs": -10,
+              "sugar": -10
+            }
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "바닐라 시럽과 카라멜 드리즐이 올라간 달콤한 라떼예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-iced-caramel-macchiato",
+    "brandId": "starbucks",
+    "name": "아이스 카라멜 마키아또",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 27,
+      "protein": 6,
+      "fat": 6,
+      "satFat": 4,
+      "sugar": 23,
+      "sodium": 110,
+      "caffeine": 75
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 62.7,
+              "carbs": 8.9,
+              "protein": 2,
+              "fat": 2,
+              "satFat": 1.3,
+              "sugar": 7.6,
+              "sodium": 36.3,
+              "caffeine": 24.8
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 127.3,
+              "carbs": 18.1,
+              "protein": 4,
+              "fat": 4,
+              "satFat": 2.7,
+              "sugar": 15.4,
+              "sodium": 73.7,
+              "caffeine": 50.3
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "syrup",
+        "label": "시럽",
+        "choices": [
+          {
+            "label": "기본",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "시럽 빼기",
+            "delta": {
+              "kcal": -40,
+              "carbs": -10,
+              "sugar": -10
+            }
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-cafe-mocha",
+    "brandId": "starbucks",
+    "name": "카페 모카",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5700,
+    "nutrients": {
+      "kcal": 290,
+      "carbs": 32,
+      "protein": 10,
+      "fat": 13,
+      "satFat": 8,
+      "sugar": 24,
+      "sodium": 105,
+      "caffeine": 95
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 95.7,
+              "carbs": 10.6,
+              "protein": 3.3,
+              "fat": 4.3,
+              "satFat": 2.6,
+              "sugar": 7.9,
+              "sodium": 34.7,
+              "caffeine": 31.4
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 194.3,
+              "carbs": 21.4,
+              "protein": 6.7,
+              "fat": 8.7,
+              "satFat": 5.4,
+              "sugar": 16.1,
+              "sodium": 70.4,
+              "caffeine": 63.7
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "초콜릿 모카 소스와 휘핑크림이 어우러진 커피예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-cappuccino",
+    "brandId": "starbucks",
+    "name": "카푸치노",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5200,
+    "nutrients": {
+      "kcal": 110,
+      "carbs": 9,
+      "protein": 6,
+      "fat": 5,
+      "satFat": 3,
+      "sugar": 8,
+      "sodium": 80,
+      "caffeine": 75
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 36.3,
+              "carbs": 3,
+              "protein": 2,
+              "fat": 1.7,
+              "satFat": 1,
+              "sugar": 2.6,
+              "sodium": 26.4,
+              "caffeine": 24.8
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 73.7,
+              "carbs": 6,
+              "protein": 4,
+              "fat": 3.4,
+              "satFat": 2,
+              "sugar": 5.4,
+              "sodium": 53.6,
+              "caffeine": 50.3
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "풍성한 우유 거품이 올라간 가벼운 라떼예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-cold-brew",
+    "brandId": "starbucks",
+    "name": "콜드 브루",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5100,
+    "nutrients": {
+      "kcal": 5,
+      "carbs": 0,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 11,
+      "caffeine": 150
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 1.7,
+              "carbs": 0,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 3.6,
+              "caffeine": 49.5
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 3.4,
+              "carbs": 0,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 7.4,
+              "caffeine": 100.5
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "차갑게 오래 우려내 부드럽고 깔끔한 커피예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-dolce-cold-brew",
+    "brandId": "starbucks",
+    "name": "돌체 콜드 브루",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 6000,
+    "nutrients": {
+      "kcal": 265,
+      "carbs": 32,
+      "protein": 7,
+      "fat": 12,
+      "satFat": 9,
+      "sugar": 29,
+      "sodium": 115,
+      "caffeine": 150
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 87.5,
+              "carbs": 10.6,
+              "protein": 2.3,
+              "fat": 4,
+              "satFat": 3,
+              "sugar": 9.6,
+              "sodium": 38,
+              "caffeine": 49.5
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 177.6,
+              "carbs": 21.4,
+              "protein": 4.7,
+              "fat": 8,
+              "satFat": 6,
+              "sugar": 19.4,
+              "sodium": 77.1,
+              "caffeine": 100.5
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-vanilla-cream-cold-brew",
+    "brandId": "starbucks",
+    "name": "바닐라 크림 콜드 브루",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 125,
+      "carbs": 12,
+      "protein": 3,
+      "fat": 7,
+      "satFat": 4,
+      "sugar": 11,
+      "sodium": 58,
+      "caffeine": 150
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 41.3,
+              "carbs": 4,
+              "protein": 1,
+              "fat": 2.3,
+              "satFat": 1.3,
+              "sugar": 3.6,
+              "sodium": 19.1,
+              "caffeine": 49.5
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 83.8,
+              "carbs": 8,
+              "protein": 2,
+              "fat": 4.7,
+              "satFat": 2.7,
+              "sugar": 7.4,
+              "sodium": 38.9,
+              "caffeine": 100.5
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "syrup",
+        "label": "시럽",
+        "choices": [
+          {
+            "label": "기본",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "시럽 빼기",
+            "delta": {
+              "kcal": -40,
+              "carbs": -10,
+              "sugar": -10
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-grapefruit-honey-black-tea",
+    "brandId": "starbucks",
+    "name": "자몽 허니 블랙 티",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5700,
+    "nutrients": {
+      "kcal": 125,
+      "carbs": 31,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 30,
+      "sodium": 5,
+      "caffeine": 70
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 41.3,
+              "carbs": 10.2,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 9.9,
+              "sodium": 1.7,
+              "caffeine": 23.1
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 83.8,
+              "carbs": 20.8,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 20.1,
+              "sodium": 3.4,
+              "caffeine": 46.9
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "자몽과 꿀, 블랙 티가 어우러진 상큼한 티예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-yuja-mint-tea",
+    "brandId": "starbucks",
+    "name": "유자 민트 티",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 140,
+      "carbs": 35,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 33,
+      "sodium": 10,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 46.2,
+              "carbs": 11.6,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 10.9,
+              "sodium": 3.3,
+              "caffeine": 0
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 93.8,
+              "carbs": 23.5,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 22.1,
+              "sodium": 6.7,
+              "caffeine": 0
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-iced-chamomile",
+    "brandId": "starbucks",
+    "name": "아이스 캐모마일 블렌드 티",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5000,
+    "nutrients": {
+      "kcal": 0,
+      "carbs": 0,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 0,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "저당"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 0,
+              "carbs": 0,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 0,
+              "caffeine": 0
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 0,
+              "carbs": 0,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 0,
+              "caffeine": 0
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "카페인 없이 은은하게 즐기는 허브티예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-matcha-latte",
+    "brandId": "starbucks",
+    "name": "제주 유기농 말차로 만든 라떼",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 6100,
+    "nutrients": {
+      "kcal": 240,
+      "carbs": 31,
+      "protein": 9,
+      "fat": 9,
+      "satFat": 6,
+      "sugar": 28,
+      "sodium": 115,
+      "caffeine": 60
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 79.2,
+              "carbs": 10.2,
+              "protein": 3,
+              "fat": 3,
+              "satFat": 2,
+              "sugar": 9.2,
+              "sodium": 38,
+              "caffeine": 19.8
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 160.8,
+              "carbs": 20.8,
+              "protein": 6,
+              "fat": 6,
+              "satFat": 4,
+              "sugar": 18.8,
+              "sodium": 77.1,
+              "caffeine": 40.2
+            },
+            "priceDelta": 1000
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-java-chip-frappuccino",
+    "brandId": "starbucks",
+    "name": "자바 칩 프라푸치노",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 6300,
+    "nutrients": {
+      "kcal": 340,
+      "carbs": 49,
+      "protein": 5,
+      "fat": 14,
+      "satFat": 9,
+      "sugar": 42,
+      "sodium": 180,
+      "caffeine": 100
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 112.2,
+              "carbs": 16.2,
+              "protein": 1.7,
+              "fat": 4.6,
+              "satFat": 3,
+              "sugar": 13.9,
+              "sodium": 59.4,
+              "caffeine": 33
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 227.8,
+              "carbs": 32.8,
+              "protein": 3.4,
+              "fat": 9.4,
+              "satFat": 6,
+              "sugar": 28.1,
+              "sodium": 120.6,
+              "caffeine": 67
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-mango-passion-blended",
+    "brandId": "starbucks",
+    "name": "망고 패션 티 블렌디드",
+    "category": "drink",
+    "serving": "Tall (355 ml)",
+    "price": 5400,
+    "nutrients": {
+      "kcal": 150,
+      "carbs": 37,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 34,
+      "sodium": 20,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "Tall",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "Grande",
+            "delta": {
+              "kcal": 49.5,
+              "carbs": 12.2,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 11.2,
+              "sodium": 6.6,
+              "caffeine": 0
+            },
+            "priceDelta": 500
+          },
+          {
+            "label": "Venti",
+            "delta": {
+              "kcal": 100.5,
+              "carbs": 24.8,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 22.8,
+              "sodium": 13.4,
+              "caffeine": 0
+            },
+            "priceDelta": 1000
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "starbucks-ham-cheese-sandwich",
+    "brandId": "starbucks",
+    "name": "햄 & 치즈 샌드위치",
+    "category": "meal",
+    "serving": "1개 (195 g)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 420,
+      "carbs": 40,
+      "protein": 18,
+      "fat": 20,
+      "satFat": 9,
+      "sugar": 6,
+      "sodium": 1000,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "햄과 치즈를 따뜻하게 구운 든든한 샌드위치예요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "starbucks-chicken-salad-sandwich",
+    "brandId": "starbucks",
+    "name": "치킨 & 머쉬룸 샌드위치",
+    "category": "meal",
+    "serving": "1개 (180 g)",
+    "price": 6500,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 38,
+      "protein": 21,
+      "fat": 15,
+      "satFat": 5,
+      "sugar": 5,
+      "sodium": 880,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "starbucks-basil-tomato-bagel",
+    "brandId": "starbucks",
+    "name": "바질 토마토 크림치즈 베이글",
+    "category": "snack",
+    "serving": "1개 (125 g)",
+    "price": 4900,
+    "nutrients": {
+      "kcal": 360,
+      "carbs": 50,
+      "protein": 11,
+      "fat": 13,
+      "satFat": 7,
+      "sugar": 6,
+      "sodium": 560,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "starbucks-classic-scone",
+    "brandId": "starbucks",
+    "name": "클래식 스콘",
+    "category": "snack",
+    "serving": "1개 (100 g)",
+    "price": 3500,
+    "nutrients": {
+      "kcal": 410,
+      "carbs": 48,
+      "protein": 7,
+      "fat": 21,
+      "satFat": 13,
+      "sugar": 12,
+      "sodium": 490,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "starbucks-castella",
+    "brandId": "starbucks",
+    "name": "부드러운 생크림 카스텔라",
+    "category": "snack",
+    "serving": "1개 (110 g)",
+    "price": 4200,
+    "nutrients": {
+      "kcal": 330,
+      "carbs": 38,
+      "protein": 7,
+      "fat": 16,
+      "satFat": 9,
+      "sugar": 26,
+      "sodium": 115,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "starbucks-newyork-cheesecake",
+    "brandId": "starbucks",
+    "name": "뉴욕 치즈 케이크",
+    "category": "snack",
+    "serving": "1조각 (110 g)",
+    "price": 6500,
+    "nutrients": {
+      "kcal": 370,
+      "carbs": 29,
+      "protein": 6,
+      "fat": 26,
+      "satFat": 16,
+      "sugar": 20,
+      "sodium": 300,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "starbucks-greek-yogurt",
+    "brandId": "starbucks",
+    "name": "그릭 요거트 & 그래놀라",
+    "category": "snack",
+    "serving": "1개 (160 g)",
+    "price": 4900,
+    "nutrients": {
+      "kcal": 240,
+      "carbs": 28,
+      "protein": 11,
+      "fat": 9,
+      "satFat": 4,
+      "sugar": 14,
+      "sodium": 70,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "그릭 요거트에 바삭한 그래놀라를 곁들였어요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "ediya-hot-black-sesame-cream-latte",
+    "brandId": "ediya",
+    "name": "HOT 흑임자 크림 라떼",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 5200,
+    "nutrients": {
+      "kcal": 501,
+      "protein": 14,
+      "satFat": 14,
+      "sugar": 55,
+      "sodium": 272,
+      "caffeine": 0
+    },
+    "trust": "official",
+    "sourceUrl": "https://www.ediya.com/contents/drink.html",
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 248,
+              "protein": 7,
+              "satFat": 5,
+              "sugar": 33,
+              "sodium": 113
+            },
+            "priceDelta": 700
+          }
+        ]
+      }
+    ],
+    "blurb": "고소한 흑임자와 크림이 어우러진 따뜻한 라떼예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-iced-black-sesame-cream-latte",
+    "brandId": "ediya",
+    "name": "ICED 흑임자 크림 라떼",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 5200,
+    "nutrients": {
+      "kcal": 422,
+      "protein": 10,
+      "satFat": 11,
+      "sugar": 49,
+      "sodium": 211,
+      "caffeine": 0
+    },
+    "trust": "official",
+    "sourceUrl": "https://www.ediya.com/contents/drink.html",
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 193,
+              "protein": 4,
+              "satFat": 3,
+              "sugar": 28,
+              "sodium": 70
+            },
+            "priceDelta": 700
+          }
+        ]
+      }
+    ],
+    "blurb": "고소한 흑임자와 크림을 시원하게 즐기는 라떼예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-iced-americano",
+    "brandId": "ediya",
+    "name": "아이스 아메리카노",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 3200,
+    "nutrients": {
+      "kcal": 15,
+      "carbs": 3,
+      "protein": 1,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 10,
+      "caffeine": 200
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 6.8,
+              "carbs": 1.4,
+              "protein": 0.5,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 4.5,
+              "caffeine": 90
+            },
+            "priceDelta": 700
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-americano",
+    "brandId": "ediya",
+    "name": "아메리카노",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 3200,
+    "nutrients": {
+      "kcal": 15,
+      "carbs": 3,
+      "protein": 1,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 10,
+      "caffeine": 200
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 6.8,
+              "carbs": 1.4,
+              "protein": 0.5,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 4.5,
+              "caffeine": 90
+            },
+            "priceDelta": 700
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-cafe-latte",
+    "brandId": "ediya",
+    "name": "카페라떼",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 3700,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 15,
+      "protein": 10,
+      "fat": 9,
+      "satFat": 6,
+      "sugar": 13,
+      "sodium": 130,
+      "caffeine": 200
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 85.5,
+              "carbs": 6.8,
+              "protein": 4.5,
+              "fat": 4.1,
+              "satFat": 2.7,
+              "sugar": 5.9,
+              "sodium": 58.5,
+              "caffeine": 90
+            },
+            "priceDelta": 700
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-vanilla-latte",
+    "brandId": "ediya",
+    "name": "바닐라라떼",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 4200,
+    "nutrients": {
+      "kcal": 260,
+      "carbs": 35,
+      "protein": 9,
+      "fat": 9,
+      "satFat": 6,
+      "sugar": 32,
+      "sodium": 130,
+      "caffeine": 200
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 117,
+              "carbs": 15.8,
+              "protein": 4.1,
+              "fat": 4.1,
+              "satFat": 2.7,
+              "sugar": 14.4,
+              "sodium": 58.5,
+              "caffeine": 90
+            },
+            "priceDelta": 700
+          }
+        ]
+      },
+      {
+        "id": "syrup",
+        "label": "시럽",
+        "choices": [
+          {
+            "label": "기본",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "시럽 빼기",
+            "delta": {
+              "kcal": -40,
+              "carbs": -10,
+              "sugar": -10
+            }
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-caramel-macchiato",
+    "brandId": "ediya",
+    "name": "카라멜 마끼아또",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 4200,
+    "nutrients": {
+      "kcal": 250,
+      "carbs": 34,
+      "protein": 9,
+      "fat": 9,
+      "satFat": 6,
+      "sugar": 30,
+      "sodium": 150,
+      "caffeine": 200
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 112.5,
+              "carbs": 15.3,
+              "protein": 4.1,
+              "fat": 4.1,
+              "satFat": 2.7,
+              "sugar": 13.5,
+              "sodium": 67.5,
+              "caffeine": 90
+            },
+            "priceDelta": 700
+          }
+        ]
+      },
+      {
+        "id": "syrup",
+        "label": "시럽",
+        "choices": [
+          {
+            "label": "기본",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "시럽 빼기",
+            "delta": {
+              "kcal": -40,
+              "carbs": -10,
+              "sugar": -10
+            }
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-cafe-mocha",
+    "brandId": "ediya",
+    "name": "카페모카",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 4200,
+    "nutrients": {
+      "kcal": 330,
+      "carbs": 42,
+      "protein": 9,
+      "fat": 14,
+      "satFat": 10,
+      "sugar": 34,
+      "sodium": 150,
+      "caffeine": 200
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 148.5,
+              "carbs": 18.9,
+              "protein": 4.1,
+              "fat": 6.3,
+              "satFat": 4.5,
+              "sugar": 15.3,
+              "sodium": 67.5,
+              "caffeine": 90
+            },
+            "priceDelta": 700
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-toffee-nut-latte",
+    "brandId": "ediya",
+    "name": "토피넛 라떼",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 4500,
+    "nutrients": {
+      "kcal": 320,
+      "carbs": 45,
+      "protein": 8,
+      "fat": 11,
+      "satFat": 7,
+      "sugar": 40,
+      "sodium": 170,
+      "caffeine": 110
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 144,
+              "carbs": 20.3,
+              "protein": 3.6,
+              "fat": 5,
+              "satFat": 3.2,
+              "sugar": 18,
+              "sodium": 76.5,
+              "caffeine": 49.5
+            },
+            "priceDelta": 700
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-cold-brew",
+    "brandId": "ediya",
+    "name": "콜드브루 아메리카노",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 3900,
+    "nutrients": {
+      "kcal": 15,
+      "carbs": 2,
+      "protein": 1,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 10,
+      "caffeine": 220
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 6.8,
+              "carbs": 0.9,
+              "protein": 0.5,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 0,
+              "sodium": 4.5,
+              "caffeine": 99
+            },
+            "priceDelta": 700
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-green-tea-latte",
+    "brandId": "ediya",
+    "name": "녹차라떼",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 4200,
+    "nutrients": {
+      "kcal": 290,
+      "carbs": 42,
+      "protein": 9,
+      "fat": 9,
+      "satFat": 6,
+      "sugar": 38,
+      "sodium": 140,
+      "caffeine": 40
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 130.5,
+              "carbs": 18.9,
+              "protein": 4.1,
+              "fat": 4.1,
+              "satFat": 2.7,
+              "sugar": 17.1,
+              "sodium": 63,
+              "caffeine": 18
+            },
+            "priceDelta": 700
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-sweet-potato-latte",
+    "brandId": "ediya",
+    "name": "고구마라떼",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 4200,
+    "nutrients": {
+      "kcal": 340,
+      "carbs": 52,
+      "protein": 9,
+      "fat": 10,
+      "satFat": 7,
+      "sugar": 40,
+      "sodium": 170,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 153,
+              "carbs": 23.4,
+              "protein": 4.1,
+              "fat": 4.5,
+              "satFat": 3.2,
+              "sugar": 18,
+              "sodium": 76.5,
+              "caffeine": 0
+            },
+            "priceDelta": 700
+          }
+        ]
+      },
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-peach-iced-tea",
+    "brandId": "ediya",
+    "name": "복숭아 아이스티",
+    "category": "drink",
+    "serving": "(L) 1잔",
+    "price": 3500,
+    "nutrients": {
+      "kcal": 180,
+      "carbs": 45,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 44,
+      "sodium": 30,
+      "caffeine": 20
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "size",
+        "label": "사이즈",
+        "choices": [
+          {
+            "label": "L",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "EX",
+            "delta": {
+              "kcal": 81,
+              "carbs": 20.3,
+              "protein": 0,
+              "fat": 0,
+              "satFat": 0,
+              "sugar": 19.8,
+              "sodium": 13.5,
+              "caffeine": 9
+            },
+            "priceDelta": 700
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "ediya-ham-cheese-panini",
+    "brandId": "ediya",
+    "name": "햄 치즈 파니니",
+    "category": "meal",
+    "serving": "1개 (170 g)",
+    "price": 5300,
+    "nutrients": {
+      "kcal": 430,
+      "carbs": 45,
+      "protein": 19,
+      "fat": 19,
+      "satFat": 9,
+      "sugar": 5,
+      "sodium": 1050,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "ediya-plain-bagel",
+    "brandId": "ediya",
+    "name": "플레인 베이글 & 크림치즈",
+    "category": "snack",
+    "serving": "1세트 (130 g)",
+    "price": 3500,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 55,
+      "protein": 11,
+      "fat": 13,
+      "satFat": 7,
+      "sugar": 7,
+      "sodium": 520,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "subway-egg-mayo",
+    "brandId": "subway",
+    "name": "에그마요",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 480,
+      "carbs": 42,
+      "protein": 16,
+      "fat": 26,
+      "satFat": 5,
+      "sugar": 7,
+      "sodium": 700,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 480,
+              "carbs": 42,
+              "protein": 16,
+              "fat": 26,
+              "satFat": 5,
+              "sugar": 7,
+              "sodium": 700,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "부드러운 에그마요가 듬뿍 들어간 인기 샌드위치예요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-italian-bmt",
+    "brandId": "subway",
+    "name": "이탈리안 비엠티",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 7200,
+    "nutrients": {
+      "kcal": 410,
+      "carbs": 41,
+      "protein": 20,
+      "fat": 18,
+      "satFat": 6,
+      "sugar": 7,
+      "sodium": 1200,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 410,
+              "carbs": 41,
+              "protein": 20,
+              "fat": 18,
+              "satFat": 6,
+              "sugar": 7,
+              "sodium": 1200,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-roasted-chicken",
+    "brandId": "subway",
+    "name": "로스트 치킨",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 7900,
+    "nutrients": {
+      "kcal": 300,
+      "carbs": 41,
+      "protein": 23,
+      "fat": 5,
+      "satFat": 1,
+      "sugar": 7,
+      "sodium": 560,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 300,
+              "carbs": 41,
+              "protein": 23,
+              "fat": 5,
+              "satFat": 1,
+              "sugar": 7,
+              "sodium": 560,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "담백한 오븐 구이 닭가슴살이 들어간 샌드위치예요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-rotisserie-chicken",
+    "brandId": "subway",
+    "name": "로티세리 바비큐 치킨",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 7900,
+    "nutrients": {
+      "kcal": 330,
+      "carbs": 43,
+      "protein": 24,
+      "fat": 6,
+      "satFat": 1.5,
+      "sugar": 9,
+      "sodium": 700,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 330,
+              "carbs": 43,
+              "protein": 24,
+              "fat": 6,
+              "satFat": 1.5,
+              "sugar": 9,
+              "sodium": 700,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-turkey",
+    "brandId": "subway",
+    "name": "터키",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 6900,
+    "nutrients": {
+      "kcal": 280,
+      "carbs": 40,
+      "protein": 18,
+      "fat": 4,
+      "satFat": 1,
+      "sugar": 7,
+      "sodium": 700,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 280,
+              "carbs": 40,
+              "protein": 18,
+              "fat": 4,
+              "satFat": 1,
+              "sugar": 7,
+              "sodium": 700,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-ham",
+    "brandId": "subway",
+    "name": "햄",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 6200,
+    "nutrients": {
+      "kcal": 260,
+      "carbs": 40,
+      "protein": 17,
+      "fat": 4,
+      "satFat": 1,
+      "sugar": 7,
+      "sodium": 800,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 260,
+              "carbs": 40,
+              "protein": 17,
+              "fat": 4,
+              "satFat": 1,
+              "sugar": 7,
+              "sodium": 800,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-subway-club",
+    "brandId": "subway",
+    "name": "서브웨이 클럽",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 7500,
+    "nutrients": {
+      "kcal": 300,
+      "carbs": 41,
+      "protein": 22,
+      "fat": 5,
+      "satFat": 1.5,
+      "sugar": 7,
+      "sodium": 850,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 300,
+              "carbs": 41,
+              "protein": 22,
+              "fat": 5,
+              "satFat": 1.5,
+              "sugar": 7,
+              "sodium": 850,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-steak-cheese",
+    "brandId": "subway",
+    "name": "스테이크 & 치즈",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 8500,
+    "nutrients": {
+      "kcal": 360,
+      "carbs": 42,
+      "protein": 25,
+      "fat": 11,
+      "satFat": 5,
+      "sugar": 8,
+      "sodium": 850,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 360,
+              "carbs": 42,
+              "protein": 25,
+              "fat": 11,
+              "satFat": 5,
+              "sugar": 8,
+              "sodium": 850,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-shrimp",
+    "brandId": "subway",
+    "name": "쉬림프",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 8200,
+    "nutrients": {
+      "kcal": 230,
+      "carbs": 38,
+      "protein": 15,
+      "fat": 3,
+      "satFat": 0.5,
+      "sugar": 7,
+      "sodium": 530,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 230,
+              "carbs": 38,
+              "protein": 15,
+              "fat": 3,
+              "satFat": 0.5,
+              "sugar": 7,
+              "sodium": 530,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-spicy-italian",
+    "brandId": "subway",
+    "name": "스파이시 이탈리안",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 7000,
+    "nutrients": {
+      "kcal": 460,
+      "carbs": 41,
+      "protein": 20,
+      "fat": 24,
+      "satFat": 9,
+      "sugar": 7,
+      "sodium": 1300,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 460,
+              "carbs": 41,
+              "protein": 20,
+              "fat": 24,
+              "satFat": 9,
+              "sugar": 7,
+              "sodium": 1300,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-pulled-pork",
+    "brandId": "subway",
+    "name": "풀드 포크 바비큐",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 7900,
+    "nutrients": {
+      "kcal": 350,
+      "carbs": 46,
+      "protein": 20,
+      "fat": 9,
+      "satFat": 3,
+      "sugar": 13,
+      "sodium": 850,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 350,
+              "carbs": 46,
+              "protein": 20,
+              "fat": 9,
+              "satFat": 3,
+              "sugar": 13,
+              "sodium": 850,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-veggie-delite",
+    "brandId": "subway",
+    "name": "베지",
+    "category": "meal",
+    "serving": "15cm 1개 (치즈·소스 제외)",
+    "price": 5500,
+    "nutrients": {
+      "kcal": 210,
+      "carbs": 37,
+      "protein": 8,
+      "fat": 3,
+      "satFat": 0.5,
+      "sugar": 6,
+      "sodium": 250,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "bread",
+        "label": "빵 길이",
+        "choices": [
+          {
+            "label": "15cm",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "30cm",
+            "delta": {
+              "kcal": 210,
+              "carbs": 37,
+              "protein": 8,
+              "fat": 3,
+              "satFat": 0.5,
+              "sugar": 6,
+              "sodium": 250,
+              "caffeine": 0
+            },
+            "priceDelta": 4000
+          }
+        ]
+      },
+      {
+        "id": "cheese",
+        "label": "치즈",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "아메리칸 치즈 추가",
+            "delta": {
+              "kcal": 35,
+              "protein": 2,
+              "fat": 3,
+              "satFat": 2,
+              "sodium": 170
+            }
+          }
+        ]
+      },
+      {
+        "id": "sauce",
+        "label": "소스",
+        "choices": [
+          {
+            "label": "없음",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "스위트 어니언 추가",
+            "delta": {
+              "kcal": 40,
+              "carbs": 9,
+              "sugar": 9,
+              "sodium": 80
+            }
+          },
+          {
+            "label": "랜치 추가",
+            "delta": {
+              "kcal": 115,
+              "carbs": 1,
+              "fat": 12,
+              "satFat": 2,
+              "sugar": 1,
+              "sodium": 170
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "신선한 채소만 담아 가볍게 즐기는 샌드위치예요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "subway-roasted-chicken-salad",
+    "brandId": "subway",
+    "name": "로스트 치킨 샐러드",
+    "category": "salad",
+    "serving": "1개 (280 g, 드레싱 제외)",
+    "price": 8900,
+    "nutrients": {
+      "kcal": 130,
+      "carbs": 9,
+      "protein": 20,
+      "fat": 2,
+      "satFat": 0.5,
+      "sugar": 5,
+      "sodium": 400,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "채소를 넉넉하게 챙길 수 있어요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "paris_baguette-soboro",
+    "brandId": "paris_baguette",
+    "name": "소보로빵",
+    "category": "snack",
+    "serving": "1개 (90 g)",
+    "price": 1900,
+    "nutrients": {
+      "kcal": 360,
+      "carbs": 48,
+      "protein": 7,
+      "fat": 16,
+      "satFat": 7,
+      "sugar": 18,
+      "sodium": 290,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-red-bean-bread",
+    "brandId": "paris_baguette",
+    "name": "단팥빵",
+    "category": "snack",
+    "serving": "1개 (100 g)",
+    "price": 1900,
+    "nutrients": {
+      "kcal": 280,
+      "carbs": 52,
+      "protein": 7,
+      "fat": 5,
+      "satFat": 2,
+      "sugar": 24,
+      "sodium": 170,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-croissant",
+    "brandId": "paris_baguette",
+    "name": "버터 크루아상",
+    "category": "snack",
+    "serving": "1개 (65 g)",
+    "price": 2800,
+    "nutrients": {
+      "kcal": 280,
+      "carbs": 28,
+      "protein": 5,
+      "fat": 16,
+      "satFat": 10,
+      "sugar": 5,
+      "sodium": 330,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "저당"
+    ],
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-egg-tart",
+    "brandId": "paris_baguette",
+    "name": "에그타르트",
+    "category": "snack",
+    "serving": "1개 (70 g)",
+    "price": 2500,
+    "nutrients": {
+      "kcal": 230,
+      "carbs": 26,
+      "protein": 4,
+      "fat": 12,
+      "satFat": 7,
+      "sugar": 13,
+      "sodium": 120,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-garlic-baguette",
+    "brandId": "paris_baguette",
+    "name": "마늘 바게트",
+    "category": "snack",
+    "serving": "1봉 (100 g)",
+    "price": 3900,
+    "nutrients": {
+      "kcal": 430,
+      "carbs": 50,
+      "protein": 8,
+      "fat": 22,
+      "satFat": 11,
+      "sugar": 10,
+      "sodium": 520,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-whole-wheat-bread",
+    "brandId": "paris_baguette",
+    "name": "통밀 식빵",
+    "category": "snack",
+    "serving": "2장 (70 g)",
+    "price": 3900,
+    "nutrients": {
+      "kcal": 180,
+      "carbs": 33,
+      "protein": 7,
+      "fat": 3,
+      "satFat": 1,
+      "sugar": 3,
+      "sodium": 310,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "저당"
+    ],
+    "blurb": "통밀로 구워 담백하게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-cream-cheese-bagel",
+    "brandId": "paris_baguette",
+    "name": "크림치즈 베이글",
+    "category": "snack",
+    "serving": "1개 (120 g)",
+    "price": 3500,
+    "nutrients": {
+      "kcal": 340,
+      "carbs": 50,
+      "protein": 10,
+      "fat": 11,
+      "satFat": 6,
+      "sugar": 7,
+      "sodium": 480,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-jambon-beurre",
+    "brandId": "paris_baguette",
+    "name": "잠봉뵈르 샌드위치",
+    "category": "meal",
+    "serving": "1개 (180 g)",
+    "price": 6900,
+    "nutrients": {
+      "kcal": 470,
+      "carbs": 45,
+      "protein": 20,
+      "fat": 22,
+      "satFat": 13,
+      "sugar": 4,
+      "sodium": 1150,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "paris_baguette-ham-egg-sandwich",
+    "brandId": "paris_baguette",
+    "name": "햄에그 샌드위치",
+    "category": "meal",
+    "serving": "1개 (170 g)",
+    "price": 4900,
+    "nutrients": {
+      "kcal": 390,
+      "carbs": 36,
+      "protein": 15,
+      "fat": 21,
+      "satFat": 6,
+      "sugar": 6,
+      "sodium": 820,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "paris_baguette-chicken-salad",
+    "brandId": "paris_baguette",
+    "name": "닭가슴살 샐러드",
+    "category": "salad",
+    "serving": "1개 (230 g, 드레싱 포함)",
+    "price": 6500,
+    "nutrients": {
+      "kcal": 260,
+      "carbs": 14,
+      "protein": 22,
+      "fat": 12,
+      "satFat": 2,
+      "sugar": 7,
+      "sodium": 620,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "채소를 넉넉하게 챙길 수 있어요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "paris_baguette-greek-yogurt-cup",
+    "brandId": "paris_baguette",
+    "name": "그릭요거트 컵",
+    "category": "snack",
+    "serving": "1개 (150 g)",
+    "price": 4300,
+    "nutrients": {
+      "kcal": 200,
+      "carbs": 22,
+      "protein": 10,
+      "fat": 8,
+      "satFat": 5,
+      "sugar": 15,
+      "sodium": 80,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-fresh-cream-cake",
+    "brandId": "paris_baguette",
+    "name": "생크림 케이크 조각",
+    "category": "snack",
+    "serving": "1조각 (100 g)",
+    "price": 5200,
+    "nutrients": {
+      "kcal": 320,
+      "carbs": 32,
+      "protein": 4,
+      "fat": 20,
+      "satFat": 13,
+      "sugar": 22,
+      "sodium": 110,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "paris_baguette-iced-americano",
+    "brandId": "paris_baguette",
+    "name": "아이스 아메리카노",
+    "category": "drink",
+    "serving": "Regular (400 ml)",
+    "price": 3800,
+    "nutrients": {
+      "kcal": 10,
+      "carbs": 2,
+      "protein": 1,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 5,
+      "caffeine": 150
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "paris_baguette-cafe-latte",
+    "brandId": "paris_baguette",
+    "name": "카페 라떼",
+    "category": "drink",
+    "serving": "Regular (400 ml)",
+    "price": 4300,
+    "nutrients": {
+      "kcal": 170,
+      "carbs": 14,
+      "protein": 9,
+      "fat": 8,
+      "satFat": 5,
+      "sugar": 12,
+      "sodium": 120,
+      "caffeine": 150
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "options": [
+      {
+        "id": "milk",
+        "label": "우유 변경",
+        "choices": [
+          {
+            "label": "일반",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "오트밀크",
+            "delta": {
+              "kcal": -10,
+              "carbs": 4,
+              "protein": -4,
+              "fat": -1,
+              "satFat": -2,
+              "sugar": -3
+            },
+            "priceDelta": 500
+          }
+        ]
+      }
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "mom_touch-thigh-burger",
+    "brandId": "mom_touch",
+    "name": "싸이버거",
+    "category": "meal",
+    "serving": "단품 1개 (230 g)",
+    "price": 4900,
+    "nutrients": {
+      "kcal": 580,
+      "carbs": 47,
+      "protein": 26,
+      "fat": 31,
+      "satFat": 8,
+      "sugar": 6,
+      "sodium": 1100,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "두툼한 통다리살 패티가 들어간 대표 버거예요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "mom_touch-deep-cheese-thigh-burger",
+    "brandId": "mom_touch",
+    "name": "딥치즈싸이버거",
+    "category": "meal",
+    "serving": "단품 1개 (260 g)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 700,
+      "carbs": 49,
+      "protein": 32,
+      "fat": 41,
+      "satFat": 14,
+      "sugar": 7,
+      "sodium": 1450,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "mom_touch-white-garlic-thigh-burger",
+    "brandId": "mom_touch",
+    "name": "화이트갈릭싸이버거",
+    "category": "meal",
+    "serving": "단품 1개 (260 g)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 650,
+      "carbs": 50,
+      "protein": 28,
+      "fat": 37,
+      "satFat": 10,
+      "sugar": 8,
+      "sodium": 1300,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "mom_touch-bulgogi-burger",
+    "brandId": "mom_touch",
+    "name": "불고기버거",
+    "category": "meal",
+    "serving": "단품 1개 (180 g)",
+    "price": 3900,
+    "nutrients": {
+      "kcal": 420,
+      "carbs": 45,
+      "protein": 16,
+      "fat": 19,
+      "satFat": 6,
+      "sugar": 12,
+      "sodium": 850,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "mom_touch-incredible-burger",
+    "brandId": "mom_touch",
+    "name": "인크레더블버거",
+    "category": "meal",
+    "serving": "단품 1개 (300 g)",
+    "price": 6900,
+    "nutrients": {
+      "kcal": 760,
+      "carbs": 52,
+      "protein": 36,
+      "fat": 45,
+      "satFat": 15,
+      "sugar": 10,
+      "sodium": 1600,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "mom_touch-jalapeno-burger",
+    "brandId": "mom_touch",
+    "name": "할라피뇨통살버거",
+    "category": "meal",
+    "serving": "단품 1개 (240 g)",
+    "price": 5600,
+    "nutrients": {
+      "kcal": 600,
+      "carbs": 50,
+      "protein": 27,
+      "fat": 32,
+      "satFat": 8,
+      "sugar": 8,
+      "sodium": 1250,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "mom_touch-chicken-fillet-burger",
+    "brandId": "mom_touch",
+    "name": "휠렛버거",
+    "category": "meal",
+    "serving": "단품 1개 (200 g)",
+    "price": 4200,
+    "nutrients": {
+      "kcal": 480,
+      "carbs": 44,
+      "protein": 22,
+      "fat": 23,
+      "satFat": 5,
+      "sugar": 6,
+      "sodium": 950,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "mom_touch-cajun-fries",
+    "brandId": "mom_touch",
+    "name": "케이준 양념감자",
+    "category": "side",
+    "serving": "중 (130 g)",
+    "price": 2300,
+    "nutrients": {
+      "kcal": 370,
+      "carbs": 45,
+      "protein": 4,
+      "fat": 19,
+      "satFat": 4,
+      "sugar": 1,
+      "sodium": 600,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "mom_touch-nuggets",
+    "brandId": "mom_touch",
+    "name": "치킨너겟",
+    "category": "side",
+    "serving": "4조각 (80 g)",
+    "price": 2500,
+    "nutrients": {
+      "kcal": 250,
+      "carbs": 13,
+      "protein": 12,
+      "fat": 17,
+      "satFat": 4,
+      "sugar": 1,
+      "sodium": 450,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "mom_touch-corn-salad",
+    "brandId": "mom_touch",
+    "name": "콘샐러드",
+    "category": "side",
+    "serving": "1컵 (100 g)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 130,
+      "carbs": 13,
+      "protein": 2,
+      "fat": 8,
+      "satFat": 1,
+      "sugar": 7,
+      "sodium": 170,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "mom_touch-cola",
+    "brandId": "mom_touch",
+    "name": "콜라",
+    "category": "drink",
+    "serving": "M (400 ml)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 170,
+      "carbs": 42,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 42,
+      "sodium": 15,
+      "caffeine": 25
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "mom_touch-zero-cola",
+    "brandId": "mom_touch",
+    "name": "제로 콜라",
+    "category": "drink",
+    "serving": "M (400 ml)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 0,
+      "carbs": 0,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 20,
+      "caffeine": 25
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "salady-cobb-salad",
+    "brandId": "salady",
+    "name": "콥 샐러드",
+    "category": "salad",
+    "serving": "1개 (300 g, 드레싱 포함)",
+    "price": 7900,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 18,
+      "protein": 25,
+      "fat": 23,
+      "satFat": 6,
+      "sugar": 7,
+      "sodium": 780,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "닭가슴살, 달걀, 베이컨이 들어간 든든한 샐러드예요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "salady-tandanji-salad",
+    "brandId": "salady",
+    "name": "탄단지 샐러드",
+    "category": "salad",
+    "serving": "1개 (320 g, 드레싱 포함)",
+    "price": 7900,
+    "nutrients": {
+      "kcal": 420,
+      "carbs": 40,
+      "protein": 26,
+      "fat": 17,
+      "satFat": 3,
+      "sugar": 8,
+      "sodium": 650,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "탄수화물·단백질·지방을 고르게 담은 샐러드예요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "salady-chicken-breast-salad",
+    "brandId": "salady",
+    "name": "닭가슴살 샐러드",
+    "category": "salad",
+    "serving": "1개 (270 g, 드레싱 포함)",
+    "price": 7300,
+    "nutrients": {
+      "kcal": 260,
+      "carbs": 12,
+      "protein": 27,
+      "fat": 11,
+      "satFat": 2,
+      "sugar": 6,
+      "sodium": 620,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "채소를 넉넉하게 챙길 수 있어요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "salady-salmon-salad",
+    "brandId": "salady",
+    "name": "연어 샐러드",
+    "category": "salad",
+    "serving": "1개 (270 g, 드레싱 포함)",
+    "price": 9300,
+    "nutrients": {
+      "kcal": 330,
+      "carbs": 12,
+      "protein": 20,
+      "fat": 22,
+      "satFat": 4,
+      "sugar": 6,
+      "sodium": 540,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "채소를 넉넉하게 챙길 수 있어요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "salady-tofu-salad",
+    "brandId": "salady",
+    "name": "두부 샐러드",
+    "category": "salad",
+    "serving": "1개 (280 g, 드레싱 포함)",
+    "price": 7300,
+    "nutrients": {
+      "kcal": 280,
+      "carbs": 16,
+      "protein": 16,
+      "fat": 16,
+      "satFat": 2,
+      "sugar": 7,
+      "sodium": 520,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "채소를 넉넉하게 챙길 수 있어요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "salady-beef-samgyeop-salad",
+    "brandId": "salady",
+    "name": "우삼겹 샐러드",
+    "category": "salad",
+    "serving": "1개 (280 g, 드레싱 포함)",
+    "price": 8900,
+    "nutrients": {
+      "kcal": 450,
+      "carbs": 16,
+      "protein": 20,
+      "fat": 34,
+      "satFat": 11,
+      "sugar": 9,
+      "sodium": 760,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "채소를 넉넉하게 챙길 수 있어요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "salady-chicken-wrap",
+    "brandId": "salady",
+    "name": "닭가슴살 랩",
+    "category": "meal",
+    "serving": "1개 (230 g)",
+    "price": 6900,
+    "nutrients": {
+      "kcal": 430,
+      "carbs": 45,
+      "protein": 26,
+      "fat": 15,
+      "satFat": 4,
+      "sugar": 5,
+      "sodium": 880,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "salady-warm-bowl-bulgogi",
+    "brandId": "salady",
+    "name": "불고기 웜볼",
+    "category": "meal",
+    "serving": "1개",
+    "price": 9300,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "salady-warm-bowl-shrimp",
+    "brandId": "salady",
+    "name": "쉬림프 웜볼",
+    "category": "meal",
+    "serving": "1개",
+    "price": 9900,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "salady-mexican-wrap",
+    "brandId": "salady",
+    "name": "멕시칸 랩",
+    "category": "meal",
+    "serving": "1개",
+    "price": 7300,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "mega-americano",
+    "brandId": "mega",
+    "name": "아메리카노",
+    "category": "drink",
+    "serving": "1잔 (24 oz)",
+    "price": 2000,
+    "nutrients": null,
+    "trust": "none",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "mega-megaricano",
+    "brandId": "mega",
+    "name": "메가리카노",
+    "category": "drink",
+    "serving": "1잔 (32 oz)",
+    "price": 3000,
+    "nutrients": null,
+    "trust": "none",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "mega-cafe-latte",
+    "brandId": "mega",
+    "name": "카페라떼",
+    "category": "drink",
+    "serving": "1잔 (24 oz)",
+    "price": 2900,
+    "nutrients": null,
+    "trust": "none",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "mega-hutgae-americano",
+    "brandId": "mega",
+    "name": "헛개리카노",
+    "category": "drink",
+    "serving": "1잔 (24 oz)",
+    "price": 2500,
+    "nutrients": null,
+    "trust": "none",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "mega-cookie-frappe",
+    "brandId": "mega",
+    "name": "쿠키프라페",
+    "category": "drink",
+    "serving": "1잔 (24 oz)",
+    "price": 3900,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "compose-americano",
+    "brandId": "compose",
+    "name": "아메리카노",
+    "category": "drink",
+    "serving": "1잔 (20 oz)",
+    "price": 1800,
+    "nutrients": null,
+    "trust": "none",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "compose-cafe-latte",
+    "brandId": "compose",
+    "name": "카페라떼",
+    "category": "drink",
+    "serving": "1잔 (20 oz)",
+    "price": 2900,
+    "nutrients": null,
+    "trust": "none",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "compose-dolce-latte",
+    "brandId": "compose",
+    "name": "돌체라떼",
+    "category": "drink",
+    "serving": "1잔 (20 oz)",
+    "price": 3900,
+    "nutrients": null,
+    "trust": "none",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "compose-black-sugar-bubble-latte",
+    "brandId": "compose",
+    "name": "흑당버블라떼",
+    "category": "drink",
+    "serving": "1잔 (20 oz)",
+    "price": 3800,
+    "nutrients": null,
+    "trust": "none",
+    "tags": [
+      "카페인 있음"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "bonjuk-abalone",
+    "brandId": "bonjuk",
+    "name": "전복죽",
+    "category": "meal",
+    "serving": "1인분",
+    "price": 15000,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "bonjuk-beef-vegetable",
+    "brandId": "bonjuk",
+    "name": "쇠고기야채죽",
+    "category": "meal",
+    "serving": "1인분",
+    "price": 11000,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "bonjuk-pumpkin",
+    "brandId": "bonjuk",
+    "name": "단호박죽",
+    "category": "meal",
+    "serving": "1인분",
+    "price": 10500,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "bonjuk-octopus-kimchi",
+    "brandId": "bonjuk",
+    "name": "낙지김치죽",
+    "category": "meal",
+    "serving": "1인분",
+    "price": 12500,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "bonjuk-shrimp",
+    "brandId": "bonjuk",
+    "name": "새우죽",
+    "category": "meal",
+    "serving": "1인분",
+    "price": 12000,
+    "nutrients": null,
+    "trust": "none",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "gs25-dosirak-gs",
+    "brandId": "gs25",
+    "name": "유어스 한끼 불고기 도시락",
+    "category": "meal",
+    "serving": "1개 (400 g)",
+    "price": 5500,
+    "nutrients": {
+      "kcal": 730,
+      "carbs": 102,
+      "protein": 24,
+      "fat": 24,
+      "satFat": 7,
+      "sugar": 14,
+      "sodium": 1600,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "불고기와 반찬을 골고루 담은 도시락이에요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "gs25-dosirak2-gs",
+    "brandId": "gs25",
+    "name": "유어스 제육 도시락",
+    "category": "meal",
+    "serving": "1개 (420 g)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 800,
+      "carbs": 108,
+      "protein": 27,
+      "fat": 28,
+      "satFat": 8,
+      "sugar": 16,
+      "sodium": 1750,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "gs25-tuna-mayo-onigiri-gs",
+    "brandId": "gs25",
+    "name": "참치마요 삼각김밥",
+    "category": "meal",
+    "serving": "1개 (110 g)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 210,
+      "carbs": 32,
+      "protein": 5,
+      "fat": 7,
+      "satFat": 1,
+      "sugar": 2,
+      "sodium": 420,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "gs25-bibim-onigiri-gs",
+    "brandId": "gs25",
+    "name": "전주비빔 삼각김밥",
+    "category": "meal",
+    "serving": "1개 (110 g)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 35,
+      "protein": 4,
+      "fat": 3,
+      "satFat": 0.5,
+      "sugar": 3,
+      "sodium": 450,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "gs25-ham-egg-sandwich-gs",
+    "brandId": "gs25",
+    "name": "유어스 햄에그 샌드위치",
+    "category": "meal",
+    "serving": "1개 (170 g)",
+    "price": 3300,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 38,
+      "protein": 14,
+      "fat": 18,
+      "satFat": 6,
+      "sugar": 5,
+      "sodium": 780,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "gs25-chicken-salad-gs",
+    "brandId": "gs25",
+    "name": "유어스 닭가슴살 샐러드",
+    "category": "salad",
+    "serving": "1개 (200 g, 드레싱 포함)",
+    "price": 4900,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 11,
+      "protein": 18,
+      "fat": 8,
+      "satFat": 1.5,
+      "sugar": 5,
+      "sodium": 460,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "닭가슴살과 채소를 가볍게 담은 샐러드예요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "gs25-chicken-breast-gs",
+    "brandId": "gs25",
+    "name": "훈제 닭가슴살",
+    "category": "side",
+    "serving": "1팩 (100 g)",
+    "price": 2900,
+    "nutrients": {
+      "kcal": 120,
+      "carbs": 3,
+      "protein": 23,
+      "fat": 2,
+      "satFat": 0.5,
+      "sugar": 1,
+      "sodium": 450,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "gs25-boiled-egg-gs",
+    "brandId": "gs25",
+    "name": "구운란",
+    "category": "side",
+    "serving": "2입 (100 g)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 140,
+      "carbs": 1,
+      "protein": 12,
+      "fat": 10,
+      "satFat": 3,
+      "sugar": 0,
+      "sodium": 250,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "gs25-big-cup-ramen-gs",
+    "brandId": "gs25",
+    "name": "신라면 큰사발",
+    "category": "meal",
+    "serving": "1개 (114 g)",
+    "price": 1900,
+    "nutrients": {
+      "kcal": 505,
+      "carbs": 78,
+      "protein": 10,
+      "fat": 17,
+      "satFat": 8,
+      "sugar": 4,
+      "sodium": 1790,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "noodle",
+        "label": "면 양",
+        "choices": [
+          {
+            "label": "전부",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "면 반만",
+            "delta": {
+              "kcal": -202,
+              "carbs": -31
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "gs25-udon-gs",
+    "brandId": "gs25",
+    "name": "유어스 가쓰오 우동",
+    "category": "meal",
+    "serving": "1개 (300 g)",
+    "price": 3500,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 70,
+      "protein": 10,
+      "fat": 5,
+      "satFat": 1,
+      "sugar": 6,
+      "sodium": 2100,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "noodle",
+        "label": "면 양",
+        "choices": [
+          {
+            "label": "전부",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "면 반만",
+            "delta": {
+              "kcal": -152,
+              "carbs": -28
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "gs25-protein-drink-gs",
+    "brandId": "gs25",
+    "name": "셀렉스 프로틴 음료",
+    "category": "drink",
+    "serving": "1병 (190 ml)",
+    "price": 2800,
+    "nutrients": {
+      "kcal": 120,
+      "carbs": 9,
+      "protein": 16,
+      "fat": 2,
+      "satFat": 0.5,
+      "sugar": 3,
+      "sodium": 150,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "gs25-banana-milk-gs",
+    "brandId": "gs25",
+    "name": "바나나맛 우유",
+    "category": "drink",
+    "serving": "1개 (240 ml)",
+    "price": 1800,
+    "nutrients": {
+      "kcal": 208,
+      "carbs": 28,
+      "protein": 7,
+      "fat": 8,
+      "satFat": 5,
+      "sugar": 27,
+      "sodium": 110,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "gs25-white-milk-gs",
+    "brandId": "gs25",
+    "name": "흰우유",
+    "category": "drink",
+    "serving": "1팩 (200 ml)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 130,
+      "carbs": 9,
+      "protein": 6,
+      "fat": 8,
+      "satFat": 5,
+      "sugar": 9,
+      "sodium": 100,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "gs25-soy-milk-gs",
+    "brandId": "gs25",
+    "name": "두유",
+    "category": "drink",
+    "serving": "1팩 (190 ml)",
+    "price": 1300,
+    "nutrients": {
+      "kcal": 125,
+      "carbs": 12,
+      "protein": 6,
+      "fat": 6,
+      "satFat": 1,
+      "sugar": 8,
+      "sodium": 140,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "gs25-cold-americano-gs",
+    "brandId": "gs25",
+    "name": "유어스 아이스 아메리카노",
+    "category": "drink",
+    "serving": "1컵 (300 ml)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 10,
+      "carbs": 2,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 10,
+      "caffeine": 120
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "gs25-zero-cola-gs",
+    "brandId": "gs25",
+    "name": "제로 콜라",
+    "category": "drink",
+    "serving": "1캔 (355 ml)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 0,
+      "carbs": 0,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 20,
+      "caffeine": 30
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "gs25-greek-yogurt-gs",
+    "brandId": "gs25",
+    "name": "그릭요거트 플레인",
+    "category": "snack",
+    "serving": "1개 (100 g)",
+    "price": 2500,
+    "nutrients": {
+      "kcal": 90,
+      "carbs": 6,
+      "protein": 9,
+      "fat": 3,
+      "satFat": 2,
+      "sugar": 5,
+      "sodium": 45,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "저당"
+    ],
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "gs25-sweet-potato-gs",
+    "brandId": "gs25",
+    "name": "군고구마",
+    "category": "snack",
+    "serving": "1개 (150 g)",
+    "price": 2500,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 45,
+      "protein": 2,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 10,
+      "sodium": 20,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "gs25-protein-bar-gs",
+    "brandId": "gs25",
+    "name": "닥터유 프로틴바",
+    "category": "snack",
+    "serving": "1개 (50 g)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 200,
+      "carbs": 20,
+      "protein": 15,
+      "fat": 7,
+      "satFat": 3,
+      "sugar": 5,
+      "sodium": 150,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백",
+      "저당"
+    ],
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "cu-dosirak-cu",
+    "brandId": "cu",
+    "name": "헤이루 한끼 불고기 도시락",
+    "category": "meal",
+    "serving": "1개 (400 g)",
+    "price": 5500,
+    "nutrients": {
+      "kcal": 730,
+      "carbs": 102,
+      "protein": 24,
+      "fat": 24,
+      "satFat": 7,
+      "sugar": 14,
+      "sodium": 1600,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "불고기와 반찬을 골고루 담은 도시락이에요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "cu-dosirak2-cu",
+    "brandId": "cu",
+    "name": "헤이루 제육 도시락",
+    "category": "meal",
+    "serving": "1개 (420 g)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 800,
+      "carbs": 108,
+      "protein": 27,
+      "fat": 28,
+      "satFat": 8,
+      "sugar": 16,
+      "sodium": 1750,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "cu-tuna-mayo-onigiri-cu",
+    "brandId": "cu",
+    "name": "참치마요 삼각김밥",
+    "category": "meal",
+    "serving": "1개 (110 g)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 210,
+      "carbs": 32,
+      "protein": 5,
+      "fat": 7,
+      "satFat": 1,
+      "sugar": 2,
+      "sodium": 420,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "cu-bibim-onigiri-cu",
+    "brandId": "cu",
+    "name": "전주비빔 삼각김밥",
+    "category": "meal",
+    "serving": "1개 (110 g)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 35,
+      "protein": 4,
+      "fat": 3,
+      "satFat": 0.5,
+      "sugar": 3,
+      "sodium": 450,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "cu-ham-egg-sandwich-cu",
+    "brandId": "cu",
+    "name": "헤이루 햄에그 샌드위치",
+    "category": "meal",
+    "serving": "1개 (170 g)",
+    "price": 3300,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 38,
+      "protein": 14,
+      "fat": 18,
+      "satFat": 6,
+      "sugar": 5,
+      "sodium": 780,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "cu-chicken-salad-cu",
+    "brandId": "cu",
+    "name": "헤이루 닭가슴살 샐러드",
+    "category": "salad",
+    "serving": "1개 (200 g, 드레싱 포함)",
+    "price": 4900,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 11,
+      "protein": 18,
+      "fat": 8,
+      "satFat": 1.5,
+      "sugar": 5,
+      "sodium": 460,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "닭가슴살과 채소를 가볍게 담은 샐러드예요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "cu-chicken-breast-cu",
+    "brandId": "cu",
+    "name": "훈제 닭가슴살",
+    "category": "side",
+    "serving": "1팩 (100 g)",
+    "price": 2900,
+    "nutrients": {
+      "kcal": 120,
+      "carbs": 3,
+      "protein": 23,
+      "fat": 2,
+      "satFat": 0.5,
+      "sugar": 1,
+      "sodium": 450,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "cu-boiled-egg-cu",
+    "brandId": "cu",
+    "name": "구운란",
+    "category": "side",
+    "serving": "2입 (100 g)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 140,
+      "carbs": 1,
+      "protein": 12,
+      "fat": 10,
+      "satFat": 3,
+      "sugar": 0,
+      "sodium": 250,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "cu-big-cup-ramen-cu",
+    "brandId": "cu",
+    "name": "신라면 큰사발",
+    "category": "meal",
+    "serving": "1개 (114 g)",
+    "price": 1900,
+    "nutrients": {
+      "kcal": 505,
+      "carbs": 78,
+      "protein": 10,
+      "fat": 17,
+      "satFat": 8,
+      "sugar": 4,
+      "sodium": 1790,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "noodle",
+        "label": "면 양",
+        "choices": [
+          {
+            "label": "전부",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "면 반만",
+            "delta": {
+              "kcal": -202,
+              "carbs": -31
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "cu-udon-cu",
+    "brandId": "cu",
+    "name": "헤이루 가쓰오 우동",
+    "category": "meal",
+    "serving": "1개 (300 g)",
+    "price": 3500,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 70,
+      "protein": 10,
+      "fat": 5,
+      "satFat": 1,
+      "sugar": 6,
+      "sodium": 2100,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "noodle",
+        "label": "면 양",
+        "choices": [
+          {
+            "label": "전부",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "면 반만",
+            "delta": {
+              "kcal": -152,
+              "carbs": -28
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "cu-protein-drink-cu",
+    "brandId": "cu",
+    "name": "셀렉스 프로틴 음료",
+    "category": "drink",
+    "serving": "1병 (190 ml)",
+    "price": 2800,
+    "nutrients": {
+      "kcal": 120,
+      "carbs": 9,
+      "protein": 16,
+      "fat": 2,
+      "satFat": 0.5,
+      "sugar": 3,
+      "sodium": 150,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "cu-banana-milk-cu",
+    "brandId": "cu",
+    "name": "바나나맛 우유",
+    "category": "drink",
+    "serving": "1개 (240 ml)",
+    "price": 1800,
+    "nutrients": {
+      "kcal": 208,
+      "carbs": 28,
+      "protein": 7,
+      "fat": 8,
+      "satFat": 5,
+      "sugar": 27,
+      "sodium": 110,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "cu-white-milk-cu",
+    "brandId": "cu",
+    "name": "흰우유",
+    "category": "drink",
+    "serving": "1팩 (200 ml)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 130,
+      "carbs": 9,
+      "protein": 6,
+      "fat": 8,
+      "satFat": 5,
+      "sugar": 9,
+      "sodium": 100,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "cu-soy-milk-cu",
+    "brandId": "cu",
+    "name": "두유",
+    "category": "drink",
+    "serving": "1팩 (190 ml)",
+    "price": 1300,
+    "nutrients": {
+      "kcal": 125,
+      "carbs": 12,
+      "protein": 6,
+      "fat": 6,
+      "satFat": 1,
+      "sugar": 8,
+      "sodium": 140,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "cu-cold-americano-cu",
+    "brandId": "cu",
+    "name": "헤이루 아이스 아메리카노",
+    "category": "drink",
+    "serving": "1컵 (300 ml)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 10,
+      "carbs": 2,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 10,
+      "caffeine": 120
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "cu-zero-cola-cu",
+    "brandId": "cu",
+    "name": "제로 콜라",
+    "category": "drink",
+    "serving": "1캔 (355 ml)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 0,
+      "carbs": 0,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 20,
+      "caffeine": 30
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "cu-greek-yogurt-cu",
+    "brandId": "cu",
+    "name": "그릭요거트 플레인",
+    "category": "snack",
+    "serving": "1개 (100 g)",
+    "price": 2500,
+    "nutrients": {
+      "kcal": 90,
+      "carbs": 6,
+      "protein": 9,
+      "fat": 3,
+      "satFat": 2,
+      "sugar": 5,
+      "sodium": 45,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "저당"
+    ],
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "cu-sweet-potato-cu",
+    "brandId": "cu",
+    "name": "군고구마",
+    "category": "snack",
+    "serving": "1개 (150 g)",
+    "price": 2500,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 45,
+      "protein": 2,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 10,
+      "sodium": 20,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "cu-nuts-cu",
+    "brandId": "cu",
+    "name": "하루견과",
+    "category": "snack",
+    "serving": "1봉 (25 g)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 150,
+      "carbs": 6,
+      "protein": 5,
+      "fat": 12,
+      "satFat": 1.5,
+      "sugar": 2,
+      "sodium": 0,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "저당"
+    ],
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  },
+  {
+    "id": "seven_eleven-dosirak-se",
+    "brandId": "seven_eleven",
+    "name": "세븐셀렉트 한끼 불고기 도시락",
+    "category": "meal",
+    "serving": "1개 (400 g)",
+    "price": 5500,
+    "nutrients": {
+      "kcal": 730,
+      "carbs": 102,
+      "protein": 24,
+      "fat": 24,
+      "satFat": 7,
+      "sugar": 14,
+      "sodium": 1600,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "불고기와 반찬을 골고루 담은 도시락이에요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "seven_eleven-dosirak2-se",
+    "brandId": "seven_eleven",
+    "name": "세븐셀렉트 제육 도시락",
+    "category": "meal",
+    "serving": "1개 (420 g)",
+    "price": 5900,
+    "nutrients": {
+      "kcal": 800,
+      "carbs": 108,
+      "protein": 27,
+      "fat": 28,
+      "satFat": 8,
+      "sugar": 16,
+      "sodium": 1750,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "seven_eleven-tuna-mayo-onigiri-se",
+    "brandId": "seven_eleven",
+    "name": "참치마요 삼각김밥",
+    "category": "meal",
+    "serving": "1개 (110 g)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 210,
+      "carbs": 32,
+      "protein": 5,
+      "fat": 7,
+      "satFat": 1,
+      "sugar": 2,
+      "sodium": 420,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "seven_eleven-bibim-onigiri-se",
+    "brandId": "seven_eleven",
+    "name": "전주비빔 삼각김밥",
+    "category": "meal",
+    "serving": "1개 (110 g)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 35,
+      "protein": 4,
+      "fat": 3,
+      "satFat": 0.5,
+      "sugar": 3,
+      "sodium": 450,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "seven_eleven-ham-egg-sandwich-se",
+    "brandId": "seven_eleven",
+    "name": "세븐셀렉트 햄에그 샌드위치",
+    "category": "meal",
+    "serving": "1개 (170 g)",
+    "price": 3300,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 38,
+      "protein": 14,
+      "fat": 18,
+      "satFat": 6,
+      "sugar": 5,
+      "sodium": 780,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "seven_eleven-chicken-salad-se",
+    "brandId": "seven_eleven",
+    "name": "세븐셀렉트 닭가슴살 샐러드",
+    "category": "salad",
+    "serving": "1개 (200 g, 드레싱 포함)",
+    "price": 4900,
+    "nutrients": {
+      "kcal": 190,
+      "carbs": 11,
+      "protein": 18,
+      "fat": 8,
+      "satFat": 1.5,
+      "sugar": 5,
+      "sodium": 460,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "닭가슴살과 채소를 가볍게 담은 샐러드예요.",
+    "imageKey": "salad"
+  },
+  {
+    "id": "seven_eleven-chicken-breast-se",
+    "brandId": "seven_eleven",
+    "name": "훈제 닭가슴살",
+    "category": "side",
+    "serving": "1팩 (100 g)",
+    "price": 2900,
+    "nutrients": {
+      "kcal": 120,
+      "carbs": 3,
+      "protein": 23,
+      "fat": 2,
+      "satFat": 0.5,
+      "sugar": 1,
+      "sodium": 450,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백"
+    ],
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "seven_eleven-boiled-egg-se",
+    "brandId": "seven_eleven",
+    "name": "구운란",
+    "category": "side",
+    "serving": "2입 (100 g)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 140,
+      "carbs": 1,
+      "protein": 12,
+      "fat": 10,
+      "satFat": 3,
+      "sugar": 0,
+      "sodium": 250,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "메인 메뉴와 함께 곁들이기 좋아요.",
+    "imageKey": "side"
+  },
+  {
+    "id": "seven_eleven-big-cup-ramen-se",
+    "brandId": "seven_eleven",
+    "name": "신라면 큰사발",
+    "category": "meal",
+    "serving": "1개 (114 g)",
+    "price": 1900,
+    "nutrients": {
+      "kcal": 505,
+      "carbs": 78,
+      "protein": 10,
+      "fat": 17,
+      "satFat": 8,
+      "sugar": 4,
+      "sodium": 1790,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "noodle",
+        "label": "면 양",
+        "choices": [
+          {
+            "label": "전부",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "면 반만",
+            "delta": {
+              "kcal": -202,
+              "carbs": -31
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "seven_eleven-udon-se",
+    "brandId": "seven_eleven",
+    "name": "세븐셀렉트 가쓰오 우동",
+    "category": "meal",
+    "serving": "1개 (300 g)",
+    "price": 3500,
+    "nutrients": {
+      "kcal": 380,
+      "carbs": 70,
+      "protein": 10,
+      "fat": 5,
+      "satFat": 1,
+      "sugar": 6,
+      "sodium": 2100,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "options": [
+      {
+        "id": "noodle",
+        "label": "면 양",
+        "choices": [
+          {
+            "label": "전부",
+            "delta": {},
+            "isDefault": true
+          },
+          {
+            "label": "면 반만",
+            "delta": {
+              "kcal": -152,
+              "carbs": -28
+            }
+          }
+        ]
+      }
+    ],
+    "blurb": "든든하게 한 끼를 채울 수 있어요.",
+    "imageKey": "meal"
+  },
+  {
+    "id": "seven_eleven-protein-drink-se",
+    "brandId": "seven_eleven",
+    "name": "셀렉스 프로틴 음료",
+    "category": "drink",
+    "serving": "1병 (190 ml)",
+    "price": 2800,
+    "nutrients": {
+      "kcal": 120,
+      "carbs": 9,
+      "protein": 16,
+      "fat": 2,
+      "satFat": 0.5,
+      "sugar": 3,
+      "sodium": 150,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "고단백",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "seven_eleven-banana-milk-se",
+    "brandId": "seven_eleven",
+    "name": "바나나맛 우유",
+    "category": "drink",
+    "serving": "1개 (240 ml)",
+    "price": 1800,
+    "nutrients": {
+      "kcal": 208,
+      "carbs": 28,
+      "protein": 7,
+      "fat": 8,
+      "satFat": 5,
+      "sugar": 27,
+      "sodium": 110,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "seven_eleven-white-milk-se",
+    "brandId": "seven_eleven",
+    "name": "흰우유",
+    "category": "drink",
+    "serving": "1팩 (200 ml)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 130,
+      "carbs": 9,
+      "protein": 6,
+      "fat": 8,
+      "satFat": 5,
+      "sugar": 9,
+      "sodium": 100,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "seven_eleven-soy-milk-se",
+    "brandId": "seven_eleven",
+    "name": "두유",
+    "category": "drink",
+    "serving": "1팩 (190 ml)",
+    "price": 1300,
+    "nutrients": {
+      "kcal": 125,
+      "carbs": 12,
+      "protein": 6,
+      "fat": 6,
+      "satFat": 1,
+      "sugar": 8,
+      "sodium": 140,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "seven_eleven-cold-americano-se",
+    "brandId": "seven_eleven",
+    "name": "세븐셀렉트 아이스 아메리카노",
+    "category": "drink",
+    "serving": "1컵 (300 ml)",
+    "price": 1500,
+    "nutrients": {
+      "kcal": 10,
+      "carbs": 2,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 10,
+      "caffeine": 120
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "seven_eleven-zero-cola-se",
+    "brandId": "seven_eleven",
+    "name": "제로 콜라",
+    "category": "drink",
+    "serving": "1캔 (355 ml)",
+    "price": 2000,
+    "nutrients": {
+      "kcal": 0,
+      "carbs": 0,
+      "protein": 0,
+      "fat": 0,
+      "satFat": 0,
+      "sugar": 0,
+      "sodium": 20,
+      "caffeine": 30
+    },
+    "trust": "estimated",
+    "tags": [
+      "카페인 있음",
+      "저당"
+    ],
+    "blurb": "가볍게 곁들이기 좋은 음료예요.",
+    "imageKey": "drink"
+  },
+  {
+    "id": "seven_eleven-greek-yogurt-se",
+    "brandId": "seven_eleven",
+    "name": "그릭요거트 플레인",
+    "category": "snack",
+    "serving": "1개 (100 g)",
+    "price": 2500,
+    "nutrients": {
+      "kcal": 90,
+      "carbs": 6,
+      "protein": 9,
+      "fat": 3,
+      "satFat": 2,
+      "sugar": 5,
+      "sodium": 45,
+      "caffeine": 0
+    },
+    "trust": "estimated",
+    "tags": [
+      "저당"
+    ],
+    "blurb": "출출할 때 가볍게 즐기기 좋아요.",
+    "imageKey": "snack"
+  }
+]

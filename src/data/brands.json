@@ -1,0 +1,14 @@
+[
+  { "id": "gs25", "name": "GS25", "category": "convenience", "matchKeywords": ["GS25", "지에스25", "지에스 25", "GS 25"], "coverage": "full", "blurb": "간편식, 도시락, 샐러드 등 다양해요.", "logoKey": "gs25" },
+  { "id": "cu", "name": "CU", "category": "convenience", "matchKeywords": ["CU", "씨유"], "coverage": "full", "blurb": "도시락부터 샐러드, 음료까지 골라보세요.", "logoKey": "cu" },
+  { "id": "seven_eleven", "name": "세븐일레븐", "category": "convenience", "matchKeywords": ["세븐일레븐", "세븐 일레븐", "7-ELEVEN", "7ELEVEN", "SEVEN ELEVEN", "SEVENELEVEN"], "coverage": "full", "blurb": "간편한 한 끼와 간식이 가까이 있어요.", "logoKey": "seven_eleven" },
+  { "id": "starbucks", "name": "스타벅스", "category": "cafe", "matchKeywords": ["스타벅스", "STARBUCKS"], "coverage": "full", "blurb": "커피, 샌드위치, 베이커리 등", "logoKey": "starbucks" },
+  { "id": "mega", "name": "메가MGC커피", "category": "cafe", "matchKeywords": ["메가MGC커피", "메가엠지씨커피", "메가커피", "MEGA COFFEE", "MEGACOFFEE", "MGC커피"], "coverage": "none", "blurb": "큰 사이즈 커피와 음료가 많아요.", "logoKey": "mega" },
+  { "id": "ediya", "name": "이디야커피", "category": "cafe", "matchKeywords": ["이디야", "EDIYA"], "coverage": "full", "blurb": "커피와 라떼, 달콤한 음료를 즐겨보세요.", "logoKey": "ediya" },
+  { "id": "compose", "name": "컴포즈커피", "category": "cafe", "matchKeywords": ["컴포즈커피", "컴포즈 커피", "COMPOSE COFFEE", "COMPOSECOFFEE"], "coverage": "none", "blurb": "부담 없는 가격의 커피가 있어요.", "logoKey": "compose" },
+  { "id": "subway", "name": "서브웨이", "category": "fastfood", "matchKeywords": ["서브웨이", "SUBWAY"], "coverage": "full", "blurb": "빵과 채소, 소스를 골라 만드는 샌드위치예요.", "logoKey": "subway" },
+  { "id": "salady", "name": "샐러디", "category": "salad", "matchKeywords": ["샐러디", "SALADY"], "coverage": "partial", "blurb": "신선한 샐러드와 랩, 볼을 만나보세요.", "logoKey": "salady" },
+  { "id": "paris_baguette", "name": "파리바게뜨", "category": "bakery", "matchKeywords": ["파리바게뜨", "파리바게트", "PARIS BAGUETTE", "PARISBAGUETTE"], "coverage": "full", "blurb": "빵, 샌드위치, 샐러드까지 있어요.", "logoKey": "paris_baguette" },
+  { "id": "bonjuk", "name": "본죽", "category": "korean", "matchKeywords": ["본죽", "BONJUK"], "coverage": "none", "blurb": "건강한 한 끼, 본죽과 함께해요.", "logoKey": "bonjuk" },
+  { "id": "mom_touch", "name": "맘스터치", "category": "fastfood", "matchKeywords": ["맘스터치", "MOM'S TOUCH", "MOMSTOUCH", "MOMS TOUCH"], "coverage": "full", "blurb": "버거와 치킨, 사이드를 골라보세요.", "logoKey": "mom_touch" }
+]

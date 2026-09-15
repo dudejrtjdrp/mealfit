@@ -122,7 +122,8 @@ export interface MenuItem {
   /** "Tall (355 ml)" · "1개 (195 g)" */
   serving: string;
   price?: number;
-  nutrients: Nutrients;
+  /** null = 영양 정보 없음(trust 'none'). 0으로 채우지 않는다 */
+  nutrients: Nutrients | null;
   trust: Trust;
   sourceUrl?: string;
   /** 시안 카드 보조 표기용: "카페인 있음" 등 */
