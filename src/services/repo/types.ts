@@ -14,6 +14,8 @@ export interface LogRepo {
   add(log: MealLog): Promise<void>;
   update(log: MealLog): Promise<void>;
   remove(id: string): Promise<void>;
+  /** 이 사용자의 기록 전체 삭제 (탈퇴) */
+  clear(): Promise<void>;
 }
 
 /** 식단 성향 AI 결과 캐시 — key = sha256(정규화 서술 + 프롬프트 버전) */

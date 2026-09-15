@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   logs: (date: string) => `mealfit:logs:${date}`,
   logDates: 'mealfit:logdates',
   aiCache: (key: string) => `mealfit:aicache:${key}`,
+  /** 로컬 → Supabase 1회 마이그레이션 완료 표시 (값: 옮겨 받은 사용자 id) */
+  migrated: 'mealfit:migrated-to-supabase',
 } as const;
 
 async function readJson<T>(storage: KeyValueStorage, key: string): Promise<T | null> {
@@ -81,6 +83,10 @@ export function createLocalLogRepo(storage: KeyValueStorage): LogRepo {
       const date = await findDate(id);
       if (!date) return;
       await putLogs(date, (await getLogs(date)).filter((l) => l.id !== id));
+    },
+    clear: async () => {
+      for (const d of await getDates()) await storage.removeItem(STORAGE_KEYS.logs(d));
+      await storage.removeItem(STORAGE_KEYS.logDates);
     },
   };
 }

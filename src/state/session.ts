@@ -1,59 +1,192 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { Session as SupabaseSession, SupabaseClient } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
-/** MVP 로컬 세션 — Supabase Auth 연결 전까지 provider·닉네임·생성 시각만 저장 */
-export type AuthProvider = 'kakao' | 'apple' | 'email';
+import { type AuthProvider, type AuthResult, emailSignIn, emailSignUp, oauthSignIn, type Session, sessionFromSupabase } from '@/services/auth';
+import { setAuthUserId } from '@/services/authState';
+import { newId } from '@/services/id';
+import { createLocalRepos } from '@/services/repo/local';
+import { migrateLocalToSupabase } from '@/services/repo/migrate';
+import { createSupabaseRepos } from '@/services/repo/supabase';
+import { getSupabase } from '@/services/supabase';
 
-export interface Session {
-  provider: AuthProvider;
-  nickname?: string;
-  email?: string;
-  createdAt: string;
-}
+/**
+ * 세션 스토어
+ * - Supabase 미설정(.env 비어 있음): 로컬 세션(provider·닉네임·생성 시각)만 AsyncStorage 에 저장
+ * - Supabase 설정: Supabase Auth 세션이 기준. 로그인 직후 로컬 데이터를 1회 옮긴다
+ */
+export type { AuthProvider, AuthResult, Session } from '@/services/auth';
 
 const KEY = 'mealfit:session';
 
 interface SessionState {
   session: Session | null;
   status: 'loading' | 'ready';
+  /** 'local' | 'supabase' — 로그인 화면이 어떤 시트를 보여줄지 결정 */
+  mode: 'local' | 'supabase';
   load: () => Promise<Session | null>;
+  /** 로컬 모드 전용: 닉네임 시트로 시작 */
   signIn: (provider: AuthProvider, nickname?: string, email?: string) => Promise<Session>;
+  /** Supabase 모드: 이메일+비밀번호 가입 */
+  signUpEmail: (email: string, password: string, nickname: string) => Promise<AuthResult>;
+  /** Supabase 모드: 이메일+비밀번호 로그인 */
+  signInEmail: (email: string, password: string) => Promise<AuthResult>;
+  /** Supabase 모드: 카카오·Apple OAuth */
+  signInOAuth: (provider: 'kakao' | 'apple') => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
-export const useSession = create<SessionState>((set) => ({
-  session: null,
-  status: 'loading',
-  load: async () => {
-    try {
-      const raw = await AsyncStorage.getItem(KEY);
-      const session = raw ? (JSON.parse(raw) as Session) : null;
-      set({ session, status: 'ready' });
-      return session;
-    } catch {
-      set({ session: null, status: 'ready' });
-      return null;
-    }
-  },
-  signIn: async (provider, nickname, email) => {
-    const session: Session = { provider, nickname: nickname?.trim() || undefined, email: email?.trim() || undefined, createdAt: new Date().toISOString() };
-    try {
-      await AsyncStorage.setItem(KEY, JSON.stringify(session));
-    } catch {
-      // 저장 실패해도 이번 실행 동안은 로그인 상태 유지
-    }
+let listening = false;
+let loading: Promise<Session | null> | null = null;
+const migrating = new Map<string, Promise<void>>();
+
+/** 로컬 → Supabase 1회 마이그레이션 (실패해도 로그인은 유지, 다음 로그인 때 다시 시도) */
+function migrateOnce(db: SupabaseClient, userId: string): Promise<void> {
+  const running = migrating.get(userId);
+  if (running) return running;
+  const p = migrateLocalToSupabase({
+    storage: AsyncStorage,
+    local: createLocalRepos(AsyncStorage),
+    remote: createSupabaseRepos(db, userId),
+    userId,
+    newId,
+  })
+    .then((r) => {
+      if (r.status === 'done' && (r.profile || r.logs > 0)) console.info(`[session] 로컬 데이터를 옮겼어요 (프로필 ${r.profile ? 1 : 0} · 기록 ${r.logs})`);
+    })
+    .catch((e) => console.warn('[session] 로컬 → Supabase 마이그레이션 실패', e))
+    .finally(() => migrating.delete(userId));
+  migrating.set(userId, p);
+  return p;
+}
+
+export const useSession = create<SessionState>((set, get) => {
+  /** Supabase 세션을 스토어에 반영 (마이그레이션까지 끝낸 뒤 화면이 프로필을 읽도록) */
+  const activate = async (db: SupabaseClient, s: SupabaseSession): Promise<Session> => {
+    setAuthUserId(s.user.id);
+    await migrateOnce(db, s.user.id);
+    const session = sessionFromSupabase(s);
     set({ session, status: 'ready' });
     return session;
-  },
-  signOut: async () => {
+  };
+
+  const withActivate = async (db: SupabaseClient, run: Promise<AuthResult>): Promise<AuthResult> => {
     try {
-      await AsyncStorage.removeItem(KEY);
-    } catch {
-      // 무시
+      const res = await run;
+      if (!res.ok) return res;
+      const { data } = await db.auth.getSession();
+      if (data.session) return { ok: true, session: await activate(db, data.session) };
+      return res;
+    } catch (e) {
+      console.warn('[session] 로그인 실패', e);
+      return { ok: false, message: '인터넷 연결을 확인해주세요.' };
     }
-    set({ session: null });
-  },
-}));
+  };
+
+  const notConfigured: AuthResult = { ok: false, message: '서버 로그인이 설정되지 않았어요.' };
+
+  return {
+    session: null,
+    status: 'loading',
+    mode: getSupabase() ? 'supabase' : 'local',
+
+    load: () => {
+      if (loading) return loading;
+      loading = (async () => {
+        const db = getSupabase();
+        if (!db) {
+          try {
+            const raw = await AsyncStorage.getItem(KEY);
+            const parsed = raw ? (JSON.parse(raw) as Session) : null;
+            const session = parsed ? { ...parsed, backend: 'local' as const } : null;
+            set({ session, status: 'ready' });
+            return session;
+          } catch {
+            set({ session: null, status: 'ready' });
+            return null;
+          }
+        }
+
+        if (!listening) {
+          listening = true;
+          // 콜백 안에서 Supabase 호출을 await 하면 교착될 수 있어 상태만 동기로 반영
+          db.auth.onAuthStateChange((event, s) => {
+            if (event === 'SIGNED_OUT' || !s) {
+              setAuthUserId(null);
+              set({ session: null });
+            } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+              setAuthUserId(s.user.id);
+              set({ session: sessionFromSupabase(s) });
+            }
+          });
+        }
+
+        try {
+          const { data } = await db.auth.getSession();
+          if (data.session) return await activate(db, data.session);
+        } catch (e) {
+          console.warn('[session] Supabase 세션 확인 실패', e);
+        }
+        setAuthUserId(null);
+        set({ session: null, status: 'ready' });
+        return null;
+      })().finally(() => {
+        loading = null;
+      });
+      return loading;
+    },
+
+    signIn: async (provider, nickname, email) => {
+      const session: Session = {
+        provider,
+        nickname: nickname?.trim() || undefined,
+        email: email?.trim() || undefined,
+        createdAt: new Date().toISOString(),
+        backend: 'local',
+      };
+      try {
+        await AsyncStorage.setItem(KEY, JSON.stringify(session));
+      } catch {
+        // 저장 실패해도 이번 실행 동안은 로그인 상태 유지
+      }
+      set({ session, status: 'ready' });
+      return session;
+    },
+
+    signUpEmail: async (email, password, nickname) => {
+      const db = getSupabase();
+      return db ? withActivate(db, emailSignUp(db, email, password, nickname)) : notConfigured;
+    },
+
+    signInEmail: async (email, password) => {
+      const db = getSupabase();
+      return db ? withActivate(db, emailSignIn(db, email, password)) : notConfigured;
+    },
+
+    signInOAuth: async (provider) => {
+      const db = getSupabase();
+      return db ? withActivate(db, oauthSignIn(db, provider)) : notConfigured;
+    },
+
+    signOut: async () => {
+      const db = getSupabase();
+      if (db && get().session?.backend === 'supabase') {
+        try {
+          await db.auth.signOut();
+        } catch (e) {
+          console.warn('[session] Supabase 로그아웃 실패 (로컬 세션은 정리)', e);
+        }
+      }
+      setAuthUserId(null);
+      try {
+        await AsyncStorage.removeItem(KEY);
+      } catch {
+        // 무시
+      }
+      set({ session: null });
+    },
+  };
+});
 
 /** 컴포넌트 밖에서 쓰는 단축 함수 */
 export const signIn = (provider: AuthProvider, nickname?: string, email?: string) => useSession.getState().signIn(provider, nickname, email);

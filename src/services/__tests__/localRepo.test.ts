@@ -61,6 +61,22 @@ describe('local repos', () => {
     await logs.remove('없는-id');
   });
 
+  it('logs.clear: 모든 날짜의 기록을 지운다', async () => {
+    const { logs } = createLocalRepos();
+    await logs.add(log('a', '2026-09-15', '2026-09-15T03:00:00.000Z'));
+    await logs.add(log('b', '2026-09-16', '2026-09-16T03:00:00.000Z'));
+    await logs.clear();
+    expect(await logs.datesWithLogs('2026-09-01', '2026-09-30')).toEqual([]);
+    expect(await logs.listByDate('2026-09-15')).toEqual([]);
+    expect(await AsyncStorage.getItem(STORAGE_KEYS.logs('2026-09-16'))).toBeNull();
+  });
+
+  it('getRepos: Supabase 가 설정되지 않으면 로컬', () => {
+    const { getRepos, resetReposForTest } = require('../repo');
+    resetReposForTest();
+    expect(getRepos().backend).toBe('local');
+  });
+
   it('aiCache', async () => {
     const { aiCache } = createLocalRepos();
     const v: DietClassification = { type: 'balanced', evidence: [], source: 'ai' };

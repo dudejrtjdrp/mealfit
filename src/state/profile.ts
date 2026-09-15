@@ -42,7 +42,12 @@ interface ProfileState {
   /** 드래프트 → Profile 조립 → 저장. 저장 실패해도 메모리에는 반영하고 false 반환 */
   completeOnboarding: (draft: OnboardingDraft, nickname?: string) => Promise<{ profile: Profile; saved: boolean }>;
   updateProfile: (partial: Partial<Profile>) => Promise<boolean>;
-  signOut: () => Promise<void>;
+  /**
+   * 로그아웃·탈퇴.
+   * - 로컬 저장소: 둘 다 이 기기의 프로필을 지운다(탈퇴는 기록까지)
+   * - Supabase: 로그아웃은 서버 데이터를 두고 세션만 끊는다. 탈퇴는 서버의 프로필·기록을 지운 뒤 로그아웃
+   */
+  signOut: (kind?: 'logout' | 'withdraw') => Promise<void>;
 }
 
 export const useProfile = create<ProfileState>((set, get) => ({
@@ -109,11 +114,16 @@ export const useProfile = create<ProfileState>((set, get) => ({
     }
   },
 
-  signOut: async () => {
-    try {
-      await getRepos().profile.clear();
-    } catch (e) {
-      console.warn('[profile] clear 실패', e);
+  signOut: async (kind = 'logout') => {
+    const repos = getRepos();
+    const shouldClear = repos.backend === 'local' || kind === 'withdraw';
+    if (shouldClear) {
+      try {
+        await repos.profile.clear();
+        if (kind === 'withdraw') await repos.logs.clear();
+      } catch (e) {
+        console.warn('[profile] clear 실패', e);
+      }
     }
     set({ profile: null, targets: null });
     await useSession.getState().signOut();

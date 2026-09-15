@@ -26,6 +26,8 @@ export interface InputProps {
   card?: boolean;
   style?: StyleProp<ViewStyle>;
   autoCapitalize?: 'none' | 'sentences';
+  /** 비밀번호 입력 */
+  secureTextEntry?: boolean;
 }
 
 /** B2 라벨 카드형 입력 — 카드 안 라벨 + 테두리 박스(아이콘·큰 숫자·단위) */
@@ -43,6 +45,7 @@ export function Input({
   card = true,
   style,
   autoCapitalize = 'none',
+  secureTextEntry,
 }: InputProps) {
   const [focused, setFocused] = useState(false);
   const isNum = kind === 'number';
@@ -64,6 +67,7 @@ export function Input({
           inputMode={isNum ? 'numeric' : undefined}
           maxLength={maxLength}
           autoCapitalize={autoCapitalize}
+          secureTextEntry={secureTextEntry}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={[styles.input, isNum ? styles.inputNum : styles.inputText]}

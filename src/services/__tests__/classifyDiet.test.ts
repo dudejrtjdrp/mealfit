@@ -25,7 +25,7 @@ function memoryRepos(): Repos & { store: Map<string, DietClassification> } {
     aiCache,
     backend: 'local',
     profile: { get: async () => null, save: async () => {}, clear: async () => {} },
-    logs: { listByDate: async () => [], datesWithLogs: async () => [], add: async () => {}, update: async () => {}, remove: async () => {} },
+    logs: { listByDate: async () => [], datesWithLogs: async () => [], add: async () => {}, update: async () => {}, remove: async () => {}, clear: async () => {} },
   };
 }
 

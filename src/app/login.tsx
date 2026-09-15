@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { BottomSheet, Button, Input, Screen, Sprout, Text } from '@/components';
-import { type AuthProvider, useSession } from '@/state/session';
+import { BottomSheet, Button, Input, Screen, Sprout, Text, showToast } from '@/components';
+import { PASSWORD_MIN } from '@/services/auth';
+import { useDay } from '@/state/day';
+import { useProfile } from '@/state/profile';
+import { type AuthProvider, type AuthResult, useSession } from '@/state/session';
 import { colors, fonts, spacing } from '@/theme';
 
 const PROVIDER_TITLE: Record<AuthProvider, string> = {
@@ -13,25 +16,86 @@ const PROVIDER_TITLE: Record<AuthProvider, string> = {
   email: '이메일로 시작',
 };
 
-/** A2 로그인 — 시안 docs/design/A2-login.png */
+/** 로그인 뒤: 프로필·오늘 기록을 새 저장소 기준으로 다시 읽고, 온보딩을 마쳤으면 오늘 탭으로 */
+async function routeAfterLogin() {
+  const profile = await useProfile.getState().load();
+  void useDay.getState().load();
+  router.replace(profile?.onboardingDone ? '/(tabs)/today' : '/(onboarding)/step1');
+}
+
+/**
+ * A2 로그인 — 시안 docs/design/A2-login.png
+ * - Supabase 미설정: 세 버튼 모두 닉네임 시트 → 이 기기에 세션 저장
+ * - Supabase 설정: 카카오·Apple 은 OAuth(인앱 브라우저), 이메일은 이메일+비밀번호 가입/로그인 시트
+ */
 export default function LoginScreen() {
+  const mode = useSession((s) => s.mode);
   const signIn = useSession((s) => s.signIn);
+  const signUpEmail = useSession((s) => s.signUpEmail);
+  const signInEmail = useSession((s) => s.signInEmail);
+  const signInOAuth = useSession((s) => s.signInOAuth);
+  const cloud = mode === 'supabase';
+
   const [provider, setProvider] = useState<AuthProvider | null>(null);
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  /** Supabase 이메일 시트: 가입 / 로그인 */
+  const [emailMode, setEmailMode] = useState<'signup' | 'signin'>('signup');
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState<'kakao' | 'apple' | null>(null);
 
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canStart = nickname.trim().length > 0 && (provider !== 'email' || emailOk);
+  const passwordOk = password.length >= PASSWORD_MIN;
+  const cloudEmail = cloud && provider === 'email';
+  const canStart = cloudEmail
+    ? emailOk && passwordOk && (emailMode === 'signin' || nickname.trim().length > 0)
+    : nickname.trim().length > 0 && (provider !== 'email' || emailOk);
+
+  const openSheet = (p: AuthProvider) => {
+    setNotice(null);
+    setProvider(p);
+  };
+
+  const onSocial = async (p: 'kakao' | 'apple') => {
+    if (!cloud) return openSheet(p);
+    setOauthBusy(p);
+    const res = await signInOAuth(p);
+    setOauthBusy(null);
+    if (res.ok) return routeAfterLogin();
+    if (!res.cancelled) showToast(res.message, 'info');
+  };
 
   const start = async () => {
     if (!provider || !canStart) return;
     setBusy(true);
-    await signIn(provider, nickname, provider === 'email' ? email : undefined);
+    if (!cloudEmail) {
+      await signIn(provider, nickname, provider === 'email' ? email : undefined);
+      setBusy(false);
+      setProvider(null);
+      return routeAfterLogin();
+    }
+    const res: AuthResult = emailMode === 'signup' ? await signUpEmail(email, password, nickname) : await signInEmail(email, password);
     setBusy(false);
-    setProvider(null);
-    router.replace('/(onboarding)/step1');
+    if (res.ok) {
+      setProvider(null);
+      setPassword('');
+      return routeAfterLogin();
+    }
+    if (res.needsConfirm) setEmailMode('signin');
+    setNotice(res.message);
   };
+
+  const sheetSubtitle = cloudEmail
+    ? emailMode === 'signup'
+      ? `닉네임과 이메일, 비밀번호(${PASSWORD_MIN}자 이상)를 정해주세요.`
+      : '가입한 이메일과 비밀번호를 입력해주세요.'
+    : provider === 'email'
+      ? '닉네임과 이메일을 알려주세요.'
+      : '앱에서 불러드릴 닉네임을 알려주세요.';
+  const sheetTitle = cloudEmail ? (emailMode === 'signup' ? '이메일로 가입' : '이메일로 로그인') : provider ? PROVIDER_TITLE[provider] : undefined;
+  const cta = cloudEmail ? (emailMode === 'signup' ? '가입하고 시작하기' : '로그인') : '시작하기';
 
   return (
     <Screen>
@@ -67,9 +131,9 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.buttons}>
-        <Button variant="kakao" title="카카오로 시작" onPress={() => setProvider('kakao')} />
-        <Button variant="apple" title="Apple로 계속" onPress={() => setProvider('apple')} />
-        <Button variant="email" title="이메일로 시작" onPress={() => setProvider('email')} />
+        <Button variant="kakao" title="카카오로 시작" onPress={() => void onSocial('kakao')} loading={oauthBusy === 'kakao'} disabled={oauthBusy !== null} />
+        <Button variant="apple" title="Apple로 계속" onPress={() => void onSocial('apple')} loading={oauthBusy === 'apple'} disabled={oauthBusy !== null} />
+        <Button variant="email" title="이메일로 시작" onPress={() => openSheet('email')} disabled={oauthBusy !== null} />
       </View>
 
       <View style={styles.terms}>
@@ -84,12 +148,14 @@ export default function LoginScreen() {
       <BottomSheet
         visible={provider !== null}
         onClose={() => setProvider(null)}
-        title={provider ? PROVIDER_TITLE[provider] : undefined}
-        subtitle={provider === 'email' ? '닉네임과 이메일을 알려주세요.' : '앱에서 불러드릴 닉네임을 알려주세요.'}
-        footer={<Button title="시작하기" onPress={start} disabled={!canStart} loading={busy} />}
+        title={sheetTitle}
+        subtitle={sheetSubtitle}
+        footer={<Button title={cta} onPress={start} disabled={!canStart} loading={busy} />}
       >
         <View style={styles.sheetBody}>
-          <Input kind="text" label="닉네임" icon="person-outline" value={nickname} onChangeText={setNickname} placeholder="예: 지은" maxLength={12} />
+          {!cloudEmail || emailMode === 'signup' ? (
+            <Input kind="text" label="닉네임" icon="person-outline" value={nickname} onChangeText={setNickname} placeholder="예: 지은" maxLength={12} />
+          ) : null}
           {provider === 'email' ? (
             <Input
               kind="text"
@@ -101,6 +167,40 @@ export default function LoginScreen() {
               keyboardType="email-address"
               error={email.length > 0 && !emailOk ? '이메일 형식을 확인해주세요.' : undefined}
             />
+          ) : null}
+          {cloudEmail ? (
+            <Input
+              kind="text"
+              label="비밀번호"
+              icon="lock-closed-outline"
+              value={password}
+              onChangeText={setPassword}
+              placeholder={`${PASSWORD_MIN}자 이상`}
+              secureTextEntry
+              error={password.length > 0 && !passwordOk ? `비밀번호는 ${PASSWORD_MIN}자 이상으로 정해주세요.` : undefined}
+            />
+          ) : null}
+          {cloudEmail && notice ? (
+            <Text variant="caption" color="primaryText" style={styles.notice}>
+              {notice}
+            </Text>
+          ) : null}
+          {cloudEmail ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setNotice(null);
+                setEmailMode((m) => (m === 'signup' ? 'signin' : 'signup'));
+              }}
+              style={styles.switch}
+            >
+              <Text variant="caption" color="ink2" align="center">
+                {emailMode === 'signup' ? '이미 계정이 있어요 · ' : '처음이에요 · '}
+                <Text variant="caption" color="primaryText" style={styles.underline}>
+                  {emailMode === 'signup' ? '로그인' : '가입하기'}
+                </Text>
+              </Text>
+            </Pressable>
           ) : null}
         </View>
       </BottomSheet>
@@ -128,4 +228,6 @@ const styles = StyleSheet.create({
   termsText: { marginHorizontal: spacing.md },
   underline: { textDecorationLine: 'underline' },
   sheetBody: { gap: spacing.md },
+  notice: { marginTop: -spacing.xs },
+  switch: { paddingVertical: spacing.xs },
 });
