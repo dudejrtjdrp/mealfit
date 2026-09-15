@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ToastHost } from '@/components';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -33,6 +34,7 @@ export default function RootLayout() {
           <Stack.Screen name="(onboarding)" />
           <Stack.Screen name="login" />
         </Stack>
+        <ToastHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
