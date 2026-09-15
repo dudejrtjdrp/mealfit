@@ -41,3 +41,12 @@ example
 # generated native folders
 /ios
 /android
+
+# secrets / local
+.env
+.local/
+.secrets/
+
+# native (prebuild 결과는 맥에서 생성)
+ios/
+android/
