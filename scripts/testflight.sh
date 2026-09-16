@@ -36,4 +36,5 @@ xcodebuild -exportArchive -archivePath "$OUT/app.xcarchive" \
   -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" \
   -allowProvisioningUpdates | tail -n 20
 
+[ -f release/whats-new.txt ] && { echo "── TestFlight '테스트할 내용'에 붙여넣기 ──"; cat release/whats-new.txt; }
 echo "✅ 업로드 완료 (build $BUILD_NUMBER). App Store Connect → TestFlight에서 처리(10~30분) 후 테스터에게 배포됩니다."

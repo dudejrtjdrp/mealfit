@@ -50,3 +50,8 @@ docs/                    IA, 시안, 결정 기록
 - 작업 단위마다 커밋 (기능 하나 = 커밋 하나). 본문에는 결정과 이유를 1~3줄.
 - 커밋 작성자: `dudejrtjdrp <dudejrtjdrp@gmail.com>`. 마지막 줄에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - `.env`, 토큰, `.local/` 은 절대 커밋하지 않는다.
+
+## 릴리스·패치노트
+- 사용자에게 보이는 변화(feat/fix)가 쌓여 한 번 배포할 만하면 `npm run release` 로 버전업 + `CHANGELOG.md` 패치노트 + `release/whats-new.txt`(TestFlight "테스트할 내용") 를 만들고 `chore(release): vX.Y.Z` 로 커밋한다.
+- 버전 규칙: feat 포함 → minor, fix/기타만 → patch. 빌드 번호는 `npm run testflight` 가 시각으로 자동 부여.
+- 그래서 커밋 제목은 사용자가 읽을 수 있는 한국어 한 줄로 쓴다 — 그대로 패치노트가 된다.

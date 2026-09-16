@@ -54,7 +54,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "export:web": "expo export --platform web",
-    "testflight": "bash scripts/testflight.sh"
+    "testflight": "bash scripts/testflight.sh",
+    "release": "node scripts/release.mjs"
   },
   "private": true,
   "jest": {
