@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "app.mealfit.mvp",
       "supportsTablet": false,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "주변 매장의 메뉴를 판정해 보여드리기 위해 현재 위치가 필요해요.",
         "ITSAppUsesNonExemptEncryption": false
@@ -36,6 +37,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {

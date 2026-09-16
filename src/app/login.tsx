@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BottomSheet, Button, Input, Screen, Sprout, Text, showToast } from '@/components';
-import { PASSWORD_MIN } from '@/services/auth';
+import { isAppleSignInAvailable, PASSWORD_MIN } from '@/services/auth';
 import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
 import { type AuthProvider, type AuthResult, useSession } from '@/state/session';
@@ -13,6 +13,7 @@ import { colors, fonts, spacing } from '@/theme';
 const PROVIDER_TITLE: Record<AuthProvider, string> = {
   kakao: '카카오로 시작',
   apple: 'Apple로 계속',
+  google: 'Google로 계속',
   email: '이메일로 시작',
 };
 
@@ -26,7 +27,9 @@ async function routeAfterLogin() {
 /**
  * A2 로그인 — 시안 docs/design/A2-login.png
  * - Supabase 미설정: 세 버튼 모두 닉네임 시트 → 이 기기에 세션 저장
- * - Supabase 설정: 카카오·Apple 은 OAuth(인앱 브라우저), 이메일은 이메일+비밀번호 가입/로그인 시트
+ * - Supabase 설정: 카카오·Google 은 OAuth(시스템 브라우저), Apple 은 iOS 네이티브 시트 → signInWithIdToken,
+ *   이메일은 이메일+비밀번호 가입/로그인 시트
+ * - 버튼 순서: 카카오 → Apple(iOS 에서만) → Google → 이메일
  */
 export default function LoginScreen() {
   const mode = useSession((s) => s.mode);
@@ -34,6 +37,7 @@ export default function LoginScreen() {
   const signUpEmail = useSession((s) => s.signUpEmail);
   const signInEmail = useSession((s) => s.signInEmail);
   const signInOAuth = useSession((s) => s.signInOAuth);
+  const signInApple = useSession((s) => s.signInApple);
   const cloud = mode === 'supabase';
 
   const [provider, setProvider] = useState<AuthProvider | null>(null);
@@ -44,7 +48,19 @@ export default function LoginScreen() {
   const [emailMode, setEmailMode] = useState<'signup' | 'signin'>('signup');
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [oauthBusy, setOauthBusy] = useState<'kakao' | 'apple' | null>(null);
+  const [oauthBusy, setOauthBusy] = useState<'kakao' | 'apple' | 'google' | null>(null);
+  /** Sign in with Apple 은 iOS 에서만 (Android·웹은 버튼 숨김) */
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void isAppleSignInAvailable().then((ok) => {
+      if (alive) setAppleAvailable(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const passwordOk = password.length >= PASSWORD_MIN;
@@ -58,10 +74,11 @@ export default function LoginScreen() {
     setProvider(p);
   };
 
-  const onSocial = async (p: 'kakao' | 'apple') => {
+  const onSocial = async (p: 'kakao' | 'apple' | 'google') => {
     if (!cloud) return openSheet(p);
+    if (oauthBusy) return;
     setOauthBusy(p);
-    const res = await signInOAuth(p);
+    const res = p === 'apple' ? await signInApple() : await signInOAuth(p);
     setOauthBusy(null);
     if (res.ok) return routeAfterLogin();
     if (!res.cancelled) showToast(res.message, 'info');
@@ -117,7 +134,7 @@ export default function LoginScreen() {
         시작해요.
       </Text>
 
-      <View style={styles.illust} accessibilityLabel="샐러드 일러스트">
+      <View style={[styles.illust, appleAvailable && styles.illustCompact]} accessibilityLabel="샐러드 일러스트">
         <View style={styles.illustCircle} />
         <Ionicons name="leaf" size={28} color={colors.gaugeFill} style={styles.leafA} />
         <Ionicons name="leaf" size={18} color={colors.primaryBorder} style={styles.leafB} />
@@ -132,7 +149,10 @@ export default function LoginScreen() {
 
       <View style={styles.buttons}>
         <Button variant="kakao" title="카카오로 시작" onPress={() => void onSocial('kakao')} loading={oauthBusy === 'kakao'} disabled={oauthBusy !== null} />
-        <Button variant="apple" title="Apple로 계속" onPress={() => void onSocial('apple')} loading={oauthBusy === 'apple'} disabled={oauthBusy !== null} />
+        {appleAvailable ? (
+          <Button variant="apple" title="Apple로 계속" onPress={() => void onSocial('apple')} loading={oauthBusy === 'apple'} disabled={oauthBusy !== null} />
+        ) : null}
+        <Button variant="google" title="Google로 계속" onPress={() => void onSocial('google')} loading={oauthBusy === 'google'} disabled={oauthBusy !== null} />
         <Button variant="email" title="이메일로 시작" onPress={() => openSheet('email')} disabled={oauthBusy !== null} />
       </View>
 
@@ -215,6 +235,8 @@ const styles = StyleSheet.create({
   headline: { marginTop: spacing.xxxl + spacing.xs, marginLeft: spacing.lg, fontSize: 30 },
   headlineText: { fontSize: 30 },
   illust: { flex: 1, minHeight: 170, maxHeight: 230, marginTop: spacing.md, alignItems: 'center', justifyContent: 'center' },
+  /** 버튼이 4개일 때 일러스트가 줄어들어 390×844 에서 스크롤 없이 들어가게 */
+  illustCompact: { minHeight: 120 },
   illustCircle: { position: 'absolute', width: 190, height: 190, borderRadius: 95, backgroundColor: colors.primarySofter, left: '22%', top: '8%' },
   bowl: { fontSize: 120, lineHeight: 140, marginLeft: 30, marginTop: 20 },
   leafA: { position: 'absolute', left: '14%', top: '38%', transform: [{ rotate: '-20deg' }] },

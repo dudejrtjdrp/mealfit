@@ -2,7 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session as SupabaseSession, SupabaseClient } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
-import { type AuthProvider, type AuthResult, emailSignIn, emailSignUp, oauthSignIn, type Session, sessionFromSupabase } from '@/services/auth';
+import {
+  appleSignIn,
+  type AuthProvider,
+  type AuthResult,
+  emailSignIn,
+  emailSignUp,
+  NICKNAME_FALLBACK,
+  type OAuthProvider,
+  oauthSignIn,
+  type Session,
+  sessionFromSupabase,
+} from '@/services/auth';
 import { setAuthUserId } from '@/services/authState';
 import { newId } from '@/services/id';
 import { createLocalRepos } from '@/services/repo/local';
@@ -15,7 +26,7 @@ import { getSupabase } from '@/services/supabase';
  * - Supabase 미설정(.env 비어 있음): 로컬 세션(provider·닉네임·생성 시각)만 AsyncStorage 에 저장
  * - Supabase 설정: Supabase Auth 세션이 기준. 로그인 직후 로컬 데이터를 1회 옮긴다
  */
-export type { AuthProvider, AuthResult, Session } from '@/services/auth';
+export type { AuthProvider, AuthResult, OAuthProvider, Session } from '@/services/auth';
 
 const KEY = 'mealfit:session';
 
@@ -31,8 +42,10 @@ interface SessionState {
   signUpEmail: (email: string, password: string, nickname: string) => Promise<AuthResult>;
   /** Supabase 모드: 이메일+비밀번호 로그인 */
   signInEmail: (email: string, password: string) => Promise<AuthResult>;
-  /** Supabase 모드: 카카오·Apple OAuth */
-  signInOAuth: (provider: 'kakao' | 'apple') => Promise<AuthResult>;
+  /** Supabase 모드: 카카오·Google OAuth (시스템 브라우저) */
+  signInOAuth: (provider: OAuthProvider) => Promise<AuthResult>;
+  /** Supabase 모드: iOS 네이티브 Sign in with Apple → signInWithIdToken */
+  signInApple: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -75,7 +88,17 @@ export const useSession = create<SessionState>((set, get) => {
       const res = await run;
       if (!res.ok) return res;
       const { data } = await db.auth.getSession();
-      if (data.session) return { ok: true, session: await activate(db, data.session) };
+      if (data.session) {
+        const session = await activate(db, data.session);
+        // Apple 첫 로그인 이름을 서버에 못 남겼을 때도 이번 세션 닉네임은 유지
+        const fromRes = res.session.nickname;
+        if (fromRes && fromRes !== NICKNAME_FALLBACK && (!session.nickname || session.nickname === NICKNAME_FALLBACK)) {
+          const merged = { ...session, nickname: fromRes };
+          set({ session: merged });
+          return { ok: true, session: merged };
+        }
+        return { ok: true, session };
+      }
       return res;
     } catch (e) {
       console.warn('[session] 로그인 실패', e);
@@ -166,6 +189,11 @@ export const useSession = create<SessionState>((set, get) => {
     signInOAuth: async (provider) => {
       const db = getSupabase();
       return db ? withActivate(db, oauthSignIn(db, provider)) : notConfigured;
+    },
+
+    signInApple: async () => {
+      const db = getSupabase();
+      return db ? withActivate(db, appleSignIn(db)) : notConfigured;
     },
 
     signOut: async () => {

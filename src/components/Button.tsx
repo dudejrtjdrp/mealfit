@@ -6,7 +6,7 @@ import { colors, shadow, spacing } from '@/theme';
 
 import { Text } from './Text';
 
-export type ButtonVariant = 'primary' | 'cta' | 'outline' | 'kakao' | 'apple' | 'email' | 'ghost';
+export type ButtonVariant = 'primary' | 'cta' | 'outline' | 'kakao' | 'apple' | 'google' | 'email' | 'ghost';
 
 export interface ButtonProps {
   title: string;
@@ -23,7 +23,7 @@ export interface ButtonProps {
   accessibilityLabel?: string;
 }
 
-const SOCIAL: ButtonVariant[] = ['kakao', 'apple', 'email'];
+const SOCIAL: ButtonVariant[] = ['kakao', 'apple', 'google', 'email'];
 
 /** 주 버튼·소셜 로그인·텍스트 버튼. 시안(A2·B1·B6)처럼 알약형 라운드 */
 export function Button({
@@ -47,6 +47,7 @@ export function Button({
     outline: colors.surface,
     kakao: colors.kakao,
     apple: colors.surface,
+    google: colors.surface,
     email: colors.surface,
     ghost: 'transparent',
   };
@@ -66,6 +67,8 @@ export function Button({
       <Ionicons name="chatbubble" size={24} color={colors.kakaoInk} />
     ) : variant === 'apple' ? (
       <FontAwesome name="apple" size={26} color={colors.apple} />
+    ) : variant === 'google' ? (
+      <Ionicons name="logo-google" size={24} color={colors.ink} />
     ) : variant === 'email' ? (
       <Ionicons name="mail-outline" size={24} color={colors.ink2} />
     ) : null;
@@ -81,7 +84,7 @@ export function Button({
         styles.base,
         { height: variant === 'ghost' ? 44 : height, borderRadius: height / 2, backgroundColor: bg[variant] },
         variant === 'outline' && styles.outline,
-        (variant === 'apple' || variant === 'email') && shadow.card,
+        (variant === 'apple' || variant === 'google' || variant === 'email') && shadow.card,
         social && styles.social,
         disabled && !loading && variant !== 'ghost' && styles.disabled,
         pressed && styles.pressed,

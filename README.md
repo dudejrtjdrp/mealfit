@@ -25,7 +25,7 @@ npx expo start              # Expo Go / 웹(w 키)
 ```
 
 - Node 20 이상, Expo SDK 57.
-- 카카오·Apple 로그인은 딥링크(`mealfit://`)가 필요해서 **개발 빌드(`expo run:ios`)** 에서 확인하세요. Expo Go 에서는 리다이렉트 주소가 `exp://…` 로 바뀝니다.
+- 소셜 로그인(카카오·Apple·Google)은 딥링크(`mealfit://`)·네이티브 모듈이 필요해서 **개발 빌드(`expo run:ios`)** 에서 확인하세요. Expo Go 에서는 리다이렉트 주소가 `exp://…` 로 바뀝니다.
 - `.env` 를 바꾸면 `npx expo start -c` 로 캐시를 비우고 다시 실행하세요 (`EXPO_PUBLIC_*` 는 번들 시점에 박힙니다).
 
 ## 환경 변수
@@ -51,11 +51,21 @@ npx expo start              # Expo Go / 웹(w 키)
 3. **Settings → API** 에서 Project URL 과 `anon` `public` 키를 `.env` 에 넣습니다.
 4. **Authentication → Sign In / Providers → Email** 을 켭니다.
    - 데모에서는 **Confirm email 을 끄면** 가입 즉시 로그인됩니다. 켜 두면 인증 메일의 링크를 누른 뒤 앱에서 로그인하면 됩니다.
-5. (선택) 카카오 · Apple
-   - **Authentication → Sign In / Providers** 에서 Kakao / Apple 을 켜고 각 콘솔에서 받은 키를 넣습니다.
-   - **Authentication → URL Configuration → Redirect URLs** 에 `mealfit://` 와 `mealfit://**` 를 추가합니다. (Expo Go 로 시험한다면 터미널에 찍히는 `exp://…` 주소도)
-   - 카카오 콘솔의 Redirect URI 에는 Supabase 가 알려주는 콜백 주소 `https://<project-ref>.supabase.co/auth/v1/callback` 를 등록합니다.
-   - 카카오는 기본으로 `account_email` 동의항목을 요청합니다. 비즈 앱이 아니면 이메일 동의항목을 켤 수 없으니, 카카오 동의항목에서 닉네임·이메일 설정을 먼저 확인하세요.
+5. (선택) 소셜 로그인 — 카카오 · Apple · Google
+   - 공통: **Authentication → URL Configuration → Redirect URLs** 에 `mealfit://auth` 와 `mealfit://**` 를 추가합니다. (Expo Go 로 시험한다면 터미널에 찍히는 `exp://…/--/auth` 주소도)
+   - **Apple (iOS 네이티브 Sign in with Apple)**
+     - 앱은 `expo-apple-authentication` 으로 시스템 Apple 시트를 띄우고, 받은 `identityToken` 을 `supabase.auth.signInWithIdToken({ provider: 'apple' })` 로 넘깁니다. 브라우저를 거치지 않아 Apple 콘솔의 Services ID·Secret Key 는 필요 없습니다.
+     - Supabase **Sign In / Providers → Apple** 을 켜고 **Client IDs** 에 번들 ID `app.mealfit.mvp` 를 넣습니다.
+     - `app.json` 에 `ios.usesAppleSignIn: true` 와 `expo-apple-authentication` 플러그인이 들어 있어, `npx expo run:ios` 로 prebuild 하면 **Xcode 자동 서명이 Sign in with Apple capability 를 추가**합니다. (유료 Apple Developer 팀으로 서명해야 하고, 시뮬레이터에서는 iCloud 로그인이 필요)
+     - 이름은 **첫 로그인 때만** 옵니다. 앱이 `user_metadata.nickname` 에 저장하고, 없으면 닉네임은 "회원". 이메일은 `…@privaterelay.appleid.com` 일 수 있습니다.
+     - Android·웹에서는 Apple 버튼을 숨깁니다.
+   - **Google (Supabase OAuth, 시스템 브라우저)**
+     - Google Cloud Console → **API 및 서비스 → 사용자 인증 정보 → OAuth 클라이언트 ID → 웹 애플리케이션** 을 만들고, 승인된 리디렉션 URI 에 `https://<project-ref>.supabase.co/auth/v1/callback` 을 등록합니다. (OAuth 동의 화면도 먼저 구성)
+     - 받은 클라이언트 ID·보안 비밀을 Supabase **Sign In / Providers → Google** 에 넣습니다.
+     - 앱은 `WebBrowser.openAuthSessionAsync`(iOS ASWebAuthenticationSession / Android Custom Tabs)로 열어 구글의 임베디드 웹뷰 차단에 걸리지 않습니다. 콜백 `mealfit://auth?code=…` 와 `#access_token=…` 둘 다 처리합니다.
+   - **카카오 (Supabase OAuth)**
+     - 카카오 콘솔의 Redirect URI 에 `https://<project-ref>.supabase.co/auth/v1/callback` 을 등록하고, REST API 키·Client Secret 을 Supabase **Kakao** Provider 에 넣습니다.
+     - Supabase 는 `account_email` 동의항목을 요청합니다. **비즈 앱으로 전환한 뒤 이메일 동의항목을 켜야** 로그인이 됩니다. 그 전에는 KOE205 오류가 나며, 앱은 "카카오 로그인은 준비 중이에요. 이메일로 시작해 주세요" 로 안내합니다.
 
 ### 테이블 요약
 
@@ -69,7 +79,8 @@ npx expo start              # Expo Go / 웹(w 키)
 
 | | Supabase 미설정 | Supabase 설정 |
 | --- | --- | --- |
-| 카카오 / Apple | 닉네임 시트 → 이 기기에 세션 저장 | `signInWithOAuth` → 인앱 브라우저(`WebBrowser.openAuthSessionAsync`) → `mealfit://` 로 돌아와 세션 생성 |
+| 카카오 / Google | 닉네임 시트 → 이 기기에 세션 저장 | `signInWithOAuth` → 시스템 브라우저(`WebBrowser.openAuthSessionAsync`) → `mealfit://auth` 로 돌아와 세션 생성 |
+| Apple (iOS 만) | 닉네임 시트 → 이 기기에 세션 저장 | 네이티브 Apple 시트 → `signInWithIdToken({ provider: 'apple' })` |
 | 이메일 | 닉네임 + 이메일 시트 | **이메일 + 비밀번호(8자 이상)** 가입 / 로그인 |
 | 데이터 저장 | AsyncStorage | Supabase (`profiles`, `meal_logs`, `diet_type_cache`) |
 | 기존 로컬 데이터 | — | 첫 로그인 때 **로컬 프로필·기록을 Supabase 로 1회 옮김** (서버에 프로필이 이미 있으면 프로필은 덮어쓰지 않음, 로컬 원본은 백업으로 남김) |
@@ -136,7 +147,7 @@ npx expo config --type public     # app.json 설정 확인
 ## 알려진 제한
 
 - **사진 없음**: 메뉴·매장 사진은 저작권 때문에 넣지 않았고, 카테고리 아이콘 타일로 대신합니다.
-- **소셜 로그인은 Supabase 설정이 필요**합니다. 미설정 상태의 카카오/Apple 버튼은 닉네임만 받는 로컬 로그인입니다. 웹 미리보기에서는 소셜 OAuth 를 지원하지 않아 이메일로 안내합니다.
+- **소셜 로그인은 Supabase 설정이 필요**합니다. 미설정 상태의 카카오/Apple/Google 버튼은 닉네임만 받는 로컬 로그인입니다. 웹 미리보기에서는 소셜 OAuth 를 지원하지 않아 이메일로 안내합니다.
 - **탈퇴는 데이터만 지웁니다**: 앱(anon 키)에서는 `auth.users` 계정 자체를 지울 수 없어, 계정 삭제는 서버 함수(service role)가 필요합니다.
 - **오프라인 동기화 없음**: Supabase 모드에서 네트워크가 끊기면 저장이 실패하고(화면에는 반영) 다시 시도하지 않습니다.
 - **웹 하이드레이션 경고**: 정적 웹 export 에서 첫 렌더와 클라이언트 상태(로컬 세션·날짜)가 달라 콘솔에 하이드레이션 경고가 뜰 수 있습니다. 동작에는 영향이 없습니다.
