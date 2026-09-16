@@ -50,3 +50,4 @@ example
 # native (prebuild 결과는 맥에서 생성)
 ios/
 android/
+/build

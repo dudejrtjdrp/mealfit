@@ -53,7 +53,8 @@
     "typecheck": "tsc --noEmit -p .",
     "test": "jest",
     "test:watch": "jest --watch",
-    "export:web": "expo export --platform web"
+    "export:web": "expo export --platform web",
+    "testflight": "bash scripts/testflight.sh"
   },
   "private": true,
   "jest": {
