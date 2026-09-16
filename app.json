@@ -15,7 +15,8 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "주변 매장의 메뉴를 판정해 보여드리기 위해 현재 위치가 필요해요.",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "AW9XRML8T7"
     },
     "android": {
       "adaptiveIcon": {
