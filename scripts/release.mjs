@@ -65,5 +65,5 @@ fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 
 sh('git add CHANGELOG.md app.json package.json release/whats-new.txt');
 const body = whatsNew.split('\n').slice(0, 3).join('\n');
-execSync(`git commit -q -F -`, { input: `chore(release): v${next}\n\n${body}\n` });
+execSync(`git commit -q -F -`, { input: `chore(release): v${next}\n\n${body}\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n` });
 console.log(`✅ v${next} 릴리스 커밋 완료\n\n${md}`);
