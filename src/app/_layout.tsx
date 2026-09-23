@@ -10,6 +10,7 @@ import { Component, type ReactNode } from 'react';
 import { StyleSheet, Text as RNText, View } from 'react-native';
 
 import { ToastHost } from '@/components';
+import { prewarmCatalog } from '@/data';
 import { useBootstrap } from '@/state/bootstrap';
 import { colors } from '@/theme';
 
@@ -64,7 +65,10 @@ export default function RootLayout() {
   useBootstrap();
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync().catch(() => {});
+    if (!loaded) return;
+    SplashScreen.hideAsync().catch(() => {});
+    // 메뉴 카탈로그(식약처 4.2MB·1만여 메뉴)는 첫 화면이 뜬 뒤 한가할 때 미리 만든다 — 시작 렌더를 막지 않게
+    prewarmCatalog();
   }, [loaded]);
 
   if (!loaded) return null;
