@@ -462,7 +462,10 @@ export function rowToMenu(row: IngestRow, matcher: BrandMatcher): { menu: Ingest
 
 // ───────────────────────── 시판 가공식품(제품) ─────────────────────────
 
-/** 검색 카탈로그에 싣는 소비자 제품 대분류 → 우선순위 (작을수록 먼저 싣고, 용량 초과 시 뒤부터 뺀다) */
+/**
+ * 검색 카탈로그에 싣는 소비자 제품 대분류 → 우선순위 (작을수록 먼저 싣고, 용량 초과 시 뒤부터 뺀다).
+ * "그대로 사 먹는 것"은 다 싣고, 재료·양념성 분류(식용유지류·조미식품·장류·특수의료용도식품)만 뺀다 — 2026-09-24 효님 "다양한 제품" 요청.
+ */
 export const PRODUCT_MAJOR_CATEGORIES: Record<string, number> = {
   면류: 0, // 라면·국수
   즉석식품류: 1, // 도시락·김밥·즉석밥
@@ -472,17 +475,33 @@ export const PRODUCT_MAJOR_CATEGORIES: Record<string, number> = {
   음료류: 5,
   유가공품류: 6,
   '식육가공품 및 포장육': 7, // 소시지·햄
+  수산가공식품류: 8, // 어묵·맛살·참치캔
+  '두부류 또는 묵류': 9,
+  농산가공식품류: 10, // 견과·과일가공·시리얼
+  '절임류 또는 조림류': 11,
+  당류: 12,
+  잼류: 13,
+  알가공품류: 14,
+  특수영양식품: 15, // 단백질 보충·이유식
+  기타식품류: 16,
+  동물성가공식품류: 17,
+  '벌꿀 및 화분가공 식품류': 18,
+  주류: 19,
 };
 
 /** 모든 시판 제품이 공유하는 가상 브랜드 id — 매장 매칭 키워드는 비워 둔다(장소 이름과 매칭되면 안 됨) */
 export const PACKAGED_BRAND_ID = 'packaged';
 
-/** 법인 표기를 뗀 화면용 업체명. "오뚜기라면(주)" → "오뚜기라면". 알 수 없으면 undefined */
+/**
+ * 법인 표기를 뗀 화면용 업체명. "오뚜기라면(주)" → "오뚜기라면", "오리온 제4청주공장" → "오리온".
+ * 같은 회사가 공장별로 갈라져 있으면(빈도 희석·중복 항목) 하나로 합쳐지도록 공장 접미사도 뗀다.
+ */
 export function displayCompany(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const s = normalizeDisplayText(raw)
     .replace(/\(\s*(주|유|사|재|합)\s*\)|㈜|㈔/g, '')
     .replace(/주식회사|유한회사|유한책임회사|농업회사법인|영농조합법인/g, '')
+    .replace(/\s*(제?\s*\d+)?\s*[가-힣A-Za-z]{0,2}\s*공장$/u, '')
     .replace(/\s+/g, ' ')
     .trim();
   if (!s || NO_CATEGORY.has(s)) return undefined;

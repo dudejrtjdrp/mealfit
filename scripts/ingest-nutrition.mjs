@@ -43,7 +43,7 @@ const DRY = flag('--dry-run');
 const STATS_ONLY = flag('--stats');
 const MAX_BYTES = Math.round(Number(opt('--max-mb', '5')) * 1024 * 1024);
 // 시판 제품(mfds-products.json)은 검색 때만 지연 로드하는 별도 파일 — 시작 성능과 무관해 상한을 따로 둔다
-const MAX_PRODUCT_BYTES = Math.round(Number(opt('--max-products-mb', '8')) * 1024 * 1024);
+const MAX_PRODUCT_BYTES = Math.round(Number(opt('--max-products-mb', '10')) * 1024 * 1024);
 const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--max-mb' && args[i - 1] !== '--max-products-mb');
 
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
@@ -225,21 +225,61 @@ console.log('전:', stats(current));
 console.log('후:', stats(bundle));
 
 // ───────── 시판 제품 번들 ─────────
-let products = lib.dedupeProducts(allProducts);
-// 우선순위(면류→즉석→과자→…) 안에서 이름순 — 용량 초과 시 뒤 카테고리부터 뺀다
-products.sort((a, b) => (a._priority ?? 99) - (b._priority ?? 99) || a.name.localeCompare(b.name, 'ko'));
+// 전체 원본(가공식품 표준 API)은 59만 행 → 이름+제조사 유일 26만 개라 다 실을 수 없다.
+// 카테고리별 정원 + 정원 초과 시 "제조사의 등록 제품 수가 많은 순"(대형 제조사 = 소비자가 실제로 찾는 브랜드일 확률이 높은 proxy)으로 고른다.
+const PRODUCT_QUOTA = {
+  면류: 4000, 즉석식품류: 6000, '과자류·빵류 또는 떡류': 8000, 빙과류: 2000, '코코아가공품류 또는 초콜릿류': 2000,
+  음료류: 5000, 유가공품류: 2000, '식육가공품 및 포장육': 2500, 수산가공식품류: 1500, '두부류 또는 묵류': 500,
+  농산가공식품류: 1500, '절임류 또는 조림류': 500, 당류: 300, 잼류: 300, 알가공품류: 200,
+  특수영양식품: 800, 기타식품류: 300, 동물성가공식품류: 100, '벌꿀 및 화분가공 식품류': 10, 주류: 30,
+};
+const deduped = lib.dedupeProducts(allProducts);
+const makerFreq = new Map();
+for (const p of deduped) {
+  const k = lib.normalizeCompany(p.maker);
+  if (k) makerFreq.set(k, (makerFreq.get(k) ?? 0) + 1);
+}
+// 소비자가 이름으로 찾는 유명 제조사는 등록 수와 무관하게 먼저 싣는다 (코카콜라처럼 제품 수는 적어도 검색은 많은 브랜드)
+const MAJOR_MAKERS = ['농심', '오뚜기', '삼양식품', '팔도', '롯데', '해태', '오리온', '크라운', '빙그레', '코카콜라', '동서', '매일유업', '서울우유', '남양유업', '씨제이', 'CJ', '대상', '풀무원', '동원', '사조', '샘표', '정식품', '웅진', '광동', '동아오츠카', '하이트진로', '델몬트', '목우촌', '하림', '진주햄', 'SPC', '삼립', '파리크라상', '해찬들', '청정원', '제주특별자치도개발공사', '일화'].map(lib.normalizeCompany);
+const isMajor = (makerKey) => !!makerKey && MAJOR_MAKERS.some((m) => makerKey.includes(m));
+const priorityToCat = new Map(Object.entries(lib.PRODUCT_MAJOR_CATEGORIES).map(([k, v]) => [v, k]));
+const byCat = new Map();
+for (const p of deduped) {
+  const list = byCat.get(p._priority) ?? [];
+  list.push(p);
+  byCat.set(p._priority, list);
+}
+let products = [];
+const quotaCut = {};
+for (const pr of [...byCat.keys()].sort((a, b) => a - b)) {
+  const cat = priorityToCat.get(pr) ?? String(pr);
+  const list = byCat.get(pr).sort((a, b) => {
+    const ka = lib.normalizeCompany(a.maker);
+    const kb = lib.normalizeCompany(b.maker);
+    return (isMajor(kb) ? 1 : 0) - (isMajor(ka) ? 1 : 0) || (makerFreq.get(kb) ?? 0) - (makerFreq.get(ka) ?? 0) || a.name.localeCompare(b.name, 'ko');
+  });
+  const quota = PRODUCT_QUOTA[cat] ?? 300;
+  if (list.length > quota) quotaCut[cat] = list.length - quota;
+  products.push(...list.slice(0, quota));
+}
+if (Object.keys(quotaCut).length) console.log('\n정원 초과로 뺀 제품(카테고리: 뺀 수):', quotaCut);
 // 출처 URL·이름·brandId 는 전 항목이 같아 메타에 한 번만 싣는다 — 로더(src/data/index.ts)가 다시 채운다
 const serializeProducts = (ms) =>
   '{\n' +
   `"meta": ${JSON.stringify({ generatedAt: new Date().toISOString(), source: lib.DATASETS.processed, brandId: lib.PACKAGED_BRAND_ID, count: ms.length, note: '자동 생성 파일 — scripts/ingest-nutrition.mjs' }, null, 2)},\n` +
   `"menus": [${ms.length ? '\n' + ms.map((m) => { const { _priority, sourceUrl, sourceName, brandId, ...rest } = m; void _priority; void sourceUrl; void sourceName; void brandId; return JSON.stringify(rest); }).join(',\n') + '\n' : ''}]\n` +
   '}\n';
+// 정원을 채우고도 바이트 상한을 넘으면 우선순위가 낮은 쪽 끝에서 항목 단위로 덜어낸다
 const droppedProducts = {};
-while (Buffer.byteLength(serializeProducts(products)) > MAX_PRODUCT_BYTES && products.length) {
-  const lastPriority = products[products.length - 1]._priority ?? 99;
-  const before = products.length;
-  products = products.filter((p) => (p._priority ?? 99) !== lastPriority);
-  droppedProducts[lastPriority] = before - products.length;
+let bytes = Buffer.byteLength(serializeProducts(products));
+while (bytes > MAX_PRODUCT_BYTES && products.length) {
+  const cut = Math.max(200, Math.ceil(products.length * 0.03));
+  for (const p of products.slice(-cut)) {
+    const cat = priorityToCat.get(p._priority) ?? String(p._priority);
+    droppedProducts[cat] = (droppedProducts[cat] ?? 0) + 1;
+  }
+  products = products.slice(0, -cut);
+  bytes = Buffer.byteLength(serializeProducts(products));
 }
 const productBytes = Buffer.byteLength(serializeProducts(products));
 const perCat = {};

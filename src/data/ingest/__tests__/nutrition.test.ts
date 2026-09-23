@@ -476,6 +476,9 @@ describe('시판 제품 (rowToProduct)', () => {
     expect(displayCompany('(주) 농심')).toBe('농심');
     expect(displayCompany('주식회사 오뚜기라면')).toBe('오뚜기라면');
     expect(displayCompany('해당없음')).toBeUndefined();
+    // 공장 접미사는 떼서 같은 회사로 합친다 (빈도 희석·중복 방지)
+    expect(displayCompany('오리온 제4청주공장')).toBe('오리온');
+    expect(displayCompany('삼양식품원주공장')).toBe('삼양식품');
     expect(displayCompany('WAN THAI FOODS INDUSTRY CO LTD')!.length).toBeLessThanOrEqual(20);
   });
 
