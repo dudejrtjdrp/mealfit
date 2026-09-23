@@ -83,6 +83,8 @@ type Field =
   | 'code'
   | 'name'
   | 'company'
+  | 'maker'
+  | 'importer'
   | 'distributor'
   | 'majorCat'
   | 'midCat'
@@ -106,6 +108,8 @@ const FIELD_ALIASES: Record<Field, string[]> = {
   code: ['식품코드'],
   name: ['식품명'],
   company: ['업체명', '상호명'],
+  maker: ['제조사명'],
+  importer: ['수입업체명'],
   distributor: ['유통업체명'],
   majorCat: ['식품대분류명', '대분류명', '식품대분류'],
   midCat: ['식품중분류명', '중분류명', '식품중분류'],
@@ -454,6 +458,121 @@ export function rowToMenu(row: IngestRow, matcher: BrandMatcher): { menu: Ingest
   const ref = cell('refDate');
   if (ref) menu._refDate = ref;
   return { menu };
+}
+
+// ───────────────────────── 시판 가공식품(제품) ─────────────────────────
+
+/** 검색 카탈로그에 싣는 소비자 제품 대분류 → 우선순위 (작을수록 먼저 싣고, 용량 초과 시 뒤부터 뺀다) */
+export const PRODUCT_MAJOR_CATEGORIES: Record<string, number> = {
+  면류: 0, // 라면·국수
+  즉석식품류: 1, // 도시락·김밥·즉석밥
+  '과자류·빵류 또는 떡류': 2,
+  빙과류: 3,
+  '코코아가공품류 또는 초콜릿류': 4,
+  음료류: 5,
+  유가공품류: 6,
+  '식육가공품 및 포장육': 7, // 소시지·햄
+};
+
+/** 모든 시판 제품이 공유하는 가상 브랜드 id — 매장 매칭 키워드는 비워 둔다(장소 이름과 매칭되면 안 됨) */
+export const PACKAGED_BRAND_ID = 'packaged';
+
+/** 법인 표기를 뗀 화면용 업체명. "오뚜기라면(주)" → "오뚜기라면". 알 수 없으면 undefined */
+export function displayCompany(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const s = normalizeDisplayText(raw)
+    .replace(/\(\s*(주|유|사|재|합)\s*\)|㈜|㈔/g, '')
+    .replace(/주식회사|유한회사|유한책임회사|농업회사법인|영농조합법인/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!s || NO_CATEGORY.has(s)) return undefined;
+  return s.length > 20 ? `${s.slice(0, 19)}…` : s;
+}
+
+export interface IngestedProduct extends MenuItem {
+  _refDate?: string;
+  /** 용량 초과 시 뒤 카테고리부터 빼기 위한 우선순위 */
+  _priority?: number;
+}
+
+/**
+ * 가공식품 표준데이터 행 → 시판 제품 MenuItem (매장 브랜드에 매칭되지 않은 행용).
+ * 소비자 제품 대분류만 받는다 — 식용유·장류·조미식품 같은 재료성 분류는 "지금 사 먹을 것"이 아니라 뺀다.
+ */
+export function rowToProduct(row: IngestRow): { menu: IngestedProduct } | { skip: SkipReason | 'not-consumer' } {
+  const cell = (f: Field) => (row.cols[f] == null ? undefined : row.cells[row.cols[f]!]?.trim());
+  const majorCat = cell('majorCat') ?? '';
+  const priority = PRODUCT_MAJOR_CATEGORIES[majorCat];
+  if (priority === undefined) return { skip: 'not-consumer' };
+  const rawName = cell('name');
+  if (!rawName) return { skip: 'no-name' };
+  const name = normalizeDisplayText(rawName).replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!name) return { skip: 'no-name' };
+
+  const num = (f: Field) => parseNumber(cell(f));
+  const serving = toServing(
+    {
+      kcal: num('kcal'),
+      carbs: num('carbs'),
+      sugar: num('sugar'),
+      protein: num('protein'),
+      fat: num('fat'),
+      satFat: num('satFat'),
+      sodium: num('sodium'),
+      caffeine: num('caffeine'),
+    },
+    cell('basis'),
+    cell('weight'),
+    undefined, // 1회 섭취참고량은 표("유탕면(봉지)120g…") 텍스트라 수치로 오독하기 쉬워 쓰지 않는다
+  );
+  if (!serving) return { skip: 'no-kcal' };
+
+  // 국산은 제조사, 수입품은 수입업체가 소비자에게 익숙한 이름이다
+  const maker = displayCompany(cell('maker')) ?? displayCompany(cell('importer')) ?? displayCompany(cell('distributor'));
+  const category = inferCategory(name, majorCat, cell('midCat'));
+  const code = cell('code');
+  const ds = DATASETS.processed;
+  const menu: IngestedProduct = {
+    id: `pkg-${code ? slugifyCode(code) : slugifyCode(normalizeMenuName(name)) || 'item'}`,
+    brandId: PACKAGED_BRAND_ID,
+    name,
+    category,
+    // 시판 제품의 식품중량은 포장 단위라 "1인분" 대신 "1개"로 부른다
+    serving: serving.serving.replace(/^1인분/, '1개'),
+    nutrients: serving.nutrients,
+    trust: 'official',
+    sourceUrl: ds.url,
+    sourceName: ds.sourceName,
+    imageKey: category,
+  };
+  if (serving.servingNote) menu.servingNote = serving.servingNote;
+  if (maker) menu.maker = maker;
+  if (serving.nutrients.caffeine && serving.nutrients.caffeine > 0) menu.tags = ['카페인 있음'];
+  const ref = cell('refDate');
+  if (ref) menu._refDate = ref;
+  menu._priority = priority;
+  return { menu };
+}
+
+/** 같은 이름+제조사면 기준일자가 최신인 것 하나만 (수입/재보고 중복 정리). id 충돌은 접미사로 피한다 */
+export function dedupeProducts(products: IngestedProduct[]): (MenuItem & { _priority?: number })[] {
+  const best = new Map<string, IngestedProduct>();
+  for (const p of products) {
+    const key = `${normalizeMenuName(p.name)}|${normalizeCompany(p.maker)}`;
+    const prev = best.get(key);
+    if (!prev || (p._refDate ?? '') > (prev._refDate ?? '')) best.set(key, p);
+  }
+  const ids = new Set<string>();
+  const out: (MenuItem & { _priority?: number })[] = [];
+  for (const p of best.values()) {
+    const { _refDate, ...rest } = p;
+    void _refDate;
+    let id = rest.id;
+    for (let n = 2; ids.has(id); n++) id = `${rest.id}-${n}`;
+    ids.add(id);
+    out.push({ ...rest, id });
+  }
+  return out;
 }
 
 /** 같은 브랜드 + 정규화 이름이면 기준일자가 최신인 것 하나만. id 충돌은 접미사로 피한다 */

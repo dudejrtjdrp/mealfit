@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'src/data/generated/mfds.json');
+const OUT_PRODUCTS = join(ROOT, 'src/data/generated/mfds-products.json');
 const SEED_MENUS = join(ROOT, 'src/data/menus.json');
 const SEED_BRANDS = join(ROOT, 'src/data/brands.json');
 
@@ -41,7 +42,9 @@ const opt = (name, dflt) => {
 const DRY = flag('--dry-run');
 const STATS_ONLY = flag('--stats');
 const MAX_BYTES = Math.round(Number(opt('--max-mb', '5')) * 1024 * 1024);
-const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--max-mb');
+// 시판 제품(mfds-products.json)은 검색 때만 지연 로드하는 별도 파일 — 시작 성능과 무관해 상한을 따로 둔다
+const MAX_PRODUCT_BYTES = Math.round(Number(opt('--max-products-mb', '8')) * 1024 * 1024);
+const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--max-mb' && args[i - 1] !== '--max-products-mb');
 
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const seedMenus = readJson(SEED_MENUS);
@@ -116,8 +119,10 @@ if (files.length === 0) {
 // ───────── 변환 ─────────
 const matcher = lib.buildBrandMatcher(BRAND_REGISTRY);
 const all = [];
+const allProducts = [];
 const sources = [];
 const skips = { 'no-brand': 0, 'no-name': 0, 'no-kcal': 0 };
+const productSkips = { 'not-consumer': 0, 'no-name': 0, 'no-kcal': 0 };
 const unmatched = new Map();
 
 for (const file of files) {
@@ -133,6 +138,7 @@ for (const file of files) {
     continue;
   }
   let matched = 0;
+  let productCount = 0;
   for (const cells of body) {
     const r = lib.rowToMenu({ kind, cells, cols }, matcher);
     if ('skip' in r) {
@@ -141,12 +147,22 @@ for (const file of files) {
         const c = (cols.distributor != null && kind === 'processed' ? cells[cols.distributor] : cells[cols.company ?? cols.distributor]) ?? '';
         const k = c.trim();
         if (k && k !== '해당없음' && k !== '-') unmatched.set(k, (unmatched.get(k) ?? 0) + 1);
+        // 매장 브랜드가 아닌 가공식품은 시판 제품 카탈로그(검색용)로 보낸다 — 라면·과자·음료가 여기서 산다
+        if (kind === 'processed') {
+          const p = lib.rowToProduct({ kind, cells, cols });
+          if ('skip' in p) productSkips[p.skip] = (productSkips[p.skip] ?? 0) + 1;
+          else {
+            allProducts.push(p.menu);
+            productCount++;
+          }
+        }
       }
       continue;
     }
     all.push(r.menu);
     matched++;
   }
+  if (kind === 'processed') console.log(`[제품] ${basename(file)}: 시판 제품 후보 ${productCount}`);
   sources.push({
     file: basename(file),
     kind,
@@ -208,10 +224,38 @@ console.log(
 console.log('전:', stats(current));
 console.log('후:', stats(bundle));
 
+// ───────── 시판 제품 번들 ─────────
+let products = lib.dedupeProducts(allProducts);
+// 우선순위(면류→즉석→과자→…) 안에서 이름순 — 용량 초과 시 뒤 카테고리부터 뺀다
+products.sort((a, b) => (a._priority ?? 99) - (b._priority ?? 99) || a.name.localeCompare(b.name, 'ko'));
+// 출처 URL·이름·brandId 는 전 항목이 같아 메타에 한 번만 싣는다 — 로더(src/data/index.ts)가 다시 채운다
+const serializeProducts = (ms) =>
+  '{\n' +
+  `"meta": ${JSON.stringify({ generatedAt: new Date().toISOString(), source: lib.DATASETS.processed, brandId: lib.PACKAGED_BRAND_ID, count: ms.length, note: '자동 생성 파일 — scripts/ingest-nutrition.mjs' }, null, 2)},\n` +
+  `"menus": [${ms.length ? '\n' + ms.map((m) => { const { _priority, sourceUrl, sourceName, brandId, ...rest } = m; void _priority; void sourceUrl; void sourceName; void brandId; return JSON.stringify(rest); }).join(',\n') + '\n' : ''}]\n` +
+  '}\n';
+const droppedProducts = {};
+while (Buffer.byteLength(serializeProducts(products)) > MAX_PRODUCT_BYTES && products.length) {
+  const lastPriority = products[products.length - 1]._priority ?? 99;
+  const before = products.length;
+  products = products.filter((p) => (p._priority ?? 99) !== lastPriority);
+  droppedProducts[lastPriority] = before - products.length;
+}
+const productBytes = Buffer.byteLength(serializeProducts(products));
+const perCat = {};
+for (const p of products) perCat[p._priority ?? 99] = (perCat[p._priority ?? 99] ?? 0) + 1;
+const catName = (pr) => Object.entries(lib.PRODUCT_MAJOR_CATEGORIES).find(([, v]) => v === Number(pr))?.[0] ?? pr;
+console.log('\n시판 제품:', products.length, '개 /', (productBytes / 1024 / 1024).toFixed(2), 'MB', '| 건너뜀:', productSkips);
+console.log('제품 분류별:', Object.fromEntries(Object.entries(perCat).map(([k, v]) => [catName(k), v])));
+if (Object.keys(droppedProducts).length)
+  console.log('용량 초과로 뺀 분류:', Object.fromEntries(Object.entries(droppedProducts).map(([k, v]) => [catName(k), v])));
+
 if (DRY) {
   console.log('\n--dry-run: 파일을 쓰지 않았어요.');
 } else {
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, serialize(bundle));
+  writeFileSync(OUT_PRODUCTS, serializeProducts(products));
   console.log(`\n썼어요: ${OUT}`);
+  console.log(`썼어요: ${OUT_PRODUCTS}`);
 }

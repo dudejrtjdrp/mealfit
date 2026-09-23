@@ -99,7 +99,7 @@ export default function MenuDetail() {
   const unknown = menu.trust === 'none' || !nutrients || judgement?.unknown;
   const price = menu.price != null ? menu.price + (menu.options ?? []).reduce((s, g) => s + (g.choices.find((c) => c.label === selected[g.id])?.priceDelta ?? 0), 0) : undefined;
   const categoryLabel = brand ? STORE_CATEGORY_LABEL[brand.category] : '';
-  const storeName = params.store || brand?.name;
+  const storeName = params.store || menu.maker || brand?.name;
 
   const share = () => {
     const verdict = unknown ? '정보 없음' : judgement ? VERDICT_LABEL[judgement.verdict] : '';

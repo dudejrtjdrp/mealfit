@@ -1,6 +1,6 @@
 import type { Brand, MenuItem, Store } from '../domain/types';
 import brandsJson from './brands.json';
-import { mergeBrands, mergeMenus } from './ingest/nutrition';
+import { DATASETS, PACKAGED_BRAND_ID, mergeBrands, mergeMenus } from './ingest/nutrition';
 import { getMockStores as buildMockStores } from './mockStores';
 
 /** scripts/ingest-nutrition.mjs 가 만드는 식약처 공공데이터 번들 */
@@ -9,6 +9,15 @@ interface MfdsBundle {
   brands: Brand[];
   menus: MenuItem[];
 }
+
+/** scripts/ingest-nutrition.mjs 가 만드는 시판 제품 번들 (라면·과자·음료 등 — brandId·출처는 메타로 접어 둔다) */
+interface ProductsBundle {
+  meta: { count: number };
+  menus: MenuItem[];
+}
+
+/** 시판 제품 전체가 속하는 가상 브랜드 — 매장 매칭 키워드는 비워 둔다(장소 이름과 매칭되면 안 됨) */
+const PACKAGED_BRAND: Brand = { id: PACKAGED_BRAND_ID, name: '가공식품', category: 'convenience', matchKeywords: [], coverage: 'full' };
 
 interface Catalog {
   brands: Brand[];
@@ -36,7 +45,7 @@ function buildCatalog(): Catalog {
   // 공공데이터 official 20개 이상 브랜드는 옵션 없는 시드 estimated 를 목록에서 빼고(옵션 시드는 D4 옵션 칩·구매 가이드용으로 유지), 같은 브랜드·메뉴명의 추정치는 공식값으로 교체, 나머지는 추가
   const merged = mergeMenus(menusJson, mfds.menus);
   const menus = merged.menus;
-  const brands = mergeBrands(brandsJson as Brand[], mfds.brands, menus);
+  const brands = [...mergeBrands(brandsJson as Brand[], mfds.brands, menus), PACKAGED_BRAND];
 
   const menusByBrand = new Map<string, MenuItem[]>();
   for (const m of menus) {
@@ -65,6 +74,20 @@ function data(): Catalog {
   return catalog;
 }
 
+// ───────── 시판 제품 (라면·과자·음료 등 2.3만 개) ─────────
+// 6MB 번들이라 매장 화면과는 무관하게, 검색·상세에서 처음 필요할 때만 로드한다.
+let products: { list: MenuItem[]; byId: Map<string, MenuItem> } | null = null;
+
+function loadProducts(): { list: MenuItem[]; byId: Map<string, MenuItem> } {
+  if (products) return products;
+  const bundle = require('./generated/mfds-products.json') as ProductsBundle;
+  const ds = DATASETS.processed;
+  // 용량 때문에 접어 둔 공통 필드(brandId·출처)를 되살린다
+  const list = bundle.menus.map((m) => ({ ...m, brandId: PACKAGED_BRAND_ID, sourceUrl: ds.url, sourceName: ds.sourceName }));
+  products = { list, byId: new Map(list.map((m) => [m.id, m])) };
+  return products;
+}
+
 /** 카탈로그가 이미 만들어졌는지 (예열 확인·테스트용) */
 export function isCatalogReady(): boolean {
   return catalog !== null;
@@ -81,6 +104,14 @@ export function prewarmCatalog(delayMs = 600): void {
   const run = () => {
     try {
       data();
+      // 시판 제품(6MB)도 한가할 때 미리 — 첫 검색 입력이 파싱에 막히지 않게
+      setTimeout(() => {
+        try {
+          loadProducts();
+        } catch (e) {
+          console.warn('[data] 시판 제품 예열 실패', e);
+        }
+      }, 800);
     } catch (e) {
       // 여기서 실패해도 첫 실제 접근 때 다시 시도한다
       prewarmScheduled = false;
@@ -97,6 +128,7 @@ export function prewarmCatalog(delayMs = 600): void {
 /** 테스트용: 카탈로그를 버려 다음 접근 때 다시 만들게 한다 */
 export function resetCatalogForTest(): void {
   catalog = null;
+  products = null;
   prewarmScheduled = false;
   searchIndex = null;
 }
@@ -119,23 +151,33 @@ export function getMenusByBrand(brandId: string): MenuItem[] {
   return data().menusByBrand.get(brandId) ?? [];
 }
 export function getMenu(id: string): MenuItem | undefined {
+  // 시판 제품(pkg-…)은 필요한 그 순간에만 6MB 번들을 로드한다
+  if (id.startsWith('pkg-')) return loadProducts().byId.get(id);
   return data().menuById.get(id);
+}
+/** 검색에 포함되는 시판 제품(라면·과자·음료 등) 수 — 검색 안내 문구용 */
+export function getProductCount(): number {
+  return loadProducts().list.length;
 }
 /** 시드 정리 정책 결과 (목록에서 뺀/남긴 시드 메뉴 수) — 검증·디버그용 */
 export function getSeedPolicy() {
   return data().seedPolicy;
 }
 
-// 기록 추가(E2) 검색용: 정규화 이름을 한 번만 계산해 두고(1만여 개), 키 입력마다 정규식을 다시 돌리지 않는다
+// 기록 추가(E2) 검색용: 정규화 이름을 한 번만 계산해 두고(3만여 개), 키 입력마다 정규식을 다시 돌리지 않는다
 let searchIndex: { menu: MenuItem; key: string; brandKey: string }[] | null = null;
-/** 메뉴명 또는 브랜드명에 검색어가 들어간 메뉴를 목록 순서대로 최대 limit 개 (찾는 즉시 멈춘다) */
+/**
+ * 메뉴명·브랜드명·제조사명에 검색어가 들어간 메뉴를 최대 limit 개 (찾는 즉시 멈춘다).
+ * 매장 메뉴(주변 판정과 같은 데이터)가 앞, 시판 제품(라면·과자 등 식약처 가공식품)이 뒤.
+ */
 export function searchMenus(query: string, limit = 40): MenuItem[] {
   const q = normalizeName(query);
   if (!q) return [];
   if (!searchIndex) {
     const { brands, menus } = data();
     const brandKeys = new Map(brands.map((b) => [b.id, normalizeName(b.name)]));
-    searchIndex = menus.map((m) => ({ menu: m, key: normalizeName(m.name), brandKey: brandKeys.get(m.brandId) ?? '' }));
+    const entry = (m: MenuItem) => ({ menu: m, key: normalizeName(m.name), brandKey: m.maker ? normalizeName(m.maker) : (brandKeys.get(m.brandId) ?? '') });
+    searchIndex = [...menus.map(entry), ...loadProducts().list.map(entry)];
   }
   const out: MenuItem[] = [];
   for (const x of searchIndex) {

@@ -128,6 +128,8 @@ export interface MenuItem {
   sourceUrl?: string;
   /** 출처 이름 — 예: "식약처·전국통합식품영양성분정보(음식)". 공공데이터 인제스트 메뉴에 붙는다 */
   sourceName?: string;
+  /** 시판 가공식품의 제조사 표시명 (예: "농심") — 매장 브랜드 대신 이걸 보여준다 */
+  maker?: string;
   /** 제공량 보충 설명 — 1인분량을 몰라 100 g 기준으로 표시할 때 그 사실을 밝힌다 */
   servingNote?: string;
   /** 시안 카드 보조 표기용: "카페인 있음" 등 */

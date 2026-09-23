@@ -430,3 +430,62 @@ describe('시드와 합치기', () => {
     ]);
   });
 });
+
+// ───────────────────────── 시판 가공식품(제품) ─────────────────────────
+import { PACKAGED_BRAND_ID, dedupeProducts, displayCompany, rowToProduct, type IngestedProduct } from '../nutrition';
+
+describe('시판 제품 (rowToProduct)', () => {
+  const cols = resolveColumns(PROCESSED_HEADER);
+  const cell = (over: Record<string, string>) => {
+    const base: Record<string, string> = {
+      식품코드: 'P100-001', 식품명: '신라면', 식품대분류명: '면류', 식품중분류명: '유탕면',
+      영양성분함량기준량: '100g', '에너지(kcal)': '400', '단백질(g)': '10', '지방(g)': '14',
+      '탄수화물(g)': '60', '당류(g)': '4', '나트륨(mg)': '1400', '포화지방산(g)': '7',
+      '1회 섭취참고량': '유탕면(봉지)120g', 식품중량: '120g', 제조사명: '(주)농심', 유통업체명: '해당없음', 데이터기준일자: '2026-06-26',
+    };
+    return PROCESSED_HEADER.map((h) => ({ ...base, ...over })[h] ?? '');
+  };
+
+  it('소비자 분류 행을 packaged 브랜드 제품으로 만든다 — 포장 단위 환산 + 제조사 표시명', () => {
+    const r = rowToProduct({ kind: 'processed', cols, cells: cell({}) });
+    if ('skip' in r) throw new Error('skip 되면 안 됨');
+    expect(r.menu).toMatchObject({
+      brandId: PACKAGED_BRAND_ID,
+      name: '신라면',
+      maker: '농심',
+      trust: 'official',
+      serving: '1개 (120 g)',
+      nutrients: { kcal: 480, sodium: 1680 },
+    });
+    expect(r.menu.id).toMatch(/^pkg-/);
+  });
+
+  it('식용유지류 같은 재료성 분류는 not-consumer 로 뺀다', () => {
+    const r = rowToProduct({ kind: 'processed', cols, cells: cell({ 식품대분류명: '식용유지류' }) });
+    expect(r).toEqual({ skip: 'not-consumer' });
+  });
+
+  it('kcal 없으면 no-kcal, 제조사 해당없음이면 유통업체명으로 표시명을 채운다', () => {
+    expect(rowToProduct({ kind: 'processed', cols, cells: cell({ '에너지(kcal)': '' }) })).toEqual({ skip: 'no-kcal' });
+    const r = rowToProduct({ kind: 'processed', cols, cells: cell({ 제조사명: '해당없음', 유통업체명: '㈜오뚜기' }) });
+    if ('skip' in r) throw new Error('skip 되면 안 됨');
+    expect(r.menu.maker).toBe('오뚜기');
+  });
+
+  it('법인 표기를 떼고 긴 이름은 줄인다', () => {
+    expect(displayCompany('(주) 농심')).toBe('농심');
+    expect(displayCompany('주식회사 오뚜기라면')).toBe('오뚜기라면');
+    expect(displayCompany('해당없음')).toBeUndefined();
+    expect(displayCompany('WAN THAI FOODS INDUSTRY CO LTD')!.length).toBeLessThanOrEqual(20);
+  });
+
+  it('같은 이름+제조사는 최신 기준일자 하나만 남긴다', () => {
+    const make = (id: string, ref: string, maker = '농심'): IngestedProduct => ({
+      id, brandId: PACKAGED_BRAND_ID, name: '신라면', category: 'meal', serving: '1개 (120 g)',
+      nutrients: { kcal: 480 }, trust: 'official', maker, _refDate: ref,
+    });
+    const out = dedupeProducts([make('pkg-a', '2024-01-01'), make('pkg-b', '2026-06-26'), make('pkg-c', '2025-01-01', '오뚜기')]);
+    expect(out.map((m) => m.id).sort()).toEqual(['pkg-b', 'pkg-c']);
+    expect(out.every((m) => !('_refDate' in m))).toBe(true);
+  });
+});

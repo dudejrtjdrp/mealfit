@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, Chip, EmptyState, IconButton, Input, MenuTile, Text, TrustBadge, UnknownBadge, VerdictBadge, showToast } from '@/components';
-import { getBrand, getMenu, getMenus, normalizeName, searchMenus } from '@/data';
+import { getBrand, getMenu, getMenus, getProductCount, normalizeName, searchMenus } from '@/data';
 import { applyOptions, judgeMenu } from '@/domain/judge';
 import { formatNumber, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type MealLog, type MealType, type MenuItem, type Nutrients } from '@/domain/types';
@@ -111,7 +111,7 @@ export default function AddLog() {
         return;
       }
       const j = remaining ? judgeMenu(picked.menu, remaining, { profile: judgeProfile(profile) }) : null;
-      log = { ...base, name: picked.menu.name, brandId: picked.menu.brandId, storeName: getBrand(picked.menu.brandId)?.name, menuId: picked.menu.id, nutrients: n, trust: picked.menu.trust, verdict: j && !j.unknown ? j.verdict : undefined };
+      log = { ...base, name: picked.menu.name, brandId: picked.menu.brandId, storeName: picked.menu.maker ?? getBrand(picked.menu.brandId)?.name, menuId: picked.menu.id, nutrients: n, trust: picked.menu.trust, verdict: j && !j.unknown ? j.verdict : undefined };
     } else if (picked?.kind === 'recent') {
       const { id: _id, date: _d, mealType: _m, time: _t, createdAt: _c, ...rest } = picked.log;
       log = { ...rest, ...base, qty: picked.log.qty };
@@ -198,7 +198,7 @@ export default function AddLog() {
             </View>
             {query.trim() === '' ? (
               <Text variant="caption" color="ink3" style={styles.hint}>
-                편의점·카페·프랜차이즈 메뉴 {getMenus().length}개에서 찾아드려요.
+                매장 메뉴와 라면·과자 같은 시판 제품 {formatNumber(getMenus().length + getProductCount())}개에서 찾아드려요.
               </Text>
             ) : results.length === 0 ? (
               <EmptyState pose="sorry" title="찾는 메뉴가 없어요" description="직접 입력으로 남길 수 있어요." actionLabel="직접 입력하기" onAction={() => { setName(query); setTab('manual'); }} />
@@ -215,7 +215,7 @@ export default function AddLog() {
                           {menu.name}
                         </Text>
                         <Text variant="caption" color="ink2" numberOfLines={1}>
-                          {getBrand(menu.brandId)?.name} · {n ? `${formatNumber(n.kcal)} kcal` : '정보 없음'}
+                          {menu.maker ?? getBrand(menu.brandId)?.name} · {n ? `${formatNumber(n.kcal)} kcal` : '정보 없음'}
                         </Text>
                       </View>
                       {judgement && !judgement.unknown ? <VerdictBadge verdict={judgement.verdict} size="sm" /> : !n ? <UnknownBadge /> : null}
