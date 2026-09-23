@@ -13,7 +13,15 @@ import {
   appleFullNameToNickname,
   appleSignIn,
   authErrorMessage,
+  classifyAuthError,
+  describeError,
+  emailSignIn,
   isAppleRelayEmail,
+  isOfflineError,
+  OFFLINE_MESSAGE,
+  SERVER_ERROR_MESSAGE,
+  SERVER_UNREACHABLE_MESSAGE,
+  UNKNOWN_MESSAGE,
   KAKAO_NOT_READY,
   NICKNAME_FALLBACK,
   oauthRedirectUri,
@@ -169,5 +177,57 @@ describe('Apple 네이티브 로그인', () => {
     const res = await appleSignIn(db);
     expect(res).toMatchObject({ ok: false, cancelled: true });
     expect(db.auth.signInWithIdToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('로그인 오류 분류 — 원인을 가리지 않는다', () => {
+  const retryable = (message: string, status = 0) => Object.assign(new Error(message), { name: 'AuthRetryableFetchError', status });
+
+  it('오프라인은 진짜 네트워크 에러일 때만', () => {
+    expect(authErrorMessage(new TypeError('Network request failed'))).toBe(OFFLINE_MESSAGE);
+    expect(authErrorMessage(retryable('fetch failed: The Internet connection appears to be offline.'))).toBe(OFFLINE_MESSAGE);
+    expect(authErrorMessage(retryable('fetch failed: 인터넷 연결이 오프라인 상태입니다.'))).toBe(OFFLINE_MESSAGE);
+    expect(isOfflineError(new TypeError('Network request failed'))).toBe(true);
+    // "fetch" 라는 단어만으로는 오프라인이 아니다 (expo/fetch 는 모든 실패가 "fetch failed:" 로 시작)
+    expect(isOfflineError(retryable('fetch failed: A server with the specified hostname could not be found.'))).toBe(false);
+  });
+
+  it('서버에 닿지 못함(DNS·TLS·알 수 없는 fetch 실패)은 서버 연결 문구 + 원인 한 줄', () => {
+    const dns = classifyAuthError(retryable('fetch failed: A server with the specified hostname could not be found.'));
+    expect(dns.message).toBe(SERVER_UNREACHABLE_MESSAGE);
+    expect(dns.detail).toMatch(/^AuthRetryableFetchError: fetch failed: A server/);
+    expect(classifyAuthError(retryable('fetch failed: 지정된 호스트 이름의 서버를 찾을 수 없습니다.')).message).toBe(SERVER_UNREACHABLE_MESSAGE);
+    expect(classifyAuthError(retryable('fetch failed: something odd')).message).toBe(SERVER_UNREACHABLE_MESSAGE);
+    expect(classifyAuthError(retryable('Bad Gateway', 502)).message).toBe(SERVER_ERROR_MESSAGE);
+  });
+
+  it('알 수 없는 예외는 "로그인하지 못했어요" + 에러 이름·메시지 앞 80자', () => {
+    const e = new TypeError(`Cannot assign to read-only property 'protocol' of object '#<URL>' ${'x'.repeat(100)}`);
+    const f = classifyAuthError(e);
+    expect(f.message).toBe(UNKNOWN_MESSAGE);
+    expect(f.detail!.startsWith("TypeError: Cannot assign to read-only property 'protocol'")).toBe(true);
+    expect(f.detail!.length).toBeLessThanOrEqual(80);
+    // 서버 오류 코드·상태도 원인 줄에 싣는다
+    expect(describeError(Object.assign(new Error('Unacceptable audience in id_token'), { name: 'AuthApiError', status: 400, code: 'bad_jwt' }))).toBe(
+      'AuthApiError 400 [bad_jwt]: Unacceptable audience in id_token',
+    );
+  });
+
+  it('사람이 고칠 수 있는 오류는 원래 문구 그대로', () => {
+    expect(authErrorMessage({ code: 'invalid_credentials', message: 'Invalid login credentials' })).toBe('이메일 또는 비밀번호를 확인해주세요.');
+    expect(authErrorMessage({ message: 'Password should be at least 6 characters.' })).toMatch(/비밀번호는/);
+    expect(authErrorMessage(null)).toBe(UNKNOWN_MESSAGE);
+  });
+
+  it('Supabase 가 돌려준 오류는 AuthResult.detail 로 화면까지 전달된다', async () => {
+    const db = fakeDb({ signInWithPassword: jest.fn(async () => ({ data: { session: null }, error: retryable('fetch failed: The request timed out.') })) });
+    const res = await emailSignIn(db, 'a@b.com', 'pw123456');
+    expect(res).toMatchObject({ ok: false, detail: 'AuthRetryableFetchError: fetch failed: The request timed out.' });
+  });
+
+  it('Apple 시트 실패도 원인 코드를 남긴다', async () => {
+    signInAsync.mockRejectedValue(Object.assign(new Error('The authorization attempt failed for an unknown reason'), { code: 'ERR_REQUEST_UNKNOWN' }));
+    const res = await appleSignIn(fakeDb());
+    expect(res).toMatchObject({ ok: false, detail: expect.stringContaining('ERR_REQUEST_UNKNOWN') });
   });
 });

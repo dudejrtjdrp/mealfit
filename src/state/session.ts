@@ -6,6 +6,7 @@ import {
   appleSignIn,
   type AuthProvider,
   type AuthResult,
+  classifyAuthError,
   emailSignIn,
   emailSignUp,
   NICKNAME_FALLBACK,
@@ -101,8 +102,10 @@ export const useSession = create<SessionState>((set, get) => {
       }
       return res;
     } catch (e) {
-      console.warn('[session] 로그인 실패', e);
-      return { ok: false, message: '인터넷 연결을 확인해주세요.' };
+      // 예전엔 어떤 예외든 "인터넷 연결"로 덮어 진짜 원인이 가려졌다 — 원인별 문구 + 원인 한 줄(detail)
+      const f = classifyAuthError(e);
+      console.warn('[session] 로그인 중 예외', f.detail ?? e);
+      return { ok: false, ...f };
     }
   };
 

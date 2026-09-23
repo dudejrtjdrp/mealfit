@@ -46,6 +46,8 @@ export default function LoginScreen() {
   /** Supabase 이메일 시트: 가입 / 로그인 */
   const [emailMode, setEmailMode] = useState<'signup' | 'signin'>('signup');
   const [notice, setNotice] = useState<string | null>(null);
+  /** 실패 원인 한 줄 (에러 이름·메시지 앞부분) — 토스트는 금방 사라지므로 캡션으로 남겨 스크린샷으로 원인을 특정한다 */
+  const [failDetail, setFailDetail] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [oauthBusy, setOauthBusy] = useState<'kakao' | 'apple' | 'google' | null>(null);
   /** Sign in with Apple 은 iOS 에서만 (Android·웹은 버튼 숨김) */
@@ -70,6 +72,7 @@ export default function LoginScreen() {
 
   const openSheet = (p: AuthProvider) => {
     setNotice(null);
+    setFailDetail(null);
     setProvider(p);
   };
 
@@ -77,15 +80,19 @@ export default function LoginScreen() {
     if (!cloud) return openSheet(p);
     if (oauthBusy) return;
     setOauthBusy(p);
+    setFailDetail(null);
     const res = p === 'apple' ? await signInApple() : await signInOAuth(p);
     setOauthBusy(null);
     if (res.ok) return routeAfterLogin();
-    if (!res.cancelled) showToast(res.message, 'info');
+    if (res.cancelled) return;
+    showToast(res.message, 'info');
+    setFailDetail(res.detail ?? null);
   };
 
   const start = async () => {
     if (!provider || !canStart) return;
     setBusy(true);
+    setFailDetail(null);
     if (!cloudEmail) {
       await signIn(provider, nickname, provider === 'email' ? email : undefined);
       setBusy(false);
@@ -101,6 +108,7 @@ export default function LoginScreen() {
     }
     if (res.needsConfirm) setEmailMode('signin');
     setNotice(res.message);
+    setFailDetail(res.detail ?? null);
   };
 
   const sheetSubtitle = cloudEmail
@@ -142,6 +150,12 @@ export default function LoginScreen() {
         <Button variant="google" title="Google로 계속" onPress={() => void onSocial('google')} loading={oauthBusy === 'google'} disabled={oauthBusy !== null} />
         <Button variant="email" title="이메일로 시작" onPress={() => openSheet('email')} disabled={oauthBusy !== null} />
       </View>
+
+      {failDetail && provider === null ? (
+        <Text variant="small" color="ink3" align="center" numberOfLines={2} selectable style={styles.detail}>
+          원인: {failDetail}
+        </Text>
+      ) : null}
 
       <Text variant="small" color="ink3" align="center" style={styles.terms}>
         시작하면 <Text variant="small" color="ink2" style={styles.underline}>이용약관</Text>과{' '}
@@ -188,6 +202,11 @@ export default function LoginScreen() {
               {notice}
             </Text>
           ) : null}
+          {cloudEmail && failDetail ? (
+            <Text variant="small" color="ink3" numberOfLines={2} selectable style={styles.notice}>
+              원인: {failDetail}
+            </Text>
+          ) : null}
           {cloudEmail ? (
             <Pressable
               accessibilityRole="button"
@@ -222,6 +241,7 @@ const styles = StyleSheet.create({
   bubble: { backgroundColor: colors.section, borderRadius: radius.lg, borderTopLeftRadius: 4, paddingHorizontal: 14, paddingVertical: 12, marginBottom: spacing.xl },
   buttons: { gap: 10 },
   terms: { marginTop: spacing.lg, marginBottom: spacing.md },
+  detail: { marginTop: spacing.md },
   underline: { textDecorationLine: 'underline' },
   sheetBody: { gap: spacing.lg },
   notice: { marginTop: -spacing.xs },
