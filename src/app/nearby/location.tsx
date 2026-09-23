@@ -16,7 +16,7 @@ type Mode = 'gps' | 'pinned';
 
 const key = (c: LatLng) => `${c.lat.toFixed(6)},${c.lng.toFixed(6)}`;
 
-/** D1 위치 설정 (주변 탭 위치 헤더에서 여는 모달) — 핀을 끌어 검색 기준 위치를 정한다 */
+/** D1 위치 설정 (주변 탭 위치 헤더에서 여는 모달) — 지도를 움직여 가운데 핀으로 검색 기준 위치를 정한다 */
 export default function NearbyLocation() {
   const pinned = useNearby((s) => s.pinned);
   const center = useNearby((s) => s.center);
@@ -117,7 +117,7 @@ export default function NearbyLocation() {
         {Platform.OS !== 'web' ? (
           <View pointerEvents="none" style={styles.hint}>
             <Text variant="captionMedium" color="ink2">
-              핀을 끌어서 위치를 옮길 수 있어요
+              지도를 움직여 핀을 원하는 곳에 맞춰 주세요
             </Text>
           </View>
         ) : null}
