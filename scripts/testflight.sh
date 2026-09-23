@@ -13,8 +13,13 @@ echo "▶ prebuild (ios)"
 npx expo prebuild --platform ios --no-install
 (cd ios && pod install)
 
+# 워크스페이스·스킴은 expo.name 에 따라 바뀌므로 자동 감지 (mealing 개명 대응)
+WS=$(ls -d ios/*.xcworkspace | head -1)
+SCHEME=$(basename "$WS" .xcworkspace)
+echo "▶ workspace: $WS / scheme: $SCHEME"
+
 echo "▶ archive (build $BUILD_NUMBER)"
-xcodebuild -workspace ios/app.xcworkspace -scheme app -configuration Release \
+xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
   -destination generic/platform=iOS -archivePath "$OUT/app.xcarchive" \
   -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM_ID" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   archive | tail -n 20
