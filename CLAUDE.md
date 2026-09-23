@@ -48,7 +48,7 @@ docs/                    IA, 시안, 결정 기록
 ## 커밋
 - Angular 스타일 + 한글 제목: `feat(nearby): 주변 매장 목록 화면`, `fix(judge): 여유 0일 때 패스 처리`.
 - 작업 단위마다 커밋 (기능 하나 = 커밋 하나). 본문에는 결정과 이유를 1~3줄.
-- 커밋 작성자: `dudejrtjdrp <dudejrtjdrp@gmail.com>`. 마지막 줄에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- 커밋 작성자: `dudejrtjdrp <dudejrtjdrp@naver.com>` (GitHub 계정 이메일 — 2026-09-23 효님 확정, gmail 아님). 마지막 줄에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - `.env`, 토큰, `.local/` 은 절대 커밋하지 않는다.
 
 ## 릴리스·패치노트
