@@ -1,79 +1,86 @@
-import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Chip, OnboardingHeader, Screen, Text, TextArea } from '@/components';
+import { Button, CHAT_INDENT, ChatFooter, ChatHeader, ChatInput, ChatScreen, Chip, ChoiceList, MeSay, MillySay, Text } from '@/components';
+import { ChatHistory, useAdvance, useNickname } from '@/onboarding/common';
+import { DIET_EXAMPLES, DIET_MAX, SAY, SKIP_DIET_LABEL, appendSentence, historyBefore } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 import { spacing } from '@/theme';
 
-const MAX = 500;
-const EXAMPLES: { emoji: string; label: string; sentence: string }[] = [
-  { emoji: '☕', label: '아침은 간단히', sentence: '아침은 간단히 먹는 편이에요.' },
-  { emoji: '🌶️', label: '매운 음식 좋아해요', sentence: '매운 음식을 좋아해요.' },
-  { emoji: '🍚', label: '빵보다 밥', sentence: '빵보다 밥을 좋아해요.' },
-  { emoji: '🍰', label: '단 음식은 적게', sentence: '단 음식은 적게 먹으려고 해요.' },
-];
-
-/** B5 식단 성향 자유 서술 — 시안 docs/design/B5-diet-text.png */
+/** B5 식단 성향 자유 서술 — 예시 칩으로 문장 채우기 · 건너뛰기 유지 */
 export default function Step5() {
-  const { draft, set } = useOnboarding();
-  const text = draft.dietDescription;
+  const draft = useOnboarding((s) => s.draft);
+  const reached = useOnboarding((s) => s.reached);
+  const set = useOnboarding((s) => s.set);
+  const nickname = useNickname();
+  const { go, goSoon } = useAdvance(5, '/(onboarding)/step6');
 
-  const addSentence = (sentence: string) => {
-    if (text.includes(sentence)) return;
-    const joined = text.trim().length === 0 ? sentence : `${text.trimEnd()}\n${sentence}`;
-    set({ dietDescription: joined.slice(0, MAX), diet: undefined });
+  const [answered, setAnswered] = useState(reached >= 5);
+  const [text, setText] = useState(draft.dietDescription);
+  const history = useMemo(() => historyBefore(5, draft, { nickname }), [draft, nickname]);
+
+  const send = () => {
+    const t = text.trim();
+    if (!t) return;
+    // 서술이 바뀌면 B6 에서 다시 분류하도록 결과를 비운다 (기존과 같음)
+    if (t !== draft.dietDescription.trim() || !draft.diet) set({ dietDescription: t, diet: undefined });
+    setAnswered(true);
+    goSoon();
   };
 
-  const goNext = (skip: boolean) => {
-    if (skip) set({ dietDescription: '', diet: undefined });
-    router.push('/(onboarding)/step6');
+  const skip = () => {
+    set({ dietDescription: '', diet: undefined });
+    setText('');
+    setAnswered(true);
+    goSoon();
   };
+
+  const answer = draft.dietDescription.trim() || SKIP_DIET_LABEL;
 
   return (
-    <Screen
-      scroll
-      header={<OnboardingHeader step={5} layout="stacked" />}
-      footer={
-        <View>
-          <Button variant="ghost" title="건너뛰기" onPress={() => goNext(true)} style={styles.skip} />
-          <Button title="다음" disabled={text.trim().length === 0} onPress={() => goNext(false)} />
-        </View>
+    <ChatScreen
+      header={<ChatHeader step={5} />}
+      bottom={
+        answered ? (
+          <ChatFooter>
+            <Button title="다음" onPress={go} />
+          </ChatFooter>
+        ) : (
+          <ChatInput value={text} onChangeText={(t) => setText(t.slice(0, DIET_MAX))} onSend={send} multiline maxLength={DIET_MAX} placeholder="예) 아침은 가볍게, 점심은 든든하게 먹어요" />
+        )
       }
     >
-      <Text variant="display" style={styles.title}>
-        평소 식사는{'\n'}어떤 편인가요?
-      </Text>
-      <Text variant="body" color="ink2" style={styles.sub}>
-        자유롭게 적어주시면 성향 분류에 참고할게요.
-      </Text>
-
-      <TextArea
-        style={styles.area}
-        value={text}
-        maxLength={MAX}
-        onChangeText={(t) => set({ dietDescription: t, diet: undefined })}
-        placeholder={'예) 아침은 가볍게 먹고, 점심은 든든하게 먹는 편이에요.\n커피를 자주 마셔요.'}
-        accessibilityLabel="평소 식사 서술"
-      />
-
-      <Text variant="body" color="ink2" style={styles.exTitle}>
-        예시로 참고해보세요
-      </Text>
-      <View style={styles.chips}>
-        {EXAMPLES.map((e) => (
-          <Chip key={e.label} variant="soft" size="lg" left={e.emoji} label={e.label} onPress={() => addSentence(e.sentence)} style={styles.chip} />
-        ))}
-      </View>
-    </Screen>
+      <ChatHistory lines={history} />
+      <MillySay lines={[SAY.diet, SAY.dietSub]} animate />
+      {answered ? (
+        <MeSay
+          text={answer}
+          onPress={() => {
+            setText(draft.dietDescription);
+            setAnswered(false);
+          }}
+          animate
+        />
+      ) : (
+        <>
+          <View style={styles.examples}>
+            <Text variant="small" color="ink3">
+              예시로 채워보세요
+            </Text>
+            <View style={styles.chips}>
+              {DIET_EXAMPLES.map((e) => (
+                <Chip key={e.label} variant="soft" size="sm" label={e.label} onPress={() => setText((t) => appendSentence(t, e.sentence))} />
+              ))}
+            </View>
+          </View>
+          <ChoiceList items={[{ key: 'skip', label: SKIP_DIET_LABEL }]} onSelect={skip} />
+        </>
+      )}
+    </ChatScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { marginTop: spacing.xxxl + spacing.xs, fontSize: 30, lineHeight: 38 },
-  sub: { marginTop: spacing.xs, fontSize: 16 },
-  area: { marginTop: spacing.xxl + spacing.xs, marginHorizontal: -spacing.sm },
-  exTitle: { marginTop: spacing.xxxl, marginLeft: spacing.xs },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
-  chip: {},
-  skip: { marginBottom: spacing.md },
+  examples: { paddingLeft: CHAT_INDENT, gap: spacing.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

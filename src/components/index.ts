@@ -1,8 +1,6 @@
 export * from './Text';
 export * from './Screen';
 export * from './Button';
-export * from './ProgressSteps';
-export * from './OnboardingHeader';
 export * from './Card';
 export * from './Chip';
 export * from './Badge';
@@ -24,3 +22,4 @@ export * from './icons';
 export * from './MillyAvatar';
 export * from './Wordmark';
 export * from './RichText';
+export * from './Chat';

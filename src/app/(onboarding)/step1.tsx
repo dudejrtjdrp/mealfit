@@ -1,91 +1,77 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
 
-import { Button, Card, OnboardingHeader, Screen, Text } from '@/components';
-import { colors, spacing } from '@/theme';
+import { BowlIcon, Button, ChatFooter, ChatHeader, ChatScreen, ChoiceList, MeSay, MillyAvatar, MillySay, PinIcon, Text, Wordmark } from '@/components';
+import { useAdvance, useNickname } from '@/onboarding/common';
+import { SAY } from '@/onboarding/script';
+import { useOnboarding } from '@/state/onboarding';
+import { colors, radius, spacing } from '@/theme';
 
-function FeatureCard({ icon, title }: { icon: ReactNode; title: string }) {
-  return (
-    <Card padding={18} style={styles.feature}>
-      <View style={styles.featureIcon}>{icon}</View>
-      <Text variant="h3" style={styles.featureTitle}>
-        {title}
-      </Text>
-    </Card>
-  );
-}
+const FEATURES = [
+  { key: 'target', title: '오늘 목표량', desc: '오늘 더 먹을 수 있는 만큼', icon: <BowlIcon size={20} color={colors.ink2} /> },
+  { key: 'nearby', title: '주변 메뉴 판정', desc: '먹기 전에 좋음·괜찮음·패스', icon: <PinIcon size={20} color={colors.ink2} /> },
+  { key: 'log', title: '간편 기록', desc: '먹은 건 한 번에', icon: <Ionicons name="create-outline" size={20} color={colors.ink2} /> },
+];
 
-/** B1 인트로 — 시안 docs/design/B1-intro.png */
+/** B1 인트로 — 밀리 첫인사 (건강관리 포지셔닝) */
 export default function Step1() {
-  return (
-    <Screen
-      header={<OnboardingHeader step={1} layout="intro" />}
-      footer={<Button title="시작하기" trailingChevron onPress={() => router.push('/(onboarding)/step2')} />}
-    >
-      <Text variant="display" align="center" style={styles.title}>
-        먹기 전,{'\n'}더 가볍게 고르세요
-      </Text>
-      <Text variant="body" color="ink2" align="center" style={styles.sub}>
-        남은 여유분과 주변 메뉴를 한눈에 보고,{'\n'}나에게 맞는 식사를 고를 수 있어요.
-      </Text>
+  const nickname = useNickname();
+  const reached = useOnboarding((s) => s.reached);
+  const { go, goSoon } = useAdvance(1, '/(onboarding)/step2');
+  const [answered, setAnswered] = useState(reached >= 1);
 
-      <View style={styles.cards}>
-        <FeatureCard
-          title="오늘 목표량"
-          icon={
-            <View style={styles.ringIcon}>
-              <Svg width={54} height={54} style={StyleSheet.absoluteFill}>
-                <Circle cx={27} cy={27} r={23} stroke={colors.primarySoft} strokeWidth={5} fill="none" />
-                <Circle cx={27} cy={27} r={23} stroke={colors.primary} strokeWidth={5} fill="none" strokeLinecap="round" strokeDasharray={`${2 * Math.PI * 23 * 0.72} 999`} transform="rotate(-90 27 27)" />
-              </Svg>
-              <MaterialCommunityIcons name="fire" size={22} color={colors.kcal} />
-            </View>
-          }
-        />
-        <FeatureCard title="주변 메뉴 판정" icon={<Ionicons name="location" size={40} color={colors.primary} />} />
-        <FeatureCard
-          title="간편 기록"
-          icon={
-            <View>
-              <MaterialCommunityIcons name="file-document" size={40} color={colors.primary} />
-              <View style={styles.plus}>
-                <Ionicons name="add" size={14} color={colors.inkOnPrimary} />
+  const start = () => {
+    setAnswered(true);
+    goSoon();
+  };
+
+  return (
+    <ChatScreen
+      header={<ChatHeader step={1} hideBack />}
+      bottom={
+        answered ? (
+          <ChatFooter>
+            <Button title="다음" onPress={go} />
+          </ChatFooter>
+        ) : null
+      }
+    >
+      <View style={styles.hero}>
+        <MillyAvatar pose="cheer" size={88} />
+        <Wordmark size={22} style={styles.word} />
+        <Text variant="caption" color="ink3">
+          먹기 전, 나에게 맞는 한 끼
+        </Text>
+      </View>
+
+      <MillySay pose="cheer" lines={[SAY.hello(nickname), SAY.intro]} tail={[SAY.introAsk]} animate>
+        <View style={styles.features}>
+          {FEATURES.map((f, i) => (
+            <View key={f.key} style={[styles.feature, i > 0 && styles.featureLine]}>
+              <View style={styles.featureIcon}>{f.icon}</View>
+              <View style={styles.featureText}>
+                <Text variant="h3">{f.title}</Text>
+                <Text variant="small" color="ink3">
+                  {f.desc}
+                </Text>
               </View>
             </View>
-          }
-        />
-      </View>
-
-      <View style={styles.illust} accessibilityLabel="샐러드 일러스트">
-        <View style={styles.illustCircle} />
-        <View style={styles.illustBowl}>
-          <Ionicons name="leaf" size={22} color={colors.primaryBorder} style={styles.leaf1} />
-          <Ionicons name="leaf" size={14} color={colors.primaryBorder} style={styles.leaf2} />
-          <Ionicons name="leaf" size={20} color={colors.primaryBorder} style={styles.leaf3} />
-          <Text style={styles.bowl}>🥗</Text>
+          ))}
         </View>
-      </View>
-    </Screen>
+      </MillySay>
+
+      {answered ? <MeSay text={SAY.introReply} animate /> : <ChoiceList items={[{ key: 'start', label: SAY.introReply }]} onSelect={start} />}
+    </ChatScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { marginTop: spacing.xxl },
-  sub: { marginTop: spacing.md, fontSize: 16, lineHeight: 25 },
-  cards: { marginTop: spacing.xxl, gap: 10 },
-  feature: { height: 108, flexDirection: 'row', alignItems: 'center', paddingVertical: 0 },
-  featureIcon: { width: 74, height: 74, borderRadius: 37, backgroundColor: colors.primarySofter, alignItems: 'center', justifyContent: 'center' },
-  featureTitle: { marginLeft: spacing.xl, fontSize: 18 },
-  ringIcon: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center' },
-  plus: { position: 'absolute', right: -6, bottom: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primaryDark, borderWidth: 2, borderColor: colors.primarySofter, alignItems: 'center', justifyContent: 'center' },
-  illust: { flex: 1, minHeight: 90, alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden', marginHorizontal: -spacing.page, marginBottom: -spacing.sm },
-  illustCircle: { position: 'absolute', bottom: -150, width: 300, height: 260, borderRadius: 150, backgroundColor: colors.primarySofter },
-  illustBowl: { width: 240, height: 90, alignItems: 'center' },
-  bowl: { fontSize: 140, lineHeight: 160, marginTop: -8 },
-  leaf1: { position: 'absolute', left: 6, top: 0, transform: [{ rotate: '-30deg' }] },
-  leaf2: { position: 'absolute', left: -30, top: 50 },
-  leaf3: { position: 'absolute', right: -10, top: 16, transform: [{ rotate: '40deg' }] },
+  hero: { alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.sm, gap: 2 },
+  word: { marginTop: spacing.md },
+  features: { alignSelf: 'stretch', maxWidth: 280, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, paddingHorizontal: 14 },
+  feature: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  featureLine: { borderTopWidth: 1, borderTopColor: colors.line },
+  featureIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  featureText: { flex: 1 },
 });

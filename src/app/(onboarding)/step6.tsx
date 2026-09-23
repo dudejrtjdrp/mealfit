@@ -1,54 +1,47 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import { BottomSheet, Button, Card, ListRow, OnboardingHeader, Screen, Text, showToast } from '@/components';
+import { BottomSheet, Button, Card, ChatFooter, ChatHeader, ChatScreen, ChoiceList, ListRow, MeSay, MillySay, MillyTyping, SproutIcon, Text, showToast } from '@/components';
 import { DIET_TYPES } from '@/domain/diet';
 import type { DietClassification, DietType } from '@/domain/types';
 import { classifyDiet } from '@/services/ai/classifyDiet';
 import { getRepos } from '@/services/repo';
+import { ChatHistory, useAdvance, useNickname } from '@/onboarding/common';
+import { SAY, historyBefore } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 import { fallbackDiet } from '@/state/profile';
-import { useSession } from '@/state/session';
-import { colors, spacing } from '@/theme';
+import { colors, radius, spacing } from '@/theme';
 
-const DIET_EMOJI: Record<DietType, string> = {
-  balanced: '🥗',
-  low_carb_high_protein: '🍗',
-  low_sugar: '🍓',
-  low_sodium: '🥬',
-  light_eater: '🍙',
-  high_protein_bulk: '🥩',
-  convenience: '🥪',
-};
-
-/** 근거 제목 키워드로 아이콘·배경 고르기 (없으면 순서대로) */
-function evidenceIcon(title: string, i: number): { icon: ReactNode; bg: string } {
-  if (/카페|커피|음료/.test(title)) return { icon: <Ionicons name="cafe" size={22} color={colors.kcal} />, bg: colors.kcalBg };
-  if (/단백질|고기|닭/.test(title)) return { icon: <MaterialCommunityIcons name="food-steak" size={22} color={colors.protein} />, bg: colors.proteinBg };
-  if (/당|단 음식|디저트/.test(title)) return { icon: <Ionicons name="ice-cream" size={20} color={colors.sugar} />, bg: colors.sugarBg };
-  if (/염|짠|국물|나트륨/.test(title)) return { icon: <Ionicons name="water" size={20} color={colors.fat} />, bg: colors.fatBg };
-  if (/밥|면|빵|탄수/.test(title)) return { icon: <MaterialCommunityIcons name="barley" size={22} color={colors.carbs} />, bg: colors.carbsBg };
-  if (/편의점|간편/.test(title)) return { icon: <Ionicons name="storefront" size={20} color={colors.sodium} />, bg: colors.sodiumBg };
-  const fallback = [
-    { icon: <MaterialCommunityIcons name="sprout" size={24} color={colors.primary} />, bg: colors.primarySoft },
-    { icon: <Ionicons name="cafe" size={22} color={colors.kcal} />, bg: colors.kcalBg },
-    { icon: <MaterialCommunityIcons name="food-steak" size={22} color={colors.protein} />, bg: colors.proteinBg },
-  ];
-  if (/채소|가볍|깔끔|담백/.test(title)) return fallback[0];
-  return fallback[i % 3];
+/** 근거 제목 키워드로 회색 원 아이콘 고르기 */
+function evidenceIcon(title: string): ReactNode {
+  const c = colors.ink2;
+  if (/카페|커피|음료/.test(title)) return <Ionicons name="cafe-outline" size={18} color={c} />;
+  if (/단백질|고기|닭/.test(title)) return <MaterialCommunityIcons name="food-steak" size={18} color={c} />;
+  if (/당|단 음식|디저트/.test(title)) return <Ionicons name="ice-cream-outline" size={18} color={c} />;
+  if (/염|짠|국물|나트륨/.test(title)) return <Ionicons name="water-outline" size={18} color={c} />;
+  if (/밥|면|빵|탄수/.test(title)) return <MaterialCommunityIcons name="barley" size={18} color={c} />;
+  if (/편의점|간편/.test(title)) return <Ionicons name="storefront-outline" size={18} color={c} />;
+  return <SproutIcon size={18} color={c} />;
 }
 
-const MIN_LOADING_MS = 700;
+/** 분석 중 연출 최소 시간 — 밀리가 생각하는 모습이 보이도록 */
+const MIN_LOADING_MS = 1200;
 
-/** B6 성향 분석 결과 — 시안 docs/design/B6-diet-result.png */
+/** B6 성향 분석 — 밀리 thinking → 결과 카드(근거 3줄) · 직접 선택 · AI 실패 시 규칙 폴백 */
 export default function Step6() {
-  const { draft, set } = useOnboarding();
-  const nickname = useSession((s) => s.session?.nickname) ?? '회원';
+  const draft = useOnboarding((s) => s.draft);
+  const set = useOnboarding((s) => s.set);
+  const reached = useOnboarding((s) => s.reached);
+  const nickname = useNickname();
+  const { go, goSoon } = useAdvance(6, '/(onboarding)/step7');
+
   const [result, setResult] = useState<DietClassification | null>(draft.diet ?? null);
+  const [picked, setPicked] = useState(false);
+  const [accepted, setAccepted] = useState(reached >= 6 && !!draft.diet);
   const [sheet, setSheet] = useState(false);
   const toasted = useRef(false);
+  const history = useMemo(() => historyBefore(6, draft, { nickname }), [draft, nickname]);
 
   useEffect(() => {
     if (draft.diet) return;
@@ -58,7 +51,7 @@ export default function Step6() {
     (async () => {
       let res: DietClassification;
       if (text.length === 0) {
-        // 건너뛴 경우: 바로 규칙 기반
+        // 건너뛴 경우: 규칙 기반 (목적만 반영)
         res = fallbackDiet('', draft.primaryGoal);
       } else {
         try {
@@ -71,9 +64,9 @@ export default function Step6() {
           }
           res = fallbackDiet(text, draft.primaryGoal);
         }
-        const wait = MIN_LOADING_MS - (Date.now() - started);
-        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       }
+      const wait = MIN_LOADING_MS - (Date.now() - started);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       if (!alive) return;
       setResult(res);
       set({ diet: res });
@@ -89,144 +82,108 @@ export default function Step6() {
     const manual: DietClassification = { type, evidence: result?.type === type ? result.evidence : [], source: 'manual' };
     setResult(manual);
     set({ diet: manual });
+    setPicked(true);
     setSheet(false);
   };
 
-  if (!result) {
-    return (
-      <Screen header={<OnboardingHeader step={6} layout="inline" />}>
-        <View style={styles.loading} accessibilityLiveRegion="polite">
-          <View style={styles.loadingCircle}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-          <Text variant="h2" align="center" style={styles.loadingTitle}>
-            식단 성향을 정리하고 있어요
-          </Text>
-          <Text variant="body" color="ink2" align="center" style={styles.loadingSub}>
-            적어주신 내용을 살펴보는 중이에요.{'\n'}잠시만 기다려주세요.
-          </Text>
-        </View>
-      </Screen>
-    );
-  }
+  const accept = () => {
+    setAccepted(true);
+    goSoon();
+  };
 
-  const info = DIET_TYPES[result.type];
+  const info = result ? DIET_TYPES[result.type] : null;
 
   return (
-    <Screen
-      scroll
-      header={<OnboardingHeader step={6} layout="inline" />}
-      footer={
-        <View style={styles.footer}>
-          <Button title="이대로 시작" height={48} onPress={() => router.push('/(onboarding)/step7')} />
-          <Button title="직접 선택" variant="outline" height={48} onPress={() => setSheet(true)} />
-        </View>
+    <ChatScreen
+      header={<ChatHeader step={6} />}
+      bottom={
+        accepted ? (
+          <ChatFooter>
+            <Button title="다음" onPress={go} />
+          </ChatFooter>
+        ) : null
       }
     >
-      <Text variant="h1" style={styles.title}>
-        식단 성향을 정리했어요
-      </Text>
-      <Text variant="body" color="ink2" style={styles.sub}>
-        {nickname}님만의 식사 성향을 바탕으로{'\n'}더 적합한 메뉴를 추천해드릴게요.
-      </Text>
-
-      <Card padding={12} style={styles.resultCard}>
-        <View style={styles.hero}>
-          <View style={[styles.ray, styles.rayL1]} />
-          <View style={[styles.ray, styles.rayL2]} />
-          <View style={styles.heroCircle}>
-            <Text style={styles.heroEmoji}>{DIET_EMOJI[result.type]}</Text>
-          </View>
-          <View style={[styles.ray, styles.rayR1]} />
-          <View style={[styles.ray, styles.rayR2]} />
-        </View>
-        <Text variant="h1" align="center" style={styles.typeLabel}>
-          {info.label}
-        </Text>
-        <Text variant="body" color="ink2" align="center" style={styles.typeDesc}>
-          {info.description}
-        </Text>
-        {result.evidence.length > 0 ? (
-          <View style={styles.evidence}>
-            {result.evidence.slice(0, 3).map((ev, i) => {
-              const ic = evidenceIcon(ev.title, i);
-              return <ListRow key={i} variant="filled" title={ev.title} subtitle={ev.detail} icon={ic.icon} iconBg={ic.bg} />;
-            })}
-          </View>
-        ) : (
-          <View style={styles.evidenceSpacer} />
-        )}
-      </Card>
-
-      <Card padding={16} style={styles.useCard}>
-        <View style={styles.useRow}>
-          <View style={styles.bulb}>
-            <Ionicons name="bulb" size={22} color={colors.primary} />
-          </View>
-          <View style={styles.useBody}>
-            <Text variant="h3">이렇게 활용돼요</Text>
-            {['오늘의 식사 메뉴를 내 성향에 맞게 추천해요.', '메뉴를 볼 때, 나에게 맞는지 함께 판단해드려요.'].map((b) => (
-              <View key={b} style={styles.bullet}>
-                <View style={styles.dot} />
-                <Text variant="caption" color="ink2" style={styles.bulletText}>
-                  {b}
-                </Text>
+      <ChatHistory lines={history} />
+      {!result || !info ? (
+        <MillyTyping label={draft.dietDescription.trim() ? SAY.analyzing : undefined} />
+      ) : (
+        <>
+          <MillySay pose="cheer" lines={[SAY.result(info.label, nickname)]} animate>
+            <Card padding={spacing.lg} style={styles.card}>
+              <Text variant="small" color="primaryText" style={styles.kicker}>
+                {result.source === 'manual' ? '직접 고른 성향' : '식단 성향'}
+              </Text>
+              <Text variant="h2">{info.label}</Text>
+              <Text variant="caption" color="ink2" style={styles.desc}>
+                {info.description}
+              </Text>
+              {result.evidence.length > 0 ? (
+                <View style={styles.evidence}>
+                  {result.evidence.slice(0, 3).map((ev, i) => (
+                    <ListRow key={i} variant="filled" chevron={false} iconSize={32} icon={evidenceIcon(ev.title)} iconBg={colors.surface} title={ev.title} subtitle={ev.detail} />
+                  ))}
+                </View>
+              ) : null}
+              <View style={styles.use}>
+                {['오늘의 식사 메뉴를 내 성향에 맞게 추천해요.', '메뉴를 볼 때, 나에게 맞는지 함께 판단해드려요.'].map((b) => (
+                  <View key={b} style={styles.bullet}>
+                    <View style={styles.dot} />
+                    <Text variant="small" color="ink2" style={styles.bulletText}>
+                      {b}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        </View>
-      </Card>
+            </Card>
+          </MillySay>
+          {picked ? <MillySay lines={[SAY.resultPicked(info.label)]} animate /> : null}
+          {accepted ? (
+            <MeSay text={SAY.resultAccept} onPress={() => setAccepted(false)} animate />
+          ) : (
+            <ChoiceList
+              items={[
+                { key: 'ok', label: SAY.resultAccept, primary: true },
+                { key: 'pick', label: SAY.resultPick },
+              ]}
+              onSelect={(k) => (k === 'ok' ? accept() : setSheet(true))}
+            />
+          )}
+        </>
+      )}
 
       <BottomSheet visible={sheet} onClose={() => setSheet(false)} title="식단 성향 직접 선택" subtitle="나와 가장 가까운 유형을 골라주세요.">
         <View style={styles.sheetList}>
-          {(Object.keys(DIET_TYPES) as DietType[]).map((t) => (
-            <Card key={t} padding={4} onPress={() => pickManual(t)} style={t === result.type ? styles.sheetSelected : undefined} accessibilityLabel={DIET_TYPES[t].label}>
-              <ListRow
-                title={DIET_TYPES[t].label}
-                subtitle={DIET_TYPES[t].description}
-                icon={DIET_EMOJI[t]}
-                iconBg={colors.primarySofter}
-                chevron={false}
-                style={styles.sheetRow}
-                right={t === result.type ? <Ionicons name="checkmark-circle" size={22} color={colors.primary} /> : null}
-              />
-            </Card>
-          ))}
+          {(Object.keys(DIET_TYPES) as DietType[]).map((t) => {
+            const on = t === result?.type;
+            return (
+              <Card key={t} padding={spacing.md} onPress={() => pickManual(t)} style={on ? styles.sheetOn : undefined} accessibilityLabel={DIET_TYPES[t].label}>
+                <ListRow
+                  title={DIET_TYPES[t].label}
+                  subtitle={DIET_TYPES[t].description}
+                  chevron={false}
+                  style={styles.sheetRow}
+                  right={on ? <Ionicons name="checkmark-circle" size={22} color={colors.primary} /> : null}
+                />
+              </Card>
+            );
+          })}
         </View>
       </BottomSheet>
-    </Screen>
+    </ChatScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
-  loadingCircle: { width: 128, height: 128, borderRadius: 64, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  loadingTitle: { marginTop: spacing.xxl },
-  loadingSub: { marginTop: spacing.sm },
-  title: { marginTop: spacing.xxl },
-  sub: { marginTop: spacing.xs, fontSize: 16, lineHeight: 22 },
-  resultCard: { marginTop: spacing.xl, marginHorizontal: -spacing.sm },
-  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
-  heroCircle: { width: 92, height: 92, borderRadius: 46, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginHorizontal: spacing.lg },
-  heroEmoji: { fontSize: 52, lineHeight: 62 },
-  ray: { position: 'absolute', width: 9, height: 2.5, borderRadius: 2, backgroundColor: colors.primary },
-  rayL1: { left: '28%', top: 28, transform: [{ rotate: '30deg' }] },
-  rayL2: { left: '27%', top: 50, transform: [{ rotate: '-8deg' }] },
-  rayR1: { right: '28%', top: 28, transform: [{ rotate: '-30deg' }] },
-  rayR2: { right: '27%', top: 50, transform: [{ rotate: '8deg' }] },
-  typeLabel: { marginTop: spacing.md, fontSize: 28, lineHeight: 36 },
-  typeDesc: { marginTop: spacing.xs },
-  evidence: { marginTop: spacing.lg, gap: 8 },
-  evidenceSpacer: { height: spacing.md },
-  useCard: { marginTop: spacing.md, marginHorizontal: -spacing.sm },
-  useRow: { flexDirection: 'row' },
-  bulb: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primarySofter, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
-  useBody: { flex: 1 },
-  bullet: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary, marginRight: spacing.sm + 2 },
+  card: { maxWidth: 300, alignSelf: 'stretch' },
+  kicker: { marginBottom: 2 },
+  desc: { marginTop: spacing.xs },
+  evidence: { marginTop: spacing.md, gap: spacing.xs + 2 },
+  use: { marginTop: spacing.md, gap: 4 },
+  bullet: { flexDirection: 'row', alignItems: 'center' },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.primary, marginRight: spacing.sm },
   bulletText: { flex: 1 },
-  footer: { gap: spacing.sm, marginHorizontal: -spacing.sm },
   sheetList: { gap: spacing.sm, paddingBottom: spacing.sm },
-  sheetSelected: { borderWidth: 1.5, borderColor: colors.primaryBorder },
-  sheetRow: { paddingHorizontal: spacing.md },
+  sheetOn: { borderWidth: 1.5, borderColor: colors.primary, backgroundColor: colors.primaryTint, borderRadius: radius.lg },
+  sheetRow: { paddingVertical: 0, minHeight: 0 },
 });

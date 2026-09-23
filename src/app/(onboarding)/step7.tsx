@@ -1,25 +1,27 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, EmptyState, KcalRing, NutrientBar, OnboardingHeader, Screen, Skeleton, Text, showToast, type NutrientKey } from '@/components';
+import { Button, Card, ChatFooter, ChatHeader, ChatScreen, ChoiceList, EmptyState, KcalRing, MeSay, MillySay, MillyTyping, NutrientBar, showToast, type NutrientKey } from '@/components';
+import { formatNumber } from '@/domain/summary';
+import { ChatHistory, useNickname } from '@/onboarding/common';
+import { SAY, historyBefore } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 import { useProfile } from '@/state/profile';
-import { useSession } from '@/state/session';
-import { colors, radius, spacing } from '@/theme';
+import { spacing } from '@/theme';
 
 type Perm = 'idle' | 'asking' | 'granted' | 'denied' | 'later';
 const BAR_KEYS: NutrientKey[] = ['carbs', 'protein', 'fat', 'sugar', 'sodium'];
 
-/** B7 오늘 목표량 첫 소개 + 위치 권한 프라이밍 */
+/** B7 오늘 목표량 첫 소개 + 위치 권한 프라이밍 — 프로필 저장은 진입 시 1회 (기존과 같음) */
 export default function Step7() {
   const draft = useOnboarding((s) => s.draft);
-  const nickname = useSession((s) => s.session?.nickname);
+  const nickname = useNickname();
   const { targets, completeOnboarding } = useProfile();
   const [done, setDone] = useState(false);
   const [perm, setPerm] = useState<Perm>('idle');
+  const history = useMemo(() => historyBefore(7, draft, { nickname }), [draft, nickname]);
 
   useEffect(() => {
     let alive = true;
@@ -50,88 +52,66 @@ export default function Step7() {
     router.replace('/(tabs)/today');
   };
 
-  // 강조 영양소 순서대로 바 3개 (emphasis에 kcal이 있으면 링이 대신하므로 제외)
+  // 강조 영양소 순서대로 바 3개 (emphasis 에 kcal 이 있으면 링이 대신하므로 제외)
   const bars = targets ? (targets.emphasis.filter((k) => k !== 'kcal') as NutrientKey[]).filter((k) => BAR_KEYS.includes(k)).slice(0, 3) : [];
+  const answered = perm === 'granted' || perm === 'denied' || perm === 'later';
 
   return (
-    <Screen scroll header={<OnboardingHeader step={7} layout="stacked" />} footer={<Button title="시작하기" trailingChevron disabled={!done} onPress={start} />}>
-      <Text variant="display" style={styles.title}>
-        오늘 이만큼{'\n'}드실 수 있어요
-      </Text>
-      <Text variant="body" color="ink2" style={styles.sub}>
-        알려주신 정보로 계산한 하루 목표량이에요.{'\n'}먹을 때마다 여유분이 줄어드는 걸 보여드려요.
-      </Text>
-
-      <Card padding={20} style={styles.card}>
-        {!done ? (
-          <View style={styles.skel}>
-            <Skeleton width={150} height={150} borderRadius={75} />
-            <View style={styles.skelBars}>
-              <Skeleton height={14} />
-              <Skeleton height={14} />
-              <Skeleton height={14} />
+    <ChatScreen
+      header={<ChatHeader step={7} />}
+      bottom={
+        <ChatFooter>
+          <Button title="시작하기" disabled={!done} onPress={start} />
+        </ChatFooter>
+      }
+    >
+      <ChatHistory lines={history} />
+      {!done ? (
+        <MillyTyping />
+      ) : targets ? (
+        <MillySay pose="cheer" lines={[SAY.target(formatNumber(targets.kcal))]} tail={[SAY.targetSub]} animate>
+          <Card padding={spacing.lg} style={styles.card}>
+            <View style={styles.gaugeRow}>
+              <KcalRing value={targets.kcal} progress={1} caption="kcal 목표" size={112} stroke={10} numberSize={24} />
+              <View style={styles.bars}>
+                {bars.map((k) => (
+                  <NutrientBar key={k} nutrient={k} max={targets[k]} />
+                ))}
+              </View>
             </View>
-          </View>
-        ) : targets ? (
-          <>
-            <KcalRing value={targets.kcal} progress={1} size={160} />
-            <Text variant="bodyMedium" color="ink2" align="center" style={styles.ringCaption}>
-              하루 목표 칼로리
-            </Text>
-            <View style={styles.bars}>
-              {bars.map((k) => (
-                <NutrientBar key={k} nutrient={k} max={targets[k]} />
-              ))}
-            </View>
-          </>
-        ) : (
-          <EmptyState emoji="🧮" title="목표량을 아직 계산하지 못했어요" description="오늘 탭에서 다시 계산해 보여드릴게요." style={styles.empty} />
-        )}
-      </Card>
+          </Card>
+        </MillySay>
+      ) : (
+        <EmptyState pose="sorry" title="목표량을 아직 계산하지 못했어요" description="오늘 탭에서 다시 계산해 보여드릴게요." style={styles.empty} />
+      )}
 
-      <Card padding={18} style={styles.permCard}>
-        <View style={styles.permRow}>
-          <View style={styles.permIcon}>
-            <Ionicons name="location" size={22} color={colors.primary} />
-          </View>
-          <View style={styles.permBody}>
-            <Text variant="h3">주변 매장을 찾으려면 위치가 필요해요</Text>
-            <Text variant="caption" color="ink2" style={styles.permSub}>
-              {perm === 'granted'
-                ? '허용했어요. 주변 탭에서 가까운 매장부터 보여드려요.'
-                : perm === 'denied'
-                  ? '괜찮아요. 주변 탭에서 언제든 다시 허용할 수 있어요.'
-                  : perm === 'later'
-                    ? '나중에 주변 탭에서 허용할 수 있어요.'
-                    : '현재 위치 근처 매장의 메뉴를 먼저 판정해 보여드려요.'}
-            </Text>
-          </View>
-        </View>
-        {perm === 'idle' || perm === 'asking' ? (
-          <View style={styles.permActions}>
-            <Button title="나중에" variant="ghost" onPress={() => setPerm('later')} style={styles.permBtn} />
-            <Button title="허용하기" height={44} loading={perm === 'asking'} onPress={askLocation} style={styles.permBtn} />
-          </View>
-        ) : null}
-      </Card>
-    </Screen>
+      {done ? <MillySay lines={[SAY.location]} animate /> : null}
+      {done && !answered ? (
+        <ChoiceList
+          items={[
+            { key: 'yes', label: perm === 'asking' ? '확인하는 중…' : SAY.locationYes, primary: true },
+            { key: 'later', label: SAY.locationLater },
+          ]}
+          onSelect={(k) => {
+            if (perm !== 'idle') return;
+            if (k === 'yes') void askLocation();
+            else setPerm('later');
+          }}
+        />
+      ) : null}
+      {answered ? (
+        <>
+          <MeSay text={perm === 'later' ? SAY.locationLater : SAY.locationYes} animate />
+          <MillySay pose={perm === 'granted' ? 'cheer' : 'base'} lines={[perm === 'granted' ? SAY.locationGranted : perm === 'denied' ? SAY.locationDenied : SAY.locationLaterReply]} animate />
+        </>
+      ) : null}
+    </ChatScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { marginTop: spacing.xxxl, fontSize: 30, lineHeight: 40 },
-  sub: { marginTop: spacing.xs, fontSize: 16, lineHeight: 23 },
-  card: { marginTop: spacing.xxl, alignItems: 'stretch' },
-  ringCaption: { marginTop: spacing.sm },
-  bars: { marginTop: spacing.xl, gap: spacing.lg },
-  skel: { alignItems: 'center', gap: spacing.xl },
-  skelBars: { alignSelf: 'stretch', gap: spacing.md },
+  card: { maxWidth: 300, alignSelf: 'stretch' },
+  gaugeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  bars: { flex: 1, gap: spacing.md, minWidth: 0 },
   empty: { paddingVertical: spacing.lg },
-  permCard: { marginTop: spacing.md, backgroundColor: colors.primarySofter, borderRadius: radius.lg },
-  permRow: { flexDirection: 'row', alignItems: 'center' },
-  permIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
-  permBody: { flex: 1 },
-  permSub: { marginTop: 2 },
-  permActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  permBtn: { flex: 1 },
 });

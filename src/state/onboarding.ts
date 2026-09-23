@@ -21,12 +21,17 @@ const initial: OnboardingDraft = { secondaryGoals: [], dietDescription: '' };
 
 interface OnboardingState {
   draft: OnboardingDraft;
+  /** 대화형 UI 진행 기록: 마친 단계 중 가장 큰 번호 (뒤로 돌아왔을 때 이미 답한 단계를 알기 위해 — 저장 데이터 아님) */
+  reached: number;
   set: (patch: Partial<OnboardingDraft>) => void;
+  markReached: (step: number) => void;
   reset: () => void;
 }
 
 export const useOnboarding = create<OnboardingState>((set) => ({
   draft: initial,
+  reached: 0,
   set: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
-  reset: () => set({ draft: initial }),
+  markReached: (step) => set((s) => ({ reached: Math.max(s.reached, step) })),
+  reset: () => set({ draft: initial, reached: 0 }),
 }));

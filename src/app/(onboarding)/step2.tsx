@@ -1,95 +1,127 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
 
-import { Button, Card, Input, OnboardingHeader, Screen, SelectCard, Text } from '@/components';
+import { Button, ChatFooter, ChatHeader, ChatInput, ChatScreen, ChoiceList, MeSay, MillySay } from '@/components';
+import type { Sex } from '@/domain/types';
+import { ChatHistory, useAdvance, useNickname } from '@/onboarding/common';
+import { SAY, SEX_OPTIONS, UNIT, answerText, checkNumber, historyBefore, matchOption, type NumberField } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
-import { spacing } from '@/theme';
 
-const THIS_YEAR = new Date().getFullYear();
-const RANGES = {
-  birthYear: { min: 1930, max: THIS_YEAR - 10, msg: `1930~${THIS_YEAR - 10}년 사이로 입력해주세요.` },
-  heightCm: { min: 100, max: 250, msg: '100~250cm 사이로 입력해주세요.' },
-  weightKg: { min: 25, max: 250, msg: '25~250kg 사이로 입력해주세요.' },
-} as const;
+type Q = 'sex' | 'birthYear' | 'heightCm' | 'weightKg';
+const ORDER: Q[] = ['sex', 'birthYear', 'heightCm', 'weightKg'];
+const PLACEHOLDER: Record<Exclude<Q, 'sex'>, string> = { birthYear: '예: 1990', heightCm: '예: 170', weightKg: '예: 60' };
+const MAXLEN: Record<Exclude<Q, 'sex'>, number> = { birthYear: 4, heightCm: 5, weightKg: 5 };
 
-const toStr = (n?: number) => (n == null ? '' : String(n));
-const inRange = (v: string, r: { min: number; max: number }) => {
-  const n = Number(v);
-  return v.length > 0 && Number.isFinite(n) && n >= r.min && n <= r.max;
-};
+type Answers = { sex?: Sex; birthYear?: number; heightCm?: number; weightKg?: number };
 
-/** B2 기본 정보 — 시안 docs/design/B2-basic-info.png */
+/** B2 기본 정보 — 성별(선택지) → 출생 연도 · 키 · 몸무게(입력바). 범위 검증은 기존과 같다 */
 export default function Step2() {
-  const { draft, set } = useOnboarding();
-  const [birth, setBirth] = useState(toStr(draft.birthYear));
-  const [height, setHeight] = useState(toStr(draft.heightCm));
-  const [weight, setWeight] = useState(toStr(draft.weightKg));
+  const draft = useOnboarding((s) => s.draft);
+  const set = useOnboarding((s) => s.set);
+  const nickname = useNickname();
+  const { go, goSoon } = useAdvance(2, '/(onboarding)/step3');
 
-  const okBirth = inRange(birth, RANGES.birthYear);
-  const okHeight = inRange(height, RANGES.heightCm);
-  const okWeight = inRange(weight, RANGES.weightKg);
-  // 연도는 4자리 다 쳤을 때만 안내, 키·몸무게는 3자리이거나 값이 넘칠 때 안내
-  const birthErr = birth.length >= 4 && !okBirth ? RANGES.birthYear.msg : undefined;
-  const heightErr = (height.length >= 3 || Number(height) > RANGES.heightCm.max) && !okHeight ? RANGES.heightCm.msg : undefined;
-  const weightErr = (weight.length >= 3 || Number(weight) > RANGES.weightKg.max) && !okWeight ? RANGES.weightKg.msg : undefined;
-  const canNext = !!draft.sex && okBirth && okHeight && okWeight;
+  const [ans, setAns] = useState<Answers>(() => ({ sex: draft.sex, birthYear: draft.birthYear, heightCm: draft.heightCm, weightKg: draft.weightKg }));
+  const cur = ORDER.find((q) => ans[q] == null);
+  const [text, setText] = useState('');
+  const [miss, setMiss] = useState(false);
 
-  const next = () => {
-    if (!canNext) return;
-    set({ birthYear: Number(birth), heightCm: Number(height), weightKg: Number(weight) });
-    router.push('/(onboarding)/step3');
+  const history = useMemo(() => historyBefore(2, draft, { nickname }), [draft, nickname]);
+
+  /** 다음 질문 입력칸에 전에 답했던 값을 채워 둔다 */
+  const moveOn = (next: Answers) => {
+    setAns(next);
+    const after = ORDER.find((q) => next[q] == null);
+    setText(after && after !== 'sex' && draft[after] != null ? String(draft[after]) : '');
+    if (!after) goSoon();
   };
 
-  return (
-    <Screen
-      scroll
-      header={<OnboardingHeader step={2} layout="bar" />}
-      footer={<Button title="다음" trailingChevron disabled={!canNext} onPress={next} style={styles.bleed} />}
-    >
-      <Text variant="h1" style={styles.title}>
-        기본 정보를 알려주세요
-      </Text>
-      <Text variant="body" color="ink2" style={styles.sub}>
-        더 정확한 식단 추천을 위해{'\n'}몇 가지 정보를 알려주세요.
-      </Text>
+  const answerSex = (sex: Sex) => {
+    setMiss(false);
+    set({ sex });
+    moveOn({ ...ans, sex });
+  };
 
-      <View style={styles.cards}>
-        <Card padding={16}>
-          <Text variant="h3" style={styles.label}>
-            성별
-          </Text>
-          <View style={styles.sexRow}>
-            <SelectCard
-              layout="tile"
-              title="남성"
-              selected={draft.sex === 'male'}
-              onPress={() => set({ sex: 'male' })}
-              icon={(c) => <Ionicons name="man-outline" size={30} color={c} />}
-            />
-            <SelectCard
-              layout="tile"
-              title="여성"
-              selected={draft.sex === 'female'}
-              onPress={() => set({ sex: 'female' })}
-              icon={(c) => <Ionicons name="woman-outline" size={30} color={c} />}
-            />
-          </View>
-        </Card>
-        <Input label="출생 연도" icon="calendar-clear-outline" unit="년" value={birth} onChangeText={setBirth} placeholder="1990" maxLength={4} error={birthErr} />
-        <Input label="키" icon="body-outline" unit="cm" value={height} onChangeText={setHeight} placeholder="170" maxLength={5} error={heightErr} />
-        <Input label="몸무게" icon="speedometer-outline" unit="kg" value={weight} onChangeText={setWeight} placeholder="60" maxLength={5} error={weightErr} />
-      </View>
-    </Screen>
+  const field = cur && cur !== 'sex' ? (cur as NumberField) : undefined;
+  const check = field ? checkNumber(field, text) : undefined;
+
+  const send = () => {
+    if (!cur) return;
+    if (cur === 'sex') {
+      const sex = matchOption(text, SEX_OPTIONS);
+      if (sex) {
+        setText('');
+        answerSex(sex);
+      } else setMiss(true);
+      return;
+    }
+    if (!check?.valid) return;
+    const n = Number(text);
+    set(cur === 'birthYear' ? { birthYear: n } : cur === 'heightCm' ? { heightCm: n } : { weightKg: n });
+    moveOn({ ...ans, [cur]: n });
+  };
+
+  /** 답한 말풍선을 누르면 그 질문부터 다시 (이전 값은 입력칸에 채워 둔다) */
+  const rewind = (q: Q) => {
+    const i = ORDER.indexOf(q);
+    const next: Answers = { ...ans };
+    ORDER.slice(i).forEach((k) => {
+      delete next[k];
+    });
+    setAns(next);
+    setMiss(false);
+    setText(q !== 'sex' && ans[q] != null ? String(ans[q]) : '');
+  };
+
+  const shown = cur ? ORDER.slice(0, ORDER.indexOf(cur) + 1) : ORDER;
+
+  return (
+    <ChatScreen
+      header={<ChatHeader step={2} />}
+      bottom={
+        !cur ? (
+          <ChatFooter>
+            <Button title="다음" onPress={go} />
+          </ChatFooter>
+        ) : (
+          <ChatInput
+            value={text}
+            onChangeText={(t) => {
+              setText(t);
+              setMiss(false);
+            }}
+            onSend={send}
+            numeric={!!field}
+            unit={field ? UNIT[field] : undefined}
+            placeholder={field ? PLACEHOLDER[field as Exclude<Q, 'sex'>] : '직접 입력할 수도 있어요'}
+            maxLength={field ? MAXLEN[field as Exclude<Q, 'sex'>] : 20}
+            canSend={field ? !!check?.valid : text.trim().length > 0}
+            hint={check?.hint}
+          />
+        )
+      }
+    >
+      <ChatHistory lines={history} />
+      {shown.map((q) => {
+        const v = ans[q];
+        return (
+          <QA key={q} q={q} answer={v == null ? undefined : q === 'sex' ? SEX_OPTIONS.find((o) => o.value === v)?.label : answerText(q as NumberField, v as number)} onRewind={() => rewind(q)}>
+            {q === 'sex' && v == null ? (
+              <ChoiceList layout="wrap" items={SEX_OPTIONS.map((o) => ({ key: o.value, label: o.label }))} onSelect={(k) => answerSex(k as Sex)} />
+            ) : null}
+          </QA>
+        );
+      })}
+      {miss ? <MillySay pose="sorry" lines={[SAY.notMatched]} animate /> : null}
+    </ChatScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  title: { marginTop: spacing.xl, fontSize: 28, lineHeight: 36 },
-  sub: { marginTop: spacing.sm, fontSize: 16, lineHeight: 22 },
-  cards: { marginTop: spacing.xl, gap: spacing.md, marginHorizontal: -spacing.sm },
-  label: { marginBottom: spacing.md },
-  bleed: { marginHorizontal: -spacing.sm },
-  sexRow: { flexDirection: 'row', gap: spacing.sm },
-});
+function QA({ q, answer, onRewind, children }: { q: Q; answer?: string; onRewind: () => void; children?: ReactNode }) {
+  return (
+    <>
+      <MillySay lines={[SAY[q]]} animate />
+      {children}
+      {answer ? <MeSay text={answer} onPress={onRewind} animate /> : null}
+    </>
+  );
+}
