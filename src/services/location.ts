@@ -115,6 +115,39 @@ async function kakaoRegion(lat: number, lng: number): Promise<string | null> {
   }
 }
 
+/** 사용자가 지도에서 고른 위치의 기본 이름 (역지오코딩을 못 할 때) */
+export const PINNED_FALLBACK_NAME = '지정한 위치';
+
+interface Coord2AddressDoc {
+  address?: { region_1depth_name?: string; region_2depth_name?: string; region_3depth_name?: string } | null;
+  road_address?: { region_1depth_name?: string; region_2depth_name?: string; region_3depth_name?: string } | null;
+}
+
+/** 카카오 coord2address 응답 → "서울 강남구 역삼동". 동 이름이 없으면 null */
+export function areaFromCoord2Address(json: { documents?: Coord2AddressDoc[] } | null | undefined): string | null {
+  const doc = json?.documents?.[0];
+  const a = doc?.address ?? doc?.road_address;
+  if (!a?.region_3depth_name?.trim()) return null;
+  return joinArea([a.region_1depth_name ? shortRegion(a.region_1depth_name) : undefined, a.region_2depth_name, a.region_3depth_name]) || null;
+}
+
+/**
+ * 지도에서 고른 좌표 → 동 이름. 카카오 REST 키가 있으면 coord2address, 없거나 실패하면 "지정한 위치".
+ * (GPS 위치 이름은 reverseGeocode 를 그대로 쓴다)
+ */
+export async function pinnedPlaceName(lat: number, lng: number): Promise<string> {
+  if (!env.kakaoRestKey) return PINNED_FALLBACK_NAME;
+  try {
+    const res = await fetch(`https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lng}&y=${lat}`, {
+      headers: { Authorization: `KakaoAK ${env.kakaoRestKey}` },
+    });
+    if (!res.ok) return PINNED_FALLBACK_NAME;
+    return areaFromCoord2Address((await res.json()) as { documents?: Coord2AddressDoc[] }) ?? PINNED_FALLBACK_NAME;
+  } catch {
+    return PINNED_FALLBACK_NAME;
+  }
+}
+
 /** 좌표 → "서울 강남구 역삼동". expo-location → 카카오 → "현재 위치" */
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   if (Platform.OS !== 'web') {

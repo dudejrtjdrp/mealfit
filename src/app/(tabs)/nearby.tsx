@@ -19,9 +19,9 @@ const CATS: { id: CategoryFilter; label: string }[] = [
   { id: 'bakery', label: '베이커리' },
 ];
 
-/** D1 주변 매장 목록 — 위치 헤더 · 반경/카테고리 칩 · 매장 카드(커버리지 아웃라인 배지) */
+/** D1 주변 매장 목록 — 위치 헤더(탭 → 위치 설정) · 반경/카테고리 칩 · 매장 카드(커버리지 아웃라인 배지) */
 export default function Nearby() {
-  const { areaName, radiusM, category, stores, status, source, loadedAt, setRadius, setCategory, refresh } = useNearby();
+  const { areaName, pinned, radiusM, category, stores, status, source, setRadius, setCategory, refresh } = useNearby();
 
   // 처음 들어오거나 5분이 지났으면 새로 찾는다
   useFocusEffect(
@@ -96,9 +96,15 @@ export default function Nearby() {
           <Text variant="h1" accessibilityRole="header">
             주변
           </Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="위치 다시 찾기" onPress={() => void refresh()} style={styles.area}>
-            <PinIcon size={18} color={colors.ink2} />
-            <Text variant="caption" color="ink2" numberOfLines={1} style={styles.areaText}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`검색 위치 설정, 지금 ${areaName || '현재 위치'}`}
+            accessibilityHint="지도에서 검색 기준 위치를 바꿀 수 있어요"
+            onPress={() => router.push('/nearby/location')}
+            style={styles.area}
+          >
+            <PinIcon size={18} color={pinned ? colors.primary : colors.ink2} />
+            <Text variant="caption" color={pinned ? 'primaryText' : 'ink2'} numberOfLines={1} style={styles.areaText}>
               {areaName || (status === 'locating' ? '위치 찾는 중' : '현재 위치')}
             </Text>
             <ChevronRightIcon size={16} color={colors.ink3} />

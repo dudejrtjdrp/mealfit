@@ -13,8 +13,17 @@ export type CategoryFilter = 'all' | StoreCategory;
 /** 웹 미리보기처럼 위치를 못 잡는 환경에서 쓰는 데모 동네 */
 export const DEMO_AREA = { center: YEOKSAM_CENTER, name: '서울 강남구 역삼동' };
 
+/** 사용자가 지도에서 직접 정한 검색 기준 위치 */
+export interface PinnedLocation {
+  center: LatLng;
+  name: string;
+}
+
 interface NearbyState {
+  /** 지금 검색 기준 좌표 (pinned 가 있으면 그 좌표, 없으면 GPS) */
   center: LatLng | null;
+  /** 사용자 지정 위치. null 이면 GPS 현재 위치를 쓴다 (앱을 다시 켜면 GPS 로 돌아간다) */
+  pinned: PinnedLocation | null;
   areaName: string;
   radiusM: Radius;
   category: CategoryFilter;
@@ -25,8 +34,12 @@ interface NearbyState {
   loadedAt: number | null;
   setRadius: (r: Radius) => void;
   setCategory: (c: CategoryFilter) => void;
-  /** 위치 다시 잡고 매장 검색. relocate=false 면 기존 좌표로 반경만 다시 검색 */
+  /** 위치 다시 잡고 매장 검색. relocate=false 면 기존 좌표로 반경만 다시 검색. 지정 위치가 있으면 GPS 를 쓰지 않는다 */
   refresh: (opts?: { relocate?: boolean }) => Promise<void>;
+  /** 지도에서 고른 위치로 기준을 바꾸고 다시 검색 */
+  setPinnedLocation: (center: LatLng, name: string) => Promise<void>;
+  /** 지정 위치를 지우고 GPS 현재 위치로 다시 검색 */
+  clearPinnedLocation: () => Promise<void>;
   findStore: (id: string) => Store | undefined;
 }
 
@@ -34,6 +47,7 @@ let seq = 0;
 
 export const useNearby = create<NearbyState>((set, get) => ({
   center: null,
+  pinned: null,
   areaName: '',
   radiusM: 500,
   category: 'all',
@@ -53,10 +67,15 @@ export const useNearby = create<NearbyState>((set, get) => ({
   refresh: async (opts) => {
     const my = ++seq;
     const relocate = opts?.relocate ?? true;
+    const pinned = get().pinned;
     let center = get().center;
     let areaName = get().areaName;
 
-    if (relocate || !center) {
+    if (pinned) {
+      center = pinned.center;
+      areaName = pinned.name;
+      set({ center, areaName });
+    } else if (relocate || !center) {
       set({ status: 'locating' });
       const pos = await location.getCurrentPosition();
       if (my !== seq) return;
@@ -92,6 +111,17 @@ export const useNearby = create<NearbyState>((set, get) => ({
       if (my !== seq) return;
       set({ status: 'error' });
     }
+  },
+
+  setPinnedLocation: async (center, name) => {
+    set({ pinned: { center, name }, center, areaName: name, stores: [], loadedAt: null });
+    await get().refresh({ relocate: false });
+  },
+
+  clearPinnedLocation: async () => {
+    // 지정 위치 이름이 GPS 라벨로 남지 않게 비우고 GPS 로 다시 잡는다
+    set({ pinned: null, areaName: '', stores: [], loadedAt: null });
+    await get().refresh({ relocate: true });
   },
 
   findStore: (id) => get().stores.find((s) => s.id === id),
