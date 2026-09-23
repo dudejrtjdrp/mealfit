@@ -6,11 +6,52 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { Component, type ReactNode } from 'react';
+import { StyleSheet, Text as RNText, View } from 'react-native';
+
 import { ToastHost } from '@/components';
 import { useBootstrap } from '@/state/bootstrap';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/**
+ * 시작 중 JS 에러가 나면 스플래시가 영영 안 사라져 "베이지 화면 멈춤"이 된다 (2026-09-23 TestFlight 사고).
+ * 어떤 에러든 스플래시를 내리고 메시지를 보여주는 최후 방어선. (theme 의존 최소화를 위해 RN Text 사용)
+ */
+class StartupErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch() {
+    SplashScreen.hideAsync().catch(() => {});
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={bStyles.wrap}>
+          <RNText style={bStyles.title}>앗, 문제가 생겼어요</RNText>
+          <RNText style={bStyles.body}>앱을 완전히 종료했다가 다시 열어주세요.</RNText>
+          <RNText style={bStyles.detail} numberOfLines={6}>
+            {String(this.state.error?.message ?? this.state.error)}
+          </RNText>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const bStyles = StyleSheet.create({
+  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', padding: 24, gap: 10 },
+  title: { fontSize: 20, fontWeight: '700', color: '#191F28' },
+  body: { fontSize: 15, color: '#4E5968', textAlign: 'center' },
+  detail: { fontSize: 12, color: '#8B95A1', textAlign: 'center', marginTop: 8 },
+});
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -29,6 +70,7 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
+    <StartupErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style="dark" />
@@ -50,5 +92,6 @@ export default function RootLayout() {
         <ToastHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
+    </StartupErrorBoundary>
   );
 }

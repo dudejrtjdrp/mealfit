@@ -9,8 +9,8 @@ TEAM_ID="AW9XRML8T7"
 OUT="build/testflight"
 rm -rf "$OUT" && mkdir -p "$OUT"
 
-echo "▶ prebuild (ios)"
-npx expo prebuild --platform ios --no-install
+echo "▶ prebuild (ios, clean — 이전 빌드 잔재로 아이콘·팟 누락되는 사고 방지)"
+npx expo prebuild --platform ios --no-install --clean
 (cd ios && pod install)
 
 # 워크스페이스·스킴은 expo.name 에 따라 바뀌므로 자동 감지 (mealing 개명 대응)
