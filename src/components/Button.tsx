@@ -13,9 +13,7 @@ import { Text } from './Text';
  * ghost   : 글자만 (건너뛰기·삭제·취소)
  * kakao · apple · google · email : 로그인 버튼
  */
-export type ButtonVariant = 'primary' | 'tint' | 'outline' | 'ghost' | 'kakao' | 'apple' | 'google' | 'email' | LegacyVariant;
-/** @deprecated 리스타일 전 화면 호환용 — primary 와 같다 */
-type LegacyVariant = 'cta';
+export type ButtonVariant = 'primary' | 'tint' | 'outline' | 'ghost' | 'kakao' | 'apple' | 'google' | 'email';
 
 export interface ButtonProps {
   title: string;
@@ -28,22 +26,18 @@ export interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   left?: ReactNode;
   accessibilityLabel?: string;
-  /** @deprecated 새 디자인 CTA 에는 화살표가 없다 (무시됨) */
-  trailingChevron?: boolean;
 }
 
 const SOCIAL: ButtonVariant[] = ['kakao', 'apple', 'google', 'email'];
 
 /** 버튼 — radius 12, 풀폭 높이 54. 비활성은 회색 바탕 + 연회색 글자 */
-export function Button({ title, onPress, variant: v = 'primary', loading, disabled, height = size.button, style, left, accessibilityLabel }: ButtonProps) {
-  const variant: ButtonVariant = v === 'cta' ? 'primary' : v;
+export function Button({ title, onPress, variant = 'primary', loading, disabled, height = size.button, style, left, accessibilityLabel }: ButtonProps) {
   const inactive = disabled || loading;
   const social = SOCIAL.includes(variant);
   const off = disabled && !loading && variant !== 'ghost';
 
   const bg: Record<ButtonVariant, string> = {
     primary: colors.primary,
-    cta: colors.primary,
     tint: colors.primaryTint,
     outline: colors.surface,
     ghost: 'transparent',
@@ -54,7 +48,6 @@ export function Button({ title, onPress, variant: v = 'primary', loading, disabl
   };
   const fgMap: Record<ButtonVariant, string> = {
     primary: colors.inkOnPrimary,
-    cta: colors.inkOnPrimary,
     tint: colors.primaryText,
     outline: colors.ink,
     ghost: colors.ink2,

@@ -9,8 +9,6 @@ import { Text } from './Text';
 export interface EmptyStateProps {
   /** 밀리 포즈 — 빈 상태 base/sleep, 오류 sorry (기본 base) */
   pose?: MillyPose;
-  /** @deprecated 이모지를 아이콘으로 쓰지 않는다 — 무시됨. pose 를 쓴다 */
-  emoji?: string;
   title: string;
   description?: string;
   actionLabel?: string;

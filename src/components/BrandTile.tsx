@@ -41,8 +41,6 @@ export interface BrandTileProps {
   /** 브랜드를 모를 때 쓰는 카테고리 아이콘 */
   category?: StoreCategory;
   size?: number;
-  /** @deprecated 항상 원형 */
-  shape?: 'rounded' | 'circle';
   style?: StyleProp<ViewStyle>;
 }
 
@@ -98,8 +96,6 @@ export function menuIconName(menu: Pick<MenuItem, 'name' | 'category'>): MciName
 export interface MenuTileProps {
   menu: Pick<MenuItem, 'name' | 'category'>;
   size?: number;
-  /** @deprecated 항상 원형 */
-  radiusSize?: number;
   style?: StyleProp<ViewStyle>;
 }
 

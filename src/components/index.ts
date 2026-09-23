@@ -14,7 +14,6 @@ export * from './Skeleton';
 export * from './Toast';
 export * from './BottomSheet';
 export * from './TabBar';
-export * from './Sprout';
 export * from './BrandTile';
 export * from './NoInfoState';
 export * from './Header';

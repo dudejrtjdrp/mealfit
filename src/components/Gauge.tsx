@@ -1,4 +1,3 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
@@ -9,7 +8,7 @@ import { Text } from './Text';
 const clamp01 = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
 export const formatNumber = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
-function Ring({ size, stroke, progress, color = colors.primary }: { size: number; stroke: number; progress: number; color?: string }) {
+function Ring({ size, stroke, progress }: { size: number; stroke: number; progress: number }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const p = clamp01(progress);
@@ -21,7 +20,7 @@ function Ring({ size, stroke, progress, color = colors.primary }: { size: number
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke={color}
+          stroke={colors.primary}
           strokeWidth={stroke}
           fill="none"
           strokeLinecap="round"
@@ -44,8 +43,6 @@ export interface KcalRingProps {
   target?: number;
   size?: number;
   stroke?: number;
-  /** @deprecated 링은 항상 포인트 그린 */
-  color?: string;
   /** 가운데 숫자 크기 (기본 30) */
   numberSize?: number;
   style?: StyleProp<ViewStyle>;
@@ -107,20 +104,15 @@ export function RoomBar({ remaining, progress, over, style }: RoomBarProps) {
   );
 }
 
-/** @deprecated RoomBar 를 쓴다 */
-export function MiniKcalGauge({ remaining, progress, style }: { remaining: number; progress: number; caption?: string; color?: string; style?: StyleProp<ViewStyle> }) {
-  return <RoomBar remaining={remaining} progress={1 - clamp01(progress)} style={style} />;
-}
-
 export type NutrientKey = 'kcal' | 'carbs' | 'protein' | 'fat' | 'sugar' | 'sodium';
 
-export const NUTRIENT_META: Record<NutrientKey, { label: string; short: string; unit: string; icon: keyof typeof Ionicons.glyphMap | 'fire' | 'barley' }> = {
-  kcal: { label: '칼로리', short: '칼로리', unit: 'kcal', icon: 'fire' },
-  carbs: { label: '탄수화물', short: '탄수', unit: 'g', icon: 'barley' },
-  protein: { label: '단백질', short: '단백질', unit: 'g', icon: 'egg-outline' },
-  fat: { label: '지방', short: '지방', unit: 'g', icon: 'water-outline' },
-  sugar: { label: '당', short: '당', unit: 'g', icon: 'cube-outline' },
-  sodium: { label: '나트륨', short: '나트륨', unit: 'g', icon: 'flask-outline' },
+export const NUTRIENT_META: Record<NutrientKey, { label: string; short: string; unit: string }> = {
+  kcal: { label: '칼로리', short: '칼로리', unit: 'kcal' },
+  carbs: { label: '탄수화물', short: '탄수', unit: 'g' },
+  protein: { label: '단백질', short: '단백질', unit: 'g' },
+  fat: { label: '지방', short: '지방', unit: 'g' },
+  sugar: { label: '당', short: '당', unit: 'g' },
+  sodium: { label: '나트륨', short: '나트륨', unit: 'g' },
 };
 
 /**
@@ -132,21 +124,6 @@ export function formatNutrient(k: NutrientKey, v: number): string {
   return formatNumber(v);
 }
 
-/** 회색 원 안 영양소 아이콘 (D4 비교 행) */
-export function NutrientIcon({ nutrient, size = 36 }: { nutrient: NutrientKey; size?: number }) {
-  const m = NUTRIENT_META[nutrient];
-  const iconSize = Math.round(size * 0.5);
-  return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.line, alignItems: 'center', justifyContent: 'center' }}>
-      {m.icon === 'fire' || m.icon === 'barley' ? (
-        <MaterialCommunityIcons name={m.icon} size={iconSize} color={colors.ink2} />
-      ) : (
-        <Ionicons name={m.icon} size={iconSize} color={colors.ink2} />
-      )}
-    </View>
-  );
-}
-
 export interface NutrientBarProps {
   nutrient: NutrientKey;
   /** 현재 값 (섭취량). 없으면 목표만 표시 */
@@ -154,8 +131,6 @@ export interface NutrientBarProps {
   max: number;
   /** 라벨 교체 */
   label?: string;
-  /** @deprecated 항상 컴팩트 */
-  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 

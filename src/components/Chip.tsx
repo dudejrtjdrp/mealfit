@@ -16,20 +16,16 @@ export interface ChipProps {
    * option : D4 옵션·끼니·선택지 — 선택 시 틴트 바탕 + 그린 테두리 + 그린 글자
    * soft   : 예시 칩 — 섹션 배경 + 검정 글자 (선택 개념 없음)
    */
-  variant?: 'filter' | 'option' | 'soft' | LegacyChipVariant;
+  variant?: 'filter' | 'option' | 'soft';
   size?: 'sm' | 'md' | 'lg';
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
 }
 
-/** @deprecated 리스타일 전 이름 — filter 와 같다 */
-type LegacyChipVariant = 'tab' | 'outline';
-
 const HEIGHT = { sm: 32, md: 36, lg: 44 } as const;
 
 /** 알약형 칩 */
-export function Chip({ label, selected, onPress, left, variant: v = 'filter', size = 'md', style, disabled }: ChipProps) {
-  const variant = v === 'tab' || v === 'outline' ? 'filter' : v;
+export function Chip({ label, selected, onPress, left, variant = 'filter', size = 'md', style, disabled }: ChipProps) {
   let bg: string = colors.surface;
   let border: string = colors.border;
   let fg: 'ink' | 'ink2' | 'primaryText' | 'inkOnPrimary' = 'ink2';

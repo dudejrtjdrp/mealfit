@@ -44,35 +44,6 @@ export const colors = {
 
   overlay: 'rgba(25, 31, 40, 0.4)',
 
-  // ── 이전 토큰 이름 (화면 리스타일 동안만 유지, 값은 새 토큰으로 매핑) ──
-  /** @deprecated primaryTint */ primarySoft: '#E6F6EE',
-  /** @deprecated primaryTint */ primarySofter: '#E6F6EE',
-  /** @deprecated primary */ primaryDark: '#17A05E',
-  /** @deprecated primary */ primaryBorder: '#17A05E',
-  /** @deprecated section */ surfaceAlt: '#F7F8FA',
-  /** @deprecated line */ lineSoft: '#F2F4F6',
-  /** @deprecated line */ gaugeTrack: '#F2F4F6',
-  /** @deprecated primary */ gaugeFill: '#17A05E',
-  /** @deprecated primary */ dot: '#17A05E',
-  /** @deprecated notice */ danger: '#B45309',
-  /** @deprecated */ coverFull: '#4E5968',
-  /** @deprecated */ coverFullBg: '#FFFFFF',
-  /** @deprecated */ coverPartial: '#4E5968',
-  /** @deprecated */ coverPartialBg: '#FFFFFF',
-  /** @deprecated */ coverNone: '#8B95A1',
-  /** @deprecated */ coverNoneBg: '#F2F4F6',
-  /** @deprecated */ kcal: '#17A05E',
-  /** @deprecated */ kcalBg: '#F2F4F6',
-  /** @deprecated */ carbs: '#17A05E',
-  /** @deprecated */ carbsBg: '#F2F4F6',
-  /** @deprecated */ protein: '#17A05E',
-  /** @deprecated */ proteinBg: '#F2F4F6',
-  /** @deprecated */ fat: '#17A05E',
-  /** @deprecated */ fatBg: '#F2F4F6',
-  /** @deprecated */ sugar: '#17A05E',
-  /** @deprecated */ sugarBg: '#F2F4F6',
-  /** @deprecated */ sodium: '#17A05E',
-  /** @deprecated */ sodiumBg: '#F2F4F6',
 } as const;
 
 export type ColorKey = keyof typeof colors;
@@ -102,8 +73,6 @@ export const radius = {
   /** 바텀시트 */
   sheet: 24,
   pill: 999,
-  /** @deprecated button */ sm: 12,
-  /** @deprecated sheet */ xl: 24,
 } as const;
 
 /** 컴포넌트 치수 */
@@ -142,8 +111,6 @@ export const type = {
 
 /** 그림자는 최소화 — 떠 있는 요소(토스트)에만 */
 export const shadow = {
-  /** @deprecated 카드는 그림자 없이 헤어라인으로 */
-  card: {},
   float: {
     shadowColor: '#191F28',
     shadowOpacity: 0.12,
