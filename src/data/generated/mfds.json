@@ -1,0 +1,9 @@
+{
+"meta": {
+  "generatedAt": null,
+  "sources": [],
+  "note": "아직 인제스트한 원본이 없어요. scripts/ingest-nutrition.mjs 참고"
+},
+"brands": [],
+"menus": []
+}

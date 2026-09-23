@@ -1,10 +1,21 @@
 import type { Brand, MenuItem, Store } from '../domain/types';
 import brandsJson from './brands.json';
+import mfdsJson from './generated/mfds.json';
+import { mergeBrands, mergeMenus } from './ingest/nutrition';
 import menusJson from './menus.json';
 import { getMockStores as buildMockStores } from './mockStores';
 
-const BRANDS = brandsJson as Brand[];
-const MENUS = menusJson as unknown as MenuItem[];
+/** scripts/ingest-nutrition.mjs 가 만드는 식약처 공공데이터 번들 */
+interface MfdsBundle {
+  meta: { generatedAt: string | null; sources: unknown[] };
+  brands: Brand[];
+  menus: MenuItem[];
+}
+const MFDS = mfdsJson as unknown as MfdsBundle;
+
+// 손으로 만든 시드 + 공공데이터: 같은 브랜드·메뉴명의 추정치는 공식값으로 교체, 나머지는 추가
+const MENUS = mergeMenus(menusJson as unknown as MenuItem[], MFDS.menus).menus;
+const BRANDS = mergeBrands(brandsJson as Brand[], MFDS.brands, MENUS);
 
 const brandById = new Map(BRANDS.map((b) => [b.id, b]));
 const menuById = new Map(MENUS.map((m) => [m.id, m]));

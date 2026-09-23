@@ -126,6 +126,10 @@ export interface MenuItem {
   nutrients: Nutrients | null;
   trust: Trust;
   sourceUrl?: string;
+  /** 출처 이름 — 예: "식약처·전국통합식품영양성분정보(음식)". 공공데이터 인제스트 메뉴에 붙는다 */
+  sourceName?: string;
+  /** 제공량 보충 설명 — 1인분량을 몰라 100 g 기준으로 표시할 때 그 사실을 밝힌다 */
+  servingNote?: string;
   /** 시안 카드 보조 표기용: "카페인 있음" 등 */
   tags?: string[];
   options?: OptionGroup[];

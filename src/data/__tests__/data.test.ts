@@ -50,6 +50,25 @@ describe('시드 데이터', () => {
   });
 });
 
+describe('공공데이터 번들 (src/data/generated/mfds.json)', () => {
+  it('앱에 들어가는 영양 JSON 합계 5MB 이하', () => {
+    const fs = require('fs') as typeof import('fs');
+    const path = require('path') as typeof import('path');
+    const bytes = ['brands.json', 'menus.json', 'generated/mfds.json']
+      .map((f) => fs.statSync(path.join(__dirname, '..', f)).size)
+      .reduce((a, b) => a + b, 0);
+    expect(bytes).toBeLessThanOrEqual(5 * 1024 * 1024);
+  });
+
+  it('공공데이터 메뉴는 official · 데이터셋 출처 · 이름 있음', () => {
+    for (const m of getMenus().filter((x) => x.sourceName?.startsWith('식약처'))) {
+      expect(m.trust).toBe('official');
+      expect(m.sourceUrl).toMatch(/^https:\/\/www\.data\.go\.kr\/data\/151000(70|66)\/standard\.do$/);
+      expect(m.name.length).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('matchBrand', () => {
   it.each([
     ['GS25 역삼센터점', 'gs25'],
