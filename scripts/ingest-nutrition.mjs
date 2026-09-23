@@ -44,7 +44,10 @@ const STATS_ONLY = flag('--stats');
 const MAX_BYTES = Math.round(Number(opt('--max-mb', '5')) * 1024 * 1024);
 // 시판 제품(mfds-products.json)은 검색 때만 지연 로드하는 별도 파일 — 시작 성능과 무관해 상한을 따로 둔다
 const MAX_PRODUCT_BYTES = Math.round(Number(opt('--max-products-mb', '10')) * 1024 * 1024);
-const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--max-mb' && args[i - 1] !== '--max-products-mb');
+// --server-out <경로>: 정원 없이 전체 유일 제품을 Supabase products 테이블 업로드용 NDJSON 으로 쓴다 (0002_products.sql 참고)
+const SERVER_OUT = opt('--server-out', null);
+const OPT_FLAGS = ['--max-mb', '--max-products-mb', '--server-out'];
+const positional = args.filter((a, i) => !a.startsWith('--') && !OPT_FLAGS.includes(args[i - 1]));
 
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const seedMenus = readJson(SEED_MENUS);
@@ -263,6 +266,36 @@ for (const pr of [...byCat.keys()].sort((a, b) => a - b)) {
   products.push(...list.slice(0, quota));
 }
 if (Object.keys(quotaCut).length) console.log('\n정원 초과로 뺀 제품(카테고리: 뺀 수):', quotaCut);
+
+// ───────── 서버 업로드용 전체 제품 (정원 없음) ─────────
+if (SERVER_OUT) {
+  // 앱 검색 정규화(normalizeName)와 같은 규칙 — 서버 ilike 검색 키
+  const norm = (s) => (s ?? '').toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+  const lines = deduped.map((p) => {
+    const n = p.nutrients;
+    return JSON.stringify({
+      id: p.id,
+      name: p.name,
+      name_norm: norm(p.name),
+      maker: p.maker ?? null,
+      maker_norm: p.maker ? norm(p.maker) : null,
+      category: p.category,
+      serving: p.serving,
+      serving_note: p.servingNote ?? null,
+      kcal: n.kcal,
+      carbs: n.carbs ?? null,
+      protein: n.protein ?? null,
+      fat: n.fat ?? null,
+      sat_fat: n.satFat ?? null,
+      sugar: n.sugar ?? null,
+      sodium: n.sodium ?? null,
+      caffeine: n.caffeine ?? null,
+      ref_date: p._refDate ?? null,
+    });
+  });
+  writeFileSync(SERVER_OUT, lines.join('\n') + '\n');
+  console.log(`\n서버 업로드용 전체 제품: ${lines.length}개 → ${SERVER_OUT} (${(Buffer.byteLength(lines.join('\n')) / 1024 / 1024).toFixed(1)} MB)`);
+}
 // 출처 URL·이름·brandId 는 전 항목이 같아 메타에 한 번만 싣는다 — 로더(src/data/index.ts)가 다시 채운다
 const serializeProducts = (ms) =>
   '{\n' +

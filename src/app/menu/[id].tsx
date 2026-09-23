@@ -30,6 +30,7 @@ import { applyOptions, judgeMenu, suggestAlternatives } from '@/domain/judge';
 import { formatNumber } from '@/domain/summary';
 import { MEAL_LABEL, VERDICT_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients } from '@/domain/types';
 import { newId } from '@/services/id';
+import { getCachedRemoteProduct } from '@/services/products';
 import { judgeProfile } from '@/state/bootstrap';
 import { defaultMealType, useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
@@ -49,7 +50,8 @@ function defaultSelection(menu?: MenuItem): Record<string, string> {
 /** D4 메뉴 상세·구매 가이드 — 판정 배지 대형 · 영양 vs 여유 비교 바 · 판정 이유 · 옵션 칩 즉시 갱신 · 대안 · CTA "이걸로 기록" */
 export default function MenuDetail() {
   const params = useLocalSearchParams<{ id: string; store?: string }>();
-  const menu = getMenu(params.id);
+  // 서버 검색(E2)에서 고른 시판 제품은 로컬 카탈로그에 없을 수 있다 → 세션 캐시에서 찾는다
+  const menu = getMenu(params.id) ?? getCachedRemoteProduct(params.id);
   const brand = menu ? getBrand(menu.brandId) : undefined;
 
   const profile = useProfile((s) => s.profile);

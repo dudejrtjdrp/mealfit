@@ -9,7 +9,9 @@ import { getBrand, getMenu, getMenus, getProductCount, normalizeName, searchMenu
 import { applyOptions, judgeMenu } from '@/domain/judge';
 import { formatNumber, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type MealLog, type MealType, type MenuItem, type Nutrients } from '@/domain/types';
+import { hasSupabase } from '@/services/env';
 import { newId } from '@/services/id';
+import { searchProductsRemote } from '@/services/products';
 import { getRepos } from '@/services/repo';
 import { judgeProfile } from '@/state/bootstrap';
 import { defaultMealType, useDay } from '@/state/day';
@@ -82,11 +84,33 @@ export default function AddLog() {
   }, []);
 
   const remaining = summary?.remaining ?? targets;
+
+  // 서버 제품 검색(식약처 전체 26만 개) — 로컬 결과를 먼저 보여주고, 서버 결과가 오면 뒤에 합친다
+  const [remote, setRemote] = useState<MenuItem[]>([]);
+  useEffect(() => {
+    if (normalizeName(query) === '') {
+      setRemote([]);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(async () => {
+      const items = await searchProductsRemote(query, 40);
+      if (alive) setRemote(items ?? []);
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [query]);
+
   const results = useMemo(() => {
     const q = normalizeName(query);
     if (!q) return [];
-    return searchMenus(q, 40).map((m) => ({ menu: m, judgement: remaining ? judgeMenu(m, remaining, { profile: judgeProfile(profile) }) : null }));
-  }, [query, remaining, profile]);
+    const local = searchMenus(q, 40);
+    const seen = new Set(local.map((m) => m.id));
+    const merged = [...local, ...remote.filter((m) => !seen.has(m.id))].slice(0, 60);
+    return merged.map((m) => ({ menu: m, judgement: remaining ? judgeMenu(m, remaining, { profile: judgeProfile(profile) }) : null }));
+  }, [query, remote, remaining, profile]);
 
   const manualOk = name.trim().length > 0 && num(kcal) !== undefined && (num(kcal) ?? -1) >= 0;
   const canSave = tab === 'manual' ? manualOk : !!picked;
@@ -198,7 +222,9 @@ export default function AddLog() {
             </View>
             {query.trim() === '' ? (
               <Text variant="caption" color="ink3" style={styles.hint}>
-                매장 메뉴와 라면·과자 같은 시판 제품 {formatNumber(getMenus().length + getProductCount())}개에서 찾아드려요.
+                {hasSupabase()
+                  ? '매장 메뉴와 시판 제품 전체(식약처 26만 개)에서 찾아드려요.'
+                  : `매장 메뉴와 라면·과자 같은 시판 제품 ${formatNumber(getMenus().length + getProductCount())}개에서 찾아드려요.`}
               </Text>
             ) : results.length === 0 ? (
               <EmptyState pose="sorry" title="찾는 메뉴가 없어요" description="직접 입력으로 남길 수 있어요." actionLabel="직접 입력하기" onAction={() => { setName(query); setTab('manual'); }} />
