@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, Chip, EmptyState, IconButton, Input, MenuTile, Text, TrustBadge, UnknownBadge, VerdictBadge, showToast } from '@/components';
-import { getBrand, getMenu, getMenus, normalizeName } from '@/data';
+import { getBrand, getMenu, getMenus, normalizeName, searchMenus } from '@/data';
 import { applyOptions, judgeMenu } from '@/domain/judge';
 import { formatNumber, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type MealLog, type MealType, type MenuItem, type Nutrients } from '@/domain/types';
@@ -85,10 +85,7 @@ export default function AddLog() {
   const results = useMemo(() => {
     const q = normalizeName(query);
     if (!q) return [];
-    return getMenus()
-      .filter((m) => normalizeName(m.name).includes(q) || normalizeName(getBrand(m.brandId)?.name ?? '').includes(q))
-      .slice(0, 40)
-      .map((m) => ({ menu: m, judgement: remaining ? judgeMenu(m, remaining, { profile: judgeProfile(profile) }) : null }));
+    return searchMenus(q, 40).map((m) => ({ menu: m, judgement: remaining ? judgeMenu(m, remaining, { profile: judgeProfile(profile) }) : null }));
   }, [query, remaining, profile]);
 
   const manualOk = name.trim().length > 0 && num(kcal) !== undefined && (num(kcal) ?? -1) >= 0;

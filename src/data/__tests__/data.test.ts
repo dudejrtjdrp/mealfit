@@ -1,6 +1,6 @@
 import { haversineM } from '../../domain/geo';
 import { judgeMenu } from '../../domain/judge';
-import { getBrand, getBrands, getMenu, getMenus, getMenusByBrand, getMockStores, getSeedPolicy, matchBrand } from '../index';
+import { getBrand, getBrands, getMenu, getMenus, getMenusByBrand, getMockStores, getSeedPolicy, matchBrand, searchMenus } from '../index';
 
 const CENTER = { lat: 37.5006, lng: 127.0366 };
 
@@ -83,6 +83,31 @@ describe('시드 정리 정책 (로더)', () => {
       expect(getMenusByBrand('starbucks').some((m) => m.id === 'starbucks-iced-latte')).toBe(false);
       expect(getMenu('starbucks-iced-latte')?.trust).toBe('estimated'); // 예전 기록이 깨지지 않게
     }
+  });
+});
+
+describe('searchMenus (기록 추가 E2)', () => {
+  it('메뉴명·브랜드명 부분 일치, 대소문자·공백 무시, limit 에서 멈춘다', () => {
+    expect(searchMenus('  ')).toEqual([]);
+    const byName = searchMenus('아메리 카노', 1000);
+    expect(byName.length).toBeGreaterThan(0);
+    expect(byName.every((m) => m.name.replace(/\s/g, '').includes('아메리카노') || getBrand(m.brandId)?.name.includes('아메리카노'))).toBe(true);
+    expect(searchMenus('스타벅스', 5)).toHaveLength(5);
+    expect(searchMenus('스타벅스', 5).every((m) => m.brandId === 'starbucks')).toBe(true);
+  });
+
+  it('목록 순서를 지키고 getMenus 필터와 결과가 같다', () => {
+    const norm = (s: string) => s.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+    const q = '라떼';
+    const naive = getMenus().filter((m) => norm(m.name).includes(q) || norm(getBrand(m.brandId)?.name ?? '').includes(q)).slice(0, 40);
+    expect(searchMenus(q).map((m) => m.id)).toEqual(naive.map((m) => m.id));
+  });
+
+  it('1만여 개에서 한 번 검색이 충분히 빠르다', () => {
+    searchMenus('워밍업');
+    const t = Date.now();
+    for (let i = 0; i < 50; i++) searchMenus(`없는메뉴${i}`);
+    expect((Date.now() - t) / 50).toBeLessThan(20);
   });
 });
 

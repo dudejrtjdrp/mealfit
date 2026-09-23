@@ -59,6 +59,25 @@ export function getSeedPolicy() {
   return MERGED.seedPolicy;
 }
 
+// 기록 추가(E2) 검색용: 정규화 이름을 한 번만 계산해 두고(1만여 개), 키 입력마다 정규식을 다시 돌리지 않는다
+let searchIndex: { menu: MenuItem; key: string; brandKey: string }[] | null = null;
+/** 메뉴명 또는 브랜드명에 검색어가 들어간 메뉴를 목록 순서대로 최대 limit 개 (찾는 즉시 멈춘다) */
+export function searchMenus(query: string, limit = 40): MenuItem[] {
+  const q = normalizeName(query);
+  if (!q) return [];
+  if (!searchIndex) {
+    const brandKeys = new Map(BRANDS.map((b) => [b.id, normalizeName(b.name)]));
+    searchIndex = MENUS.map((m) => ({ menu: m, key: normalizeName(m.name), brandKey: brandKeys.get(m.brandId) ?? '' }));
+  }
+  const out: MenuItem[] = [];
+  for (const x of searchIndex) {
+    if (x.key.includes(q) || x.brandKey.includes(q)) {
+      out.push(x.menu);
+      if (out.length >= limit) break;
+    }
+  }
+  return out;
+}
 /** 카카오 place_name → 브랜드 매칭 ("GS25 역삼센터점" → gs25) */
 export function matchBrand(placeName: string): Brand | undefined {
   const name = normalizeName(placeName ?? '');
