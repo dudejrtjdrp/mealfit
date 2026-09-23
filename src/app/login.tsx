@@ -1,14 +1,13 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { BottomSheet, Button, Input, LogoMark, Screen, Text, Wordmark, showToast } from '@/components';
+import { BottomSheet, Button, Input, LogoMark, MillyAvatar, RichText, Screen, Text, Wordmark, showToast } from '@/components';
 import { isAppleSignInAvailable, PASSWORD_MIN } from '@/services/auth';
 import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
 import { type AuthProvider, type AuthResult, useSession } from '@/state/session';
-import { colors, fonts, spacing } from '@/theme';
+import { colors, radius, spacing } from '@/theme';
 
 const PROVIDER_TITLE: Record<AuthProvider, string> = {
   kakao: '카카오로 시작',
@@ -25,7 +24,7 @@ async function routeAfterLogin() {
 }
 
 /**
- * A2 로그인 — 시안 docs/design/A2-login.png
+ * A2 로그인 — mealing 워드마크 · 2색 헤드라인 · 밀리 · 로그인 버튼
  * - Supabase 미설정: 세 버튼 모두 닉네임 시트 → 이 기기에 세션 저장
  * - Supabase 설정: 카카오·Google 은 OAuth(시스템 브라우저), Apple 은 iOS 네이티브 시트 → signInWithIdToken,
  *   이메일은 이메일+비밀번호 가입/로그인 시트
@@ -117,31 +116,21 @@ export default function LoginScreen() {
   return (
     <Screen>
       <View style={styles.brand}>
-        <LogoMark size={48} />
-        <Wordmark size={34} style={styles.wordmark} />
-        <Text variant="body" color="ink2" style={styles.tagline}>
+        <LogoMark size={44} />
+        <Wordmark size={32} style={styles.wordmark} />
+        <Text variant="caption" color="ink3" style={styles.tagline}>
           오늘도, 나에게 맞는 한 끼
         </Text>
       </View>
 
-      <Text variant="display" style={styles.headline}>
-        건강한 한 끼를{'\n'}
-        <Text variant="display" color="primaryText" style={styles.headlineText}>
-          더 가볍게
-        </Text>{' '}
-        시작해요.
-      </Text>
+      <RichText variant="display" text={'건강한 한 끼를\n**더 가볍게** 시작해요.'} style={styles.headline} />
 
-      <View style={[styles.illust, appleAvailable && styles.illustCompact]} accessibilityLabel="샐러드 일러스트">
-        <View style={styles.illustCircle} />
-        <Ionicons name="leaf" size={28} color={colors.gaugeFill} style={styles.leafA} />
-        <Ionicons name="leaf" size={18} color={colors.primaryBorder} style={styles.leafB} />
-        <Text style={styles.bowl}>🥗</Text>
-        <View style={styles.caption}>
-          <Text variant="caption" color="primaryText" style={styles.captionText}>
-            좋은 식사가{'\n'}좋은 하루를 만들어요.
+      <View style={[styles.illust, appleAvailable && styles.illustCompact]}>
+        <MillyAvatar pose="cheer" size={appleAvailable ? 88 : 104} />
+        <View style={styles.bubble}>
+          <Text variant="caption" color="ink">
+            저는 밀리예요.{'\n'}먹기 전에 같이 골라봐요!
           </Text>
-          <View style={styles.captionLine} />
         </View>
       </View>
 
@@ -154,14 +143,10 @@ export default function LoginScreen() {
         <Button variant="email" title="이메일로 시작" onPress={() => openSheet('email')} disabled={oauthBusy !== null} />
       </View>
 
-      <View style={styles.terms}>
-        <View style={styles.termsLine} />
-        <Text variant="caption" color="ink2" align="center" style={styles.termsText}>
-          시작하면 <Text variant="caption" color="ink2" style={styles.underline}>이용약관</Text>과{' '}
-          <Text variant="caption" color="ink2" style={styles.underline}>개인정보처리방침</Text>에{'\n'}동의한 것으로 간주됩니다.
-        </Text>
-        <View style={styles.termsLine} />
-      </View>
+      <Text variant="small" color="ink3" align="center" style={styles.terms}>
+        시작하면 <Text variant="small" color="ink2" style={styles.underline}>이용약관</Text>과{' '}
+        <Text variant="small" color="ink2" style={styles.underline}>개인정보처리방침</Text>에 동의한 것으로 간주됩니다.
+      </Text>
 
       <BottomSheet
         visible={provider !== null}
@@ -227,27 +212,18 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  brand: { marginTop: spacing.xxl, marginLeft: spacing.lg },
-  wordmark: { marginTop: spacing.xs },
-  tagline: { marginTop: 2, fontSize: 16 },
-  headline: { marginTop: spacing.xxxl + spacing.xs, marginLeft: spacing.lg, fontSize: 30 },
-  headlineText: { fontSize: 30 },
-  illust: { flex: 1, minHeight: 170, maxHeight: 230, marginTop: spacing.md, alignItems: 'center', justifyContent: 'center' },
+  brand: { marginTop: spacing.xxl },
+  wordmark: { marginTop: spacing.md },
+  tagline: { marginTop: 2 },
+  headline: { marginTop: spacing.xxl },
+  illust: { flex: 1, minHeight: 150, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   /** 버튼이 4개일 때 일러스트가 줄어들어 390×844 에서 스크롤 없이 들어가게 */
-  illustCompact: { minHeight: 120 },
-  illustCircle: { position: 'absolute', width: 190, height: 190, borderRadius: 95, backgroundColor: colors.primarySofter, left: '22%', top: '8%' },
-  bowl: { fontSize: 120, lineHeight: 140, marginLeft: 30, marginTop: 20 },
-  leafA: { position: 'absolute', left: '14%', top: '38%', transform: [{ rotate: '-20deg' }] },
-  leafB: { position: 'absolute', left: '11%', top: '56%', transform: [{ rotate: '200deg' }] },
-  caption: { position: 'absolute', right: 0, top: -4, transform: [{ rotate: '7deg' }] },
-  captionText: { fontFamily: fonts.medium },
-  captionLine: { width: 30, height: 2, borderRadius: 1, backgroundColor: colors.primary, marginTop: 10, marginLeft: 34 },
-  buttons: { marginTop: spacing.lg, gap: spacing.md },
-  terms: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xxl, marginBottom: spacing.lg },
-  termsLine: { flex: 1, height: 1, backgroundColor: colors.line },
-  termsText: { marginHorizontal: spacing.md },
+  illustCompact: { minHeight: 110 },
+  bubble: { backgroundColor: colors.section, borderRadius: radius.lg, borderTopLeftRadius: 4, paddingHorizontal: 14, paddingVertical: 12, marginBottom: spacing.xl },
+  buttons: { gap: 10 },
+  terms: { marginTop: spacing.lg, marginBottom: spacing.md },
   underline: { textDecorationLine: 'underline' },
-  sheetBody: { gap: spacing.md },
+  sheetBody: { gap: spacing.lg },
   notice: { marginTop: -spacing.xs },
   switch: { paddingVertical: spacing.xs },
 });

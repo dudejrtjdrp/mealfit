@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Chip, ListRow, Screen, StackHeader, Text, TextArea, showToast } from '@/components';
+import { Button, Card, Chip, ListRow, Screen, SproutIcon, StackHeader, Text, TextArea, showToast } from '@/components';
 import { DIET_TYPES, DIET_TYPE_IDS, normalizeDietText } from '@/domain/diet';
 import type { DietClassification, DietType } from '@/domain/types';
 import { classifyDiet } from '@/services/ai/classifyDiet';
@@ -77,30 +77,30 @@ export default function DietEdit() {
     >
       {phase !== 'result' ? (
         <>
-          <Text variant="h2" style={styles.title}>
+          <Text variant="h1" style={styles.title}>
             평소 식사는 어떤 편인가요?
           </Text>
-          <Text variant="body" color="ink2" style={styles.sub}>
+          <Text variant="caption" color="ink3" style={styles.sub}>
             자유롭게 적어주시면 성향 분류에 참고할게요.
           </Text>
           <TextArea value={text} onChangeText={setText} placeholder="예: 아침은 간단히 먹고, 점심은 편의점에서 자주 사 먹어요." style={styles.area} />
         </>
       ) : info && result ? (
         <>
-          <Card padding={20} style={styles.resultCard}>
-            <Text variant="caption" color="primaryText">
+          <Card style={styles.resultCard}>
+            <Text variant="captionMedium" color="primaryText">
               {result.source === 'manual' ? '직접 고른 성향' : '분석 결과'}
             </Text>
             <Text variant="h1" style={styles.resultTitle}>
               {info.label}
             </Text>
-            <Text variant="body" color="ink2" style={styles.sub}>
+            <Text variant="caption" color="ink2" style={styles.sub}>
               {info.description}
             </Text>
             {result.evidence.length > 0 ? (
               <View style={styles.evidence}>
                 {result.evidence.map((e, i) => (
-                  <ListRow key={i} variant="filled" chevron={false} icon="🌱" iconSize={36} title={e.title} subtitle={e.detail} />
+                  <ListRow key={i} variant="filled" chevron={false} icon={<SproutIcon size={18} color={colors.primaryText} />} iconBg={colors.primaryTint} iconSize={36} title={e.title} subtitle={e.detail} />
                 ))}
               </View>
             ) : null}
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   sub: { marginTop: spacing.xs },
   area: { marginTop: spacing.lg },
   footer: { gap: spacing.xs },
-  resultCard: { marginTop: spacing.lg, backgroundColor: colors.surface },
+  resultCard: { marginTop: spacing.lg },
   resultTitle: { marginTop: spacing.xs },
   evidence: { marginTop: spacing.lg, gap: spacing.sm },
   pickTitle: { marginTop: spacing.xl },

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Input, Screen, SelectCard, StackHeader, Text, showToast } from '@/components';
+import { Button, Input, Screen, SelectCard, StackHeader, Text, showToast } from '@/components';
 import { ACTIVITY_LABEL } from '@/data/labels';
 import { computeTargets } from '@/domain/targets';
 import { formatNumber } from '@/domain/summary';
@@ -63,19 +63,19 @@ export default function BodyEdit() {
 
   return (
     <Screen scroll header={<StackHeader title="신체 정보" />} footer={<Button title="저장" disabled={!canSave} loading={saving} onPress={save} />}>
-      <Text variant="body" color="ink2" style={styles.sub}>
+      <Text variant="caption" color="ink3" style={styles.sub}>
         바꾸면 오늘 목표량을 바로 다시 계산해요.
       </Text>
       <View style={styles.cards}>
-        <Card padding={16}>
-          <Text variant="h3" style={styles.label}>
+        <View>
+          <Text variant="captionMedium" color="ink2" style={styles.label}>
             성별
           </Text>
           <View style={styles.sexRow}>
-            <SelectCard layout="tile" title="남성" selected={sex === 'male'} onPress={() => setSex('male')} icon={(c) => <Ionicons name="man-outline" size={28} color={c} />} />
-            <SelectCard layout="tile" title="여성" selected={sex === 'female'} onPress={() => setSex('female')} icon={(c) => <Ionicons name="woman-outline" size={28} color={c} />} />
+            <SelectCard layout="tile" title="남성" selected={sex === 'male'} onPress={() => setSex('male')} icon={(c) => <Ionicons name="man-outline" size={22} color={c} />} />
+            <SelectCard layout="tile" title="여성" selected={sex === 'female'} onPress={() => setSex('female')} icon={(c) => <Ionicons name="woman-outline" size={22} color={c} />} />
           </View>
-        </Card>
+        </View>
         <Input label="출생 연도" icon="calendar-clear-outline" unit="년" value={birth} onChangeText={setBirth} maxLength={4} error={birth.length >= 4 && !okBirth ? `1930~${THIS_YEAR - 10}년 사이로 입력해주세요.` : undefined} />
         <Input label="키" icon="body-outline" unit="cm" value={height} onChangeText={setHeight} maxLength={5} error={height.length >= 3 && !okHeight ? '100~250cm 사이로 입력해주세요.' : undefined} />
         <Input label="몸무게" icon="speedometer-outline" unit="kg" value={weight} onChangeText={setWeight} maxLength={5} error={weight.length >= 2 && !okWeight ? '25~250kg 사이로 입력해주세요.' : undefined} />
@@ -92,8 +92,8 @@ export default function BodyEdit() {
 
 const styles = StyleSheet.create({
   sub: { marginTop: spacing.xs },
-  cards: { marginTop: spacing.lg, gap: spacing.md },
-  label: { marginBottom: spacing.md },
+  cards: { marginTop: spacing.xl, gap: spacing.lg },
+  label: { marginBottom: spacing.sm },
   sexRow: { flexDirection: 'row', gap: spacing.sm },
-  section: { marginTop: spacing.md },
+  section: { marginTop: spacing.sm, marginBottom: -spacing.xs },
 });

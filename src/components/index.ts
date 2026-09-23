@@ -23,3 +23,4 @@ export * from './Header';
 export * from './icons';
 export * from './MillyAvatar';
 export * from './Wordmark';
+export * from './RichText';

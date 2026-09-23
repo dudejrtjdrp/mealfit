@@ -1,167 +1,160 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card, EmptyState, KcalRing, NutrientBar, Screen, Skeleton, Text, VerdictBadge, type NutrientKey } from '@/components';
-import { formatNumber, remainingMessage } from '@/domain/summary';
-import { MEAL_LABEL, type DaySummary, type MealType } from '@/domain/types';
+import { BellIcon, Button, Card, EmptyState, IconButton, KcalRing, MenuTile, NutrientBar, RichText, Skeleton, Text, Wordmark, showToast, type NutrientKey } from '@/components';
+import { getMenu } from '@/data';
+import { formatNumber } from '@/domain/summary';
+import { MEAL_LABEL, type DaySummary, type MenuCategory } from '@/domain/types';
 import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, size, spacing } from '@/theme';
 
-const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
-const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MAX_ROWS = 4;
 
-/** 상태별 홈 문구 — 허용의 언어만 */
-function homeCopy(summary: DaySummary): { title: string; sub: string } {
-  if (summary.status === 'over') return { title: '오늘은 여기까지, 내일 다시 채워져요', sub: '충분히 잘 챙겨 드셨어요' };
-  return remainingMessage(summary);
+/** 인사 헤드라인 — 허용의 언어만. 넘겼거나 여유가 0이면 "오늘은 여기까지, 내일 다시 채워져요" */
+function headline(summary: DaySummary, nickname: string): string {
+  if (summary.status === 'over' || summary.remaining.kcal <= 0) return `${nickname}님, 오늘은 여기까지\n**내일** 다시 채워져요`;
+  return `${nickname}님, 오늘\n**${formatNumber(summary.remaining.kcal)}kcal** 더 먹을 수 있어요`;
 }
 
-/** C1 오늘 홈 — 여유분 게이지 + 오늘 기록 요약 + 주변 찾기 CTA */
+/** C1 오늘 홈 — 2색 인사 헤드라인 + 칼로리 도넛 링·영양소 미니바 카드 + 오늘 기록 + 주변 찾기 CTA */
 export default function Today() {
   const profile = useProfile((s) => s.profile);
   const targets = useProfile((s) => s.targets);
   const summary = useDay((s) => s.summary);
   const dayStatus = useDay((s) => s.status);
 
-  const now = new Date();
-  const dateLabel = `${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEKDAY[now.getDay()]}요일`;
   const nickname = profile?.nickname ?? '회원';
   const loading = !summary && (dayStatus === 'idle' || dayStatus === 'loading' || useProfile.getState().status === 'loading');
-
-  const over = summary?.status === 'over';
-  const ringColor = over ? colors.ok : colors.gaugeFill;
   const bars = targets ? (targets.emphasis.filter((k) => k !== 'kcal') as NutrientKey[]).slice(0, 3) : [];
-  const copy = summary ? homeCopy(summary) : null;
+  const logs = summary?.logs ?? [];
 
   return (
-    <Screen scroll edges={['top']} contentStyle={styles.content}>
-      <View style={styles.header}>
-        <Text variant="h1">오늘</Text>
-        <Text variant="body" color="ink2" style={styles.sub}>
-          {dateLabel} · {nickname}님, 오늘도 가볍게
-        </Text>
+    <SafeAreaView edges={['top']} style={styles.root}>
+      <View style={styles.topBar}>
+        <Wordmark size={20} />
+        <IconButton icon={<BellIcon color={colors.ink2} />} label="알림" onPress={() => showToast('알림은 곧 열려요', 'info')} />
       </View>
 
-      <Card padding={20} style={styles.card}>
-        <View style={styles.cardTop}>
-          <Text variant="h3" numberOfLines={1} style={styles.cardTitle}>
-            오늘의 여유
-          </Text>
-          {summary ? (
-            <View style={styles.hint}>
-              <Text variant="caption" color={over ? 'ok' : 'primaryText'} numberOfLines={1} style={styles.hintText}>
-                {remainingMessage(summary).title}
-              </Text>
-              <MaterialCommunityIcons name="sprout" size={18} color={over ? colors.ok : colors.primary} />
-            </View>
-          ) : null}
-        </View>
-
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <View style={styles.gaugeRow}>
-            <Skeleton width={136} height={136} borderRadius={68} />
-            <View style={styles.bars}>
-              <Skeleton height={14} />
-              <Skeleton height={14} />
-              <Skeleton height={14} />
-            </View>
+          <View style={styles.headSkel}>
+            <Skeleton width="60%" height={24} />
+            <Skeleton width="80%" height={24} />
           </View>
-        ) : summary && targets ? (
-          <>
+        ) : summary ? (
+          <RichText variant="h1" text={headline(summary, nickname)} accessibilityRole="header" />
+        ) : (
+          <Text variant="h1" accessibilityRole="header">
+            {nickname}님, 반가워요
+          </Text>
+        )}
+
+        <Card style={styles.gaugeCard}>
+          {loading ? (
             <View style={styles.gaugeRow}>
-              <KcalRing
-                value={summary.remaining.kcal}
-                progress={over ? 1 : targets.kcal > 0 ? summary.remaining.kcal / targets.kcal : 0}
-                target={targets.kcal}
-                size={128}
-                stroke={12}
-                color={ringColor}
-                numberSize={32}
-              />
+              <Skeleton width={130} height={130} borderRadius={65} />
+              <View style={styles.bars}>
+                <Skeleton height={12} />
+                <Skeleton height={12} />
+                <Skeleton height={12} />
+              </View>
+            </View>
+          ) : summary && targets ? (
+            <View style={styles.gaugeRow}>
+              <KcalRing value={summary.remaining.kcal} progress={targets.kcal > 0 ? summary.consumed.kcal / targets.kcal : 0} numberSize={summary.remaining.kcal >= 10000 ? 24 : undefined} />
               <View style={styles.bars}>
                 {bars.map((k) => (
-                  <NutrientBar key={k} nutrient={k} value={Math.round(summary.consumed[k] ?? 0)} max={targets[k]} compact />
+                  <NutrientBar key={k} nutrient={k} value={Math.round((summary.consumed[k] ?? 0) * 10) / 10} max={targets[k]} />
                 ))}
               </View>
             </View>
-            <View style={[styles.statusBox, over && styles.statusBoxOver]}>
-              <Text variant="bodyMedium" color={over ? 'ok' : 'primaryText'}>
-                {over ? copy?.title : copy?.sub}
-              </Text>
-              <Text variant="caption" color="ink2" style={styles.statusSub}>
-                {over ? copy?.sub : summary.status === 'empty' ? '주변 매장의 메뉴를 먼저 판정해 드릴게요' : '지금 주변에서 잘 맞는 메뉴를 찾아볼까요?'}
-              </Text>
-            </View>
-          </>
-        ) : (
-          <EmptyState emoji="🧮" title="목표량을 아직 계산하지 못했어요" description="마이 탭에서 신체 정보를 확인해 주세요." actionLabel="신체 정보 보기" onAction={() => router.push('/my/body')} style={styles.emptyInner} />
-        )}
-      </Card>
+          ) : (
+            <EmptyState
+              pose="sorry"
+              title="목표량을 아직 계산하지 못했어요"
+              description="마이 탭에서 신체 정보를 확인해 주세요."
+              actionLabel="신체 정보 보기"
+              onAction={() => router.push('/my/body')}
+              style={styles.emptyInner}
+            />
+          )}
+        </Card>
 
-      <Card padding={20} style={styles.card}>
-        <View style={styles.cardTop}>
-          <Text variant="h3">오늘의 기록</Text>
-          {summary && summary.logs.length > 0 ? (
-            <Text variant="caption" color="ink2">
-              총 {summary.logs.length}번 · {formatNumber(summary.consumed.kcal)} kcal
-            </Text>
-          ) : null}
-        </View>
-        {summary && summary.logs.length > 0 ? (
-          <View style={styles.meals}>
-            {MEAL_ORDER.map((m) => {
-              const items = summary.logs.filter((l) => l.mealType === m);
-              if (items.length === 0) return null;
-              const kcal = items.reduce((s, l) => s + l.nutrients.kcal, 0);
-              // 끼니 안 판정이 모두 같을 때만 배지 (섞여 있으면 숨김)
-              const verdict = items.every((l) => l.verdict && l.verdict === items[0].verdict) ? items[0].verdict : undefined;
-              return (
-                <View key={m} style={styles.mealRow}>
-                  <Text variant="bodyMedium" style={styles.mealLabel}>
-                    {MEAL_LABEL[m]}
-                  </Text>
-                  <Text variant="body" color="ink2" numberOfLines={1} style={styles.mealNames}>
-                    {items.map((l) => l.name).join(', ')}
-                  </Text>
-                  <Text variant="bodyMedium">{formatNumber(kcal)} kcal</Text>
-                  {verdict ? <VerdictBadge verdict={verdict} size="sm" style={styles.mealBadge} /> : null}
-                </View>
-              );
-            })}
+        <Card padding={0} style={styles.logCard}>
+          <View style={styles.logHead}>
+            <Text variant="h3">오늘 기록</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="기록 추가" hitSlop={8} onPress={() => router.push('/log/add')} style={styles.addBtn}>
+              <Text variant="bodyMedium" color="primaryText" style={styles.addText}>
+                추가
+              </Text>
+            </Pressable>
           </View>
-        ) : (
-          <EmptyState emoji="🍽️" title="오늘의 첫 끼를 기다리고 있어요" description="먹기 전에 주변 메뉴부터 살펴보세요." style={styles.emptyInner} />
-        )}
-      </Card>
+          {loading ? (
+            <View style={styles.rows}>
+              <Skeleton height={44} borderRadius={radius.pill} />
+            </View>
+          ) : logs.length > 0 ? (
+            <View style={styles.rows}>
+              {logs.slice(0, MAX_ROWS).map((l) => (
+                <Pressable key={l.id} accessibilityRole="button" onPress={() => router.navigate('/(tabs)/log')} style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}>
+                  <MenuTile menu={(l.menuId && getMenu(l.menuId)) || { name: l.name, category: 'meal' as MenuCategory }} size={44} />
+                  <Text variant="body" numberOfLines={1} style={styles.logName}>
+                    {l.name}
+                    <Text variant="body" color="ink3">
+                      {' '}· {MEAL_LABEL[l.mealType]}
+                    </Text>
+                  </Text>
+                  <Text variant="caption" color="ink2">
+                    <Text variant="captionMedium" color="ink" style={styles.bold}>
+                      {formatNumber(l.nutrients.kcal)}
+                    </Text>{' '}
+                    kcal
+                  </Text>
+                </Pressable>
+              ))}
+              {logs.length > MAX_ROWS ? (
+                <Pressable accessibilityRole="button" onPress={() => router.navigate('/(tabs)/log')} style={styles.more}>
+                  <Text variant="caption" color="ink3">
+                    기록 {logs.length - MAX_ROWS}개 더 보기
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            <Text variant="caption" color="ink3" style={styles.emptyLog}>
+              아직 기록이 없어요. 먹기 전에 주변 메뉴부터 살펴볼까요?
+            </Text>
+          )}
+        </Card>
+      </ScrollView>
 
-      <Button title="지금 주변에서 찾기" trailingChevron onPress={() => router.navigate('/(tabs)/nearby')} style={styles.cta} />
-      <Button title="직접 기록" variant="ghost" onPress={() => router.push('/log/add')} style={styles.ghost} />
-    </Screen>
+      <View style={styles.footer}>
+        <Button title="지금 주변에서 찾기" onPress={() => router.navigate('/(tabs)/nearby')} />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { paddingBottom: spacing.xxxl },
-  header: { paddingTop: spacing.xl, paddingBottom: spacing.sm },
-  sub: { marginTop: 2 },
-  card: { marginTop: spacing.lg },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  cardTitle: { flexShrink: 0 },
-  hint: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  hintText: { flexShrink: 1 },
-  gaugeRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, gap: spacing.md },
-  bars: { flex: 1, gap: spacing.lg },
-  statusBox: { marginTop: spacing.lg, backgroundColor: colors.primarySofter, borderRadius: radius.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
-  statusBoxOver: { backgroundColor: colors.okBg },
-  statusSub: { marginTop: 2 },
-  meals: { marginTop: spacing.sm },
-  mealRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm + 2, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineSoft },
-  mealLabel: { width: 40 },
-  mealNames: { flex: 1, marginRight: spacing.sm },
-  mealBadge: { marginLeft: spacing.sm },
+  root: { flex: 1, backgroundColor: colors.bg },
+  topBar: { height: size.header, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: spacing.page, paddingRight: spacing.sm },
+  scroll: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.xl },
+  headSkel: { gap: spacing.sm },
+  gaugeCard: { marginTop: spacing.xl, padding: spacing.xl },
+  gaugeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
+  bars: { flex: 1, gap: 14, minWidth: 0 },
   emptyInner: { paddingVertical: spacing.lg },
-  cta: { marginTop: spacing.xxl },
-  ghost: { marginTop: spacing.xs },
+  logCard: { marginTop: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md, paddingHorizontal: spacing.xl },
+  logHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: size.touch },
+  addBtn: { minHeight: size.touch, minWidth: size.touch, paddingLeft: spacing.md, alignItems: 'flex-end', justifyContent: 'center' },
+  addText: { fontSize: 14, fontFamily: fonts.semibold },
+  rows: { gap: 4 },
+  logRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  logName: { flex: 1, fontSize: 14 },
+  bold: { fontFamily: fonts.bold },
+  more: { paddingVertical: spacing.sm, alignItems: 'center' },
+  emptyLog: { paddingVertical: spacing.md },
+  footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.lg, backgroundColor: colors.bg },
 });

@@ -10,7 +10,7 @@ import { getPermissionStatus, requestPermission, type PermissionStatus } from '@
 import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
 import { useSession } from '@/state/session';
-import { colors, radius, spacing } from '@/theme';
+import { colors, spacing } from '@/theme';
 
 const PERM_LABEL: Record<PermissionStatus, string> = { granted: '허용됨', denied: '허용 안 됨', undetermined: '아직 묻지 않았어요' };
 
@@ -62,11 +62,11 @@ export default function Settings() {
 
   return (
     <Screen scroll header={<StackHeader title="설정" />}>
-      <Card padding={6} style={styles.card}>
+      <Card padding={spacing.xs} style={styles.card}>
         <ListRow
           title="위치 권한"
           subtitle={PERM_LABEL[perm]}
-          icon={<Ionicons name="location-outline" size={22} color={colors.primary} />}
+          icon={<Ionicons name="location-outline" size={20} color={colors.ink2} />}
           onPress={onPerm}
           style={styles.row}
         />
@@ -74,21 +74,20 @@ export default function Settings() {
         <ListRow
           title="데이터 저장 위치"
           subtitle={cloud ? `Supabase${email ? ` · ${email}` : ''}` : '이 기기'}
-          icon={<Ionicons name={cloud ? 'cloud-outline' : 'phone-portrait-outline'} size={22} color={colors.fat} />}
-          iconBg={colors.fatBg}
+          icon={<Ionicons name={cloud ? 'cloud-outline' : 'phone-portrait-outline'} size={20} color={colors.ink2} />}
           chevron={false}
           style={styles.row}
         />
       </Card>
 
-      <Card padding={18} style={styles.card}>
+      <Card style={styles.card}>
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: trustOpen }} onPress={() => setTrustOpen((v) => !v)} style={styles.foldHead}>
           <Text variant="h3">신뢰등급이란?</Text>
-          <Ionicons name={trustOpen ? 'chevron-up' : 'chevron-down'} size={20} color={colors.ink2} />
+          <Ionicons name={trustOpen ? 'chevron-up' : 'chevron-down'} size={20} color={colors.ink3} />
         </Pressable>
         {trustOpen ? (
           <View style={styles.fold}>
-            <Text variant="body" color="ink2">
+            <Text variant="caption" color="ink2">
               메뉴마다 영양 정보를 어디서 가져왔는지 함께 보여드려요. 숫자를 지어내지 않아요.
             </Text>
             {(
@@ -110,10 +109,10 @@ export default function Settings() {
         ) : null}
       </Card>
 
-      <Card padding={6} style={styles.card}>
-        <ListRow title="로그아웃" icon={<Ionicons name="log-out-outline" size={22} color={colors.ink2} />} iconBg={colors.sodiumBg} onPress={() => ask('logout')} style={styles.row} />
+      <Card padding={spacing.xs} style={styles.card}>
+        <ListRow title="로그아웃" icon={<Ionicons name="log-out-outline" size={20} color={colors.ink2} />} onPress={() => ask('logout')} style={styles.row} />
         <View style={styles.sep} />
-        <ListRow title="탈퇴하기" subtitle={cloud ? '저장된 프로필과 기록을 지워요.' : '이 기기의 프로필과 세션을 지워요.'} icon={<Ionicons name="person-remove-outline" size={22} color={colors.ink2} />} iconBg={colors.sodiumBg} onPress={() => ask('withdraw')} style={styles.row} />
+        <ListRow title="탈퇴하기" subtitle={cloud ? '저장된 프로필과 기록을 지워요.' : '이 기기의 프로필과 세션을 지워요.'} icon={<Ionicons name="person-remove-outline" size={20} color={colors.ink2} />} onPress={() => ask('withdraw')} style={styles.row} />
       </Card>
 
       <Text variant="caption" color="ink3" align="center" style={styles.version}>
@@ -128,7 +127,7 @@ export default function Settings() {
         footer={
           <View style={styles.sheetBtns}>
             <Button title="취소" variant="ghost" onPress={() => setConfirm(null)} style={styles.flex} />
-            <Button title={confirm === 'withdraw' ? '탈퇴' : '로그아웃'} height={48} onPress={() => void doSignOut()} style={styles.flex} />
+            <Button title={confirm === 'withdraw' ? '탈퇴' : '로그아웃'} onPress={() => void doSignOut()} style={styles.flex} />
           </View>
         }
       >
@@ -141,12 +140,12 @@ export default function Settings() {
 const styles = StyleSheet.create({
   card: { marginTop: spacing.md },
   row: { paddingHorizontal: spacing.md },
-  sep: { height: 1, backgroundColor: colors.lineSoft, marginHorizontal: spacing.md },
+  sep: { height: 1, backgroundColor: colors.line, marginHorizontal: spacing.md },
   foldHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   fold: { marginTop: spacing.md, gap: spacing.md },
   trustRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   trustText: { flex: 1 },
   version: { marginTop: spacing.xl },
   sheetBtns: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  flex: { flex: 1, borderRadius: radius.pill },
+  flex: { flex: 1 },
 });

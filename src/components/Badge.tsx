@@ -94,16 +94,16 @@ export function UnknownBadge({ style }: { style?: StyleProp<ViewStyle> }) {
   return <OutlinePill label="정보 없음" size="sm" accessibilityLabel="영양 정보 없음" style={style} />;
 }
 
-/** 매장 메뉴들의 신뢰등급을 하나로 요약 (D3 헤더) — 추정치가 섞이면 추정치, 공식만 있으면 공식 */
+/** 매장 메뉴들의 신뢰등급을 하나로 요약 (D3 헤더) — 정보 있는 메뉴 중 가장 많은 등급 (같으면 보수적으로 추정치) */
 export function summarizeTrust(trusts: Trust[]): Trust {
-  if (trusts.includes('estimated')) return 'estimated';
-  if (trusts.includes('official')) return 'official';
-  if (trusts.includes('user')) return 'user';
-  return 'none';
+  const official = trusts.filter((t) => t === 'official').length;
+  const estimated = trusts.filter((t) => t === 'estimated').length;
+  if (official === 0 && estimated === 0) return trusts.includes('user') ? 'user' : 'none';
+  return official > estimated ? 'official' : 'estimated';
 }
 
 const styles = StyleSheet.create({
-  pill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: radius.pill },
+  pill: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill },
   outline: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   bold: { fontFamily: fonts.bold },
   medium: { fontFamily: fonts.medium },

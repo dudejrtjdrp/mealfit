@@ -87,7 +87,7 @@ export default function GoalEdit() {
       ) : null}
 
       <Text variant="h3" style={styles.section}>
-        함께 챙길 것 (선택)
+        함께 챙길 것 <Text variant="caption" color="ink3">(선택)</Text>
       </Text>
       <View style={styles.chips}>
         {SECONDARY.filter((g) => g !== primary).map((g) => {
@@ -103,6 +103,6 @@ const styles = StyleSheet.create({
   section: { marginTop: spacing.xl },
   grid: { marginTop: spacing.md, gap: spacing.sm },
   row: { flexDirection: 'row', gap: spacing.sm },
-  targets: { marginTop: spacing.md, gap: spacing.md },
+  targets: { marginTop: spacing.lg, gap: spacing.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
 });

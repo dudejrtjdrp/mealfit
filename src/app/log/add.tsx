@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card, Chip, EmptyState, IconButton, Input, MenuTile, Text, VerdictBadge, showToast } from '@/components';
+import { Button, Card, Chip, EmptyState, IconButton, Input, MenuTile, Text, TrustBadge, UnknownBadge, VerdictBadge, showToast } from '@/components';
 import { getBrand, getMenu, getMenus, normalizeName } from '@/data';
 import { applyOptions, judgeMenu } from '@/domain/judge';
 import { formatNumber, toDateKey } from '@/domain/summary';
@@ -14,7 +14,7 @@ import { getRepos } from '@/services/repo';
 import { judgeProfile } from '@/state/bootstrap';
 import { defaultMealType, useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, fonts, radius, size, spacing, type } from '@/theme';
 
 type Tab = 'recent' | 'search' | 'manual';
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -132,8 +132,10 @@ export default function AddLog() {
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
       <View style={styles.handle} />
       <View style={styles.head}>
-        <Text variant="h2">기록 추가</Text>
-        <IconButton name="close" label="닫기" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/log'))} />
+        <Text variant="h2" accessibilityRole="header">
+          기록 추가
+        </Text>
+        <IconButton name="close" label="닫기" color={colors.ink} onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/log'))} />
       </View>
 
       <View style={styles.meals}>
@@ -147,7 +149,7 @@ export default function AddLog() {
           const on = tab === t.id;
           return (
             <Pressable key={t.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => { setTab(t.id); setPicked(null); }} style={[styles.tab, on && styles.tabOn]}>
-              <Text variant="bodyMedium" color={on ? 'ink' : 'ink2'}>
+              <Text variant="captionMedium" color={on ? 'ink' : 'ink3'} style={on ? styles.tabTextOn : undefined}>
                 {t.label}
               </Text>
             </Pressable>
@@ -158,9 +160,9 @@ export default function AddLog() {
       <ScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {tab === 'recent' ? (
           recent && recent.length === 0 ? (
-            <EmptyState emoji="🕘" title="최근 기록이 아직 없어요" description="검색이나 직접 입력으로 남겨 보세요." actionLabel="메뉴 검색" onAction={() => setTab('search')} />
+            <EmptyState pose="sleep" title="최근 기록이 아직 없어요" description="검색이나 직접 입력으로 남겨 보세요." actionLabel="메뉴 검색" onAction={() => setTab('search')} />
           ) : (
-            <Card padding={6}>
+            <Card padding={spacing.xs}>
               {(recent ?? []).map((l) => {
                 const on = picked?.kind === 'recent' && picked.log.id === l.id;
                 return (
@@ -186,7 +188,7 @@ export default function AddLog() {
         {tab === 'search' ? (
           <>
             <View style={styles.search}>
-              <Ionicons name="search" size={20} color={colors.ink3} />
+              <Ionicons name="search" size={18} color={colors.ink3} />
               <TextInput
                 accessibilityLabel="메뉴·브랜드 검색"
                 autoFocus
@@ -202,9 +204,9 @@ export default function AddLog() {
                 편의점·카페·프랜차이즈 메뉴 {getMenus().length}개에서 찾아드려요.
               </Text>
             ) : results.length === 0 ? (
-              <EmptyState emoji="🔎" title="찾는 메뉴가 없어요" description="직접 입력으로 남길 수 있어요." actionLabel="직접 입력하기" onAction={() => { setName(query); setTab('manual'); }} />
+              <EmptyState pose="sorry" title="찾는 메뉴가 없어요" description="직접 입력으로 남길 수 있어요." actionLabel="직접 입력하기" onAction={() => { setName(query); setTab('manual'); }} />
             ) : (
-              <Card padding={6} style={styles.results}>
+              <Card padding={spacing.xs} style={styles.results}>
                 {results.map(({ menu, judgement }) => {
                   const on = picked?.kind === 'menu' && picked.menu.id === menu.id;
                   const n = applyOptions(menu);
@@ -219,7 +221,7 @@ export default function AddLog() {
                           {getBrand(menu.brandId)?.name} · {n ? `${formatNumber(n.kcal)} kcal` : '정보 없음'}
                         </Text>
                       </View>
-                      {judgement && !judgement.unknown ? <VerdictBadge verdict={judgement.verdict} size="sm" /> : null}
+                      {judgement && !judgement.unknown ? <VerdictBadge verdict={judgement.verdict} size="sm" /> : !n ? <UnknownBadge /> : null}
                       {on ? <Ionicons name="checkmark-circle" size={22} color={colors.primary} style={styles.check} /> : null}
                     </Pressable>
                   );
@@ -233,17 +235,22 @@ export default function AddLog() {
           <View style={styles.form}>
             <Input label="메뉴 이름" kind="text" value={name} onChangeText={setName} placeholder="예: 닭가슴살 샐러드" autoCapitalize="sentences" />
             <Input label="칼로리" value={kcal} onChangeText={setKcal} unit="kcal" placeholder="0" maxLength={5} />
-            <Card padding={16}>
-              <Text variant="h3">탄·단·지 (선택)</Text>
+            <View>
+              <Text variant="captionMedium" color="ink2">
+                탄·단·지 <Text variant="caption" color="ink3">(선택)</Text>
+              </Text>
               <View style={styles.macros}>
-                <Input card={false} label="탄수화물" value={carbs} onChangeText={setCarbs} unit="g" maxLength={4} style={styles.macro} />
-                <Input card={false} label="단백질" value={protein} onChangeText={setProtein} unit="g" maxLength={4} style={styles.macro} />
-                <Input card={false} label="지방" value={fat} onChangeText={setFat} unit="g" maxLength={4} style={styles.macro} />
+                <Input label="탄수화물" value={carbs} onChangeText={setCarbs} unit="g" maxLength={4} style={styles.macro} />
+                <Input label="단백질" value={protein} onChangeText={setProtein} unit="g" maxLength={4} style={styles.macro} />
+                <Input label="지방" value={fat} onChangeText={setFat} unit="g" maxLength={4} style={styles.macro} />
               </View>
-            </Card>
-            <Text variant="caption" color="ink3" style={styles.hint}>
-              직접 입력한 기록은 신뢰등급 &quot;내가 입력&quot;으로 표시돼요.
-            </Text>
+            </View>
+            <View style={styles.userHint}>
+              <TrustBadge trust="user" size="sm" />
+              <Text variant="small" color="ink3" style={styles.userHintText}>
+                직접 입력한 기록은 이렇게 표시돼요.
+              </Text>
+            </View>
           </View>
         ) : null}
       </ScrollView>
@@ -258,25 +265,28 @@ export default function AddLog() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: radius.pill, backgroundColor: colors.line, marginTop: spacing.sm },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.page, marginTop: spacing.sm },
-  meals: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.page, marginTop: spacing.md },
+  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: radius.pill, backgroundColor: colors.border, marginTop: spacing.sm },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: spacing.page, paddingRight: spacing.sm, minHeight: size.header },
+  meals: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.page, marginTop: spacing.xs },
   mealChip: { flex: 1 },
-  tabs: { flexDirection: 'row', marginHorizontal: spacing.page, marginTop: spacing.lg, backgroundColor: colors.gaugeTrack, borderRadius: radius.pill, padding: 3 },
-  tab: { flex: 1, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  tabs: { flexDirection: 'row', marginHorizontal: spacing.page, marginTop: spacing.lg, backgroundColor: colors.line, borderRadius: radius.button, padding: 3 },
+  tab: { flex: 1, height: 38, borderRadius: radius.xs + 2, alignItems: 'center', justifyContent: 'center' },
   tabOn: { backgroundColor: colors.surface },
+  tabTextOn: { fontFamily: fonts.bold },
   scroll: { padding: spacing.page, paddingBottom: spacing.xxxl },
-  row: { flexDirection: 'row', alignItems: 'center', padding: spacing.sm, borderRadius: radius.md, gap: spacing.sm },
-  rowOn: { backgroundColor: colors.primarySofter },
-  rowBody: { flex: 1, marginLeft: spacing.xs },
+  row: { flexDirection: 'row', alignItems: 'center', padding: spacing.sm + 2, borderRadius: radius.md, gap: spacing.md },
+  rowOn: { backgroundColor: colors.primaryTint },
+  rowBody: { flex: 1, minWidth: 0 },
   check: { marginLeft: spacing.xs },
   dim: { opacity: 0.6 },
-  search: { flexDirection: 'row', alignItems: 'center', height: 50, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, paddingHorizontal: spacing.lg, gap: spacing.sm },
+  search: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: radius.button, backgroundColor: colors.section, paddingHorizontal: spacing.lg, gap: spacing.sm },
   searchInput: { flex: 1, height: '100%', ...type.body, color: colors.ink, outlineStyle: 'none' } as never,
   hint: { marginTop: spacing.md, textAlign: 'center' },
   results: { marginTop: spacing.md },
-  form: { gap: spacing.md },
+  form: { gap: spacing.lg },
   macros: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   macro: { flex: 1 },
-  footer: { paddingHorizontal: spacing.page, paddingVertical: spacing.sm },
+  userHint: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  userHintText: { flex: 1 },
+  footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.lg, borderTopWidth: 1, borderTopColor: colors.line },
 });

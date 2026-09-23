@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radius, spacing } from '@/theme';
 
@@ -18,9 +18,23 @@ export interface CardProps {
   accessibilityLabel?: string;
 }
 
+/**
+ * padding prop 과 style 의 padding* 을 한 벌의 longhand 로 합친다.
+ * (웹에서 shorthand padding 과 paddingHorizontal 이 섞이면 뒤엣것이 무시되는 경우가 있어서)
+ */
+function resolvePadding(padding: number, style: StyleProp<ViewStyle>): { box: ViewStyle; rest: ViewStyle } {
+  const { padding: p, paddingVertical: pv, paddingHorizontal: ph, paddingTop: pt, paddingBottom: pb, paddingLeft: pl, paddingRight: pr, ...rest } = (StyleSheet.flatten(style) ?? {}) as ViewStyle;
+  const base: DimensionValue = p ?? padding;
+  return {
+    box: { paddingTop: pt ?? pv ?? base, paddingBottom: pb ?? pv ?? base, paddingLeft: pl ?? ph ?? base, paddingRight: pr ?? ph ?? base },
+    rest,
+  };
+}
+
 /** 카드 — radius 20, 그림자 없이 헤어라인·배경색 차이로 구획 */
 export function Card({ children, style, padding = 20, tone = 'plain', onPress, accessibilityLabel }: CardProps) {
-  const s = [styles.card, styles[tone], { padding }, style];
+  const { box, rest } = resolvePadding(padding, style);
+  const s = [styles.card, styles[tone], box, rest];
   if (onPress) {
     return (
       <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={({ pressed }) => [s, pressed && styles.pressed]}>

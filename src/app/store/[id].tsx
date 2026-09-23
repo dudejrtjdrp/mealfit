@@ -1,27 +1,44 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BrandTile, Card, Chip, IconButton, MenuTile, MiniKcalGauge, NoInfoState, Skeleton, StackHeader, Text, VerdictBadge, showToast } from '@/components';
+import {
+  ChevronDownIcon,
+  Chip,
+  ListRow,
+  MenuTile,
+  NUTRIENT_META,
+  NoInfoState,
+  RoomBar,
+  Skeleton,
+  StackHeader,
+  Text,
+  TrustBadge,
+  UnknownBadge,
+  VerdictBadge,
+  formatNutrient,
+  showToast,
+  summarizeTrust,
+  type NutrientKey,
+} from '@/components';
 import { getBrand, getMenusByBrand, getMockStores } from '@/data';
 import { MENU_CATEGORY_LABEL } from '@/data/labels';
 import { YEOKSAM_CENTER } from '@/data/mockStores';
 import { applyOptions, rankMenus } from '@/domain/judge';
-import { formatNumber, remainingMessage } from '@/domain/summary';
+import { formatNumber } from '@/domain/summary';
 import type { Judgement, MenuCategory, MenuItem, Store } from '@/domain/types';
 import { judgeProfile } from '@/state/bootstrap';
 import { useDay } from '@/state/day';
 import { useNearby } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
-import { colors, fonts, radius, shadow, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 type Sort = 'rank' | 'kcal';
 type Cat = 'all' | MenuCategory;
 const CAT_ORDER: MenuCategory[] = ['drink', 'meal', 'snack', 'salad', 'side'];
 
-/** D3 매장 메뉴 판정 — 시안 docs/design/D3-store-menu.png */
+/** D3 매장 메뉴 판정 — 신뢰등급 헤더 · 여유분 미니카드 · 카테고리 칩 · 정렬 · 메뉴 카드(순위·핵심수치·판정 배지) */
 export default function StoreMenu() {
   const params = useLocalSearchParams<{ id: string; brandId?: string }>();
   const nearbyStore = useNearby((s) => s.stores.find((x) => x.id === params.id));
@@ -56,194 +73,100 @@ export default function StoreMenu() {
 
   const title = store?.name ?? brand?.name ?? '매장';
   const noInfo = !brand || brand.coverage === 'none' || menus.length === 0 || menus.every((m) => m.trust === 'none');
-  const msg = summary ? remainingMessage(summary) : null;
-  const over = summary?.status === 'over';
+  const trust = summarizeTrust(menus.map((m) => m.trust));
+  const over = summary?.status === 'over' || (summary ? summary.remaining.kcal <= 0 : false);
+  /** 메뉴 카드 보조 수치 — 내 목적의 첫 강조 영양소 (없으면 단백질) */
+  const sub: NutrientKey = ((targets?.emphasis ?? []).find((k) => k !== 'kcal') as NutrientKey | undefined) ?? 'protein';
 
   const openInfo = () => {
     if (store?.placeUrl) Linking.openURL(store.placeUrl).catch(() => showToast(store.address ?? '주소 정보가 없어요', 'info'));
     else showToast(store?.address ?? '주소 정보가 아직 없어요', 'info');
   };
+  const otherStores = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)/nearby'));
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.pad}>
-        <StackHeader
-          right={
-            <>
-              <IconButton name="search-outline" label="메뉴 검색" onPress={() => router.push('/log/add?tab=search')} />
-              <IconButton name="heart-outline" label="찜하기" onPress={() => showToast('곧 열려요', 'info')} />
-            </>
-          }
-        />
+        <StackHeader title={title} right={noInfo ? <TrustBadge trust="none" /> : <TrustBadge trust={trust} />} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.storeRow}>
-          <BrandTile brandId={brandId} category={store?.category} size={56} shape="circle" />
-          <View style={styles.storeText}>
-            <Text numberOfLines={1} style={styles.storeName}>
-              {title}
-            </Text>
-            <Text variant="caption" color="ink2" numberOfLines={1} style={styles.storeBlurb}>
-              {brand?.blurb ?? '영양 정보를 모으고 있는 매장이에요.'}
-            </Text>
-          </View>
-          <Pressable accessibilityRole="button" onPress={openInfo} style={({ pressed }) => [styles.infoBtn, pressed && { opacity: 0.8 }]}>
-            <Ionicons name="location-outline" size={16} color={colors.ink2} />
-            <Text variant="captionMedium" color="ink2">
-              매장 정보
-            </Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.ink2} />
-          </Pressable>
-        </View>
-
         {noInfo ? (
-          <Card style={styles.noInfoCard}>
-            <NoInfoState
-              reason={!brand ? '아직 데이터가 없는 매장이에요. 확인된 정보만 보여드려요.' : undefined}
-              onOtherStores={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/nearby'))}
-              onManualLog={() => router.push({ pathname: '/log/add', params: { name: '', store: title } })}
-            />
-          </Card>
+          <NoInfoState
+            reason={!brand ? '아직 데이터가 없는 매장이에요. 확인된 정보만 보여드려요.' : undefined}
+            onOtherStores={otherStores}
+            onManualLog={() => router.push({ pathname: '/log/add', params: { name: '', store: title } })}
+          />
         ) : (
           <>
-            <Card padding={16} style={styles.gaugeCard}>
-              {summary && targets ? (
-                <View style={styles.gaugeRow}>
-                  <MiniKcalGauge remaining={summary.remaining.kcal} progress={over ? 1 : summary.remaining.kcal / Math.max(1, targets.kcal)} color={over ? colors.ok : undefined} style={styles.gauge} />
-                  <View style={styles.vline} />
-                  <View style={styles.msg}>
-                    <MaterialCommunityIcons name="sprout" size={22} color={colors.gaugeFill} style={styles.msgSprout} />
-                    <Text variant="caption" color="ink2" numberOfLines={3}>
-                      {over ? '오늘은 여기까지,\n내일 다시 채워져요' : msg?.title}
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                <Skeleton height={64} />
-              )}
-            </Card>
+            {summary && targets ? (
+              <RoomBar remaining={summary.remaining.kcal} progress={targets.kcal > 0 ? summary.consumed.kcal / targets.kcal : 0} over={over} />
+            ) : (
+              <Skeleton height={48} borderRadius={radius.md} />
+            )}
 
             {cats.length > 1 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipsWrap}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipsWrap} accessibilityRole="tablist">
                 {(['all', ...cats] as Cat[]).map((c) => (
-                  <Chip key={c} label={c === 'all' ? '전체' : MENU_CATEGORY_LABEL[c]} selected={cat === c} onPress={() => setCat(c)} style={styles.chip} />
+                  <Chip key={c} label={c === 'all' ? '전체' : MENU_CATEGORY_LABEL[c]} selected={cat === c} onPress={() => setCat(c)} />
                 ))}
               </ScrollView>
-            ) : null}
+            ) : (
+              <View style={styles.chipsGap} />
+            )}
 
-            <View style={styles.sectionRow}>
-              <Text variant="h2" style={styles.sectionTitle}>
-                메뉴 추천
+            <Pressable accessibilityRole="button" accessibilityLabel="정렬 바꾸기" onPress={() => setSort((s) => (s === 'rank' ? 'kcal' : 'rank'))} style={styles.sortBtn}>
+              <Text variant="caption" color="ink3">
+                {sort === 'rank' ? '내게 맞는 순' : '칼로리 낮은 순'}
               </Text>
-              <Text variant="caption" color="ink2" style={styles.sectionSub}>
-                건강한 선택을 도와드려요.
-              </Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="정렬 바꾸기" onPress={() => setSort((s) => (s === 'rank' ? 'kcal' : 'rank'))} style={styles.sortBtn}>
-                <Text variant="captionMedium" color="ink2">
-                  {sort === 'rank' ? '추천순' : '칼로리 낮은순'}
-                </Text>
-                <Ionicons name="chevron-down" size={16} color={colors.ink2} />
-              </Pressable>
-            </View>
+              <ChevronDownIcon size={20} color={colors.ink3} />
+            </Pressable>
 
             {!ranked ? (
               <View style={styles.list}>
                 {[0, 1, 2].map((i) => (
-                  <Skeleton key={i} height={92} borderRadius={radius.lg} />
+                  <Skeleton key={i} height={80} borderRadius={radius.lg} />
                 ))}
               </View>
             ) : (
               <View style={styles.list}>
                 {list.map(({ menu, judgement, rank }) => (
-                  <MenuRow key={menu.id} menu={menu} judgement={judgement} rank={rank} onPress={() => router.push({ pathname: '/menu/[id]', params: { id: menu.id, store: title } })} />
+                  <MenuRow key={menu.id} menu={menu} judgement={judgement} rank={rank} sub={sub} onPress={() => router.push({ pathname: '/menu/[id]', params: { id: menu.id, store: title } })} />
                 ))}
               </View>
             )}
           </>
         )}
 
-        <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/nearby'))} style={({ pressed }) => [styles.banner, pressed && { opacity: 0.9 }]}>
-          <View style={styles.bannerText}>
-            <View style={styles.bannerTop}>
-              <Ionicons name="location" size={16} color={colors.primary} />
-              <Text variant="caption" color="primaryText">
-                이 매장 근처에도 있어요
-              </Text>
-            </View>
-            <Text variant="h3" style={styles.bannerTitle}>
-              다른 매장의 메뉴도 살펴보세요
-            </Text>
-            <Text variant="caption" color="primaryText" style={styles.bannerSub}>
-              더 다양한 선택지가 기다리고 있어요.
-            </Text>
-          </View>
-          <View style={styles.bannerArrow}>
-            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-          </View>
-        </Pressable>
+        <View style={styles.links}>
+          <ListRow title="매장 정보" subtitle={store?.address ?? brand?.blurb} onPress={openInfo} style={styles.linkRow} />
+          <View style={styles.sep} />
+          <ListRow title="근처 다른 매장 보기" onPress={otherStores} style={styles.linkRow} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function MenuRow({ menu, judgement, rank, onPress }: { menu: MenuItem; judgement: Judgement; rank: number; onPress: () => void }) {
+function MenuRow({ menu, judgement, rank, sub, onPress }: { menu: MenuItem; judgement: Judgement; rank: number; sub: NutrientKey; onPress: () => void }) {
   const n = applyOptions(menu);
   const unknown = judgement.unknown || !n;
-  const tag = menu.tags?.[0];
+  const subValue = n ? n[sub] : undefined;
+  const meta = n
+    ? `${formatNumber(n.kcal)} kcal${typeof subValue === 'number' ? ` · ${NUTRIENT_META[sub].short} ${formatNutrient(sub, subValue)}${NUTRIENT_META[sub].unit}` : ''}`
+    : '아직 추가되지 않은 정보입니다';
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.menuCard, unknown && styles.dim, pressed && { opacity: 0.85 }]}>
-      <View style={styles.rank}>
-        <Text style={styles.rankText}>{rank}</Text>
-      </View>
-      <MenuTile menu={menu} size={72} style={styles.menuTile} />
+    <Pressable accessibilityRole="button" accessibilityLabel={`${rank}위 ${menu.name}, ${meta}`} onPress={onPress} style={({ pressed }) => [styles.menuCard, pressed && { opacity: 0.8 }]}>
+      <Text style={[styles.rank, unknown && { color: colors.ink3 }]}>{rank}</Text>
+      <MenuTile menu={menu} size={48} />
       <View style={styles.menuBody}>
-        <View style={styles.menuTop}>
-          <Text variant="h3" numberOfLines={1} style={styles.menuName}>
-            {menu.name}
-          </Text>
-        </View>
-        <Text variant="caption" color="ink3" numberOfLines={1} style={styles.serving}>
-          {menu.serving}
+        <Text variant="h3" numberOfLines={1}>
+          {menu.name}
         </Text>
-        <View style={styles.facts}>
-          {n ? (
-            <>
-              <MaterialCommunityIcons name="fire" size={17} color={colors.kcal} />
-              <Text variant="bodyMedium" style={styles.factText}>
-                {formatNumber(n.kcal)} kcal
-              </Text>
-              {tag || typeof n.protein === 'number' ? (
-                <>
-                  <View style={styles.factDivider} />
-                  {tag ? (
-                    <Ionicons name={/카페인/.test(tag) ? 'cafe-outline' : 'pricetag-outline'} size={15} color={colors.ink2} />
-                  ) : (
-                    <MaterialCommunityIcons name="barley" size={15} color={colors.ink2} />
-                  )}
-                  <Text variant="caption" color="ink2" numberOfLines={1} style={styles.factText}>
-                    {tag ?? `단백질 ${formatNumber(n.protein ?? 0)} g`}
-                  </Text>
-                </>
-              ) : null}
-            </>
-          ) : (
-            <Text variant="caption" color="ink3">
-              아직 추가되지 않은 정보입니다
-            </Text>
-          )}
-        </View>
+        <Text variant="small" color="ink3" numberOfLines={1}>
+          {meta}
+        </Text>
       </View>
-      <View style={styles.badgeBox}>
-        {unknown ? (
-          <View style={styles.unknownPill}>
-            <Text variant="label" color="coverNone">
-              정보 없음
-            </Text>
-          </View>
-        ) : (
-          <VerdictBadge verdict={judgement.verdict} size="sm" style={styles.verdict} />
-        )}
-      </View>
+      {unknown ? <UnknownBadge /> : <VerdictBadge verdict={judgement.verdict} />}
     </Pressable>
   );
 }
@@ -251,46 +174,16 @@ function MenuRow({ menu, judgement, rank, onPress }: { menu: MenuItem; judgement
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: spacing.page },
-  scroll: { paddingHorizontal: spacing.page, paddingBottom: spacing.xxxl },
-  storeRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
-  storeText: { flex: 1, marginLeft: spacing.md, marginRight: spacing.sm },
-  storeName: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 28, color: colors.ink },
-  storeBlurb: { marginTop: 2 },
-  infoBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 38, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: colors.surface, ...shadow.card },
-  noInfoCard: { marginTop: spacing.xl },
-  gaugeCard: { marginTop: spacing.lg },
-  gaugeRow: { flexDirection: 'row', alignItems: 'center' },
-  gauge: { flexShrink: 0 },
-  vline: { width: 1, alignSelf: 'stretch', backgroundColor: colors.line, marginHorizontal: spacing.md },
-  msg: { flex: 1 },
-  msgSprout: { alignSelf: 'flex-end', marginBottom: -4 },
-  chipsWrap: { marginTop: spacing.lg, flexGrow: 0, marginHorizontal: -spacing.page },
+  scroll: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.xxxl },
+  chipsWrap: { marginTop: spacing.xl, flexGrow: 0, marginHorizontal: -spacing.page },
   chips: { paddingHorizontal: spacing.page, gap: spacing.sm },
-  chip: { minWidth: 64 },
-  sectionRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.xl },
-  sectionTitle: {},
-  sectionSub: { marginLeft: spacing.sm, flex: 1 },
-  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  list: { marginTop: spacing.md, gap: spacing.sm },
-  menuCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, paddingVertical: spacing.sm, paddingLeft: spacing.sm, paddingRight: spacing.md, ...shadow.card },
-  dim: { opacity: 0.6 },
-  rank: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  rankText: { fontFamily: fonts.semibold, fontSize: 14, lineHeight: 18, color: colors.primaryText },
-  menuTile: { marginLeft: spacing.sm },
-  menuBody: { flex: 1, marginLeft: spacing.md },
-  menuTop: { flexDirection: 'row', alignItems: 'center', paddingRight: 78 },
-  menuName: {},
-  serving: { marginTop: 0 },
-  facts: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 },
-  factText: { flexShrink: 1 },
-  factDivider: { width: 1, height: 14, backgroundColor: colors.line, marginHorizontal: 6 },
-  badgeBox: { position: 'absolute', top: 12, right: 12 },
-  verdict: { height: 28, paddingHorizontal: 10 },
-  unknownPill: { height: 26, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: colors.coverNoneBg, justifyContent: 'center' },
-  banner: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, backgroundColor: colors.primarySoft, borderRadius: radius.lg, padding: spacing.lg + 2 },
-  bannerText: { flex: 1 },
-  bannerTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  bannerTitle: { marginTop: 4, fontFamily: fonts.bold },
-  bannerSub: { marginTop: 2 },
-  bannerArrow: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  chipsGap: { height: spacing.md },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 2, minHeight: 44, marginTop: spacing.sm },
+  list: { marginTop: spacing.xs, gap: 10 },
+  menuCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg },
+  rank: { width: 16, textAlign: 'center', fontFamily: fonts.bold, fontSize: 18, lineHeight: 20, color: colors.primaryText },
+  menuBody: { flex: 1, minWidth: 0, gap: 4 },
+  links: { marginTop: spacing.xxl, borderTopWidth: 1, borderTopColor: colors.line },
+  linkRow: { paddingVertical: spacing.sm },
+  sep: { height: 1, backgroundColor: colors.line },
 });

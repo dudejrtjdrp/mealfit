@@ -1,17 +1,16 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomSheet, Button, Card, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, Skeleton, Text, VerdictBadge, showToast, type NutrientKey } from '@/components';
+import { BackIcon, BottomSheet, Button, Card, ChevronRightIcon, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, Skeleton, Text, VerdictBadge, showToast, type NutrientKey } from '@/components';
 import { getMenu } from '@/data';
 import { formatNumber, summarizeDay, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type DaySummary, type MealLog, type MealType, type MenuCategory } from '@/domain/types';
 import { getRepos } from '@/services/repo';
 import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
-import { colors, fonts, radius, spacing } from '@/theme';
+import { colors, fonts, radius, size, spacing } from '@/theme';
 
 const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -35,7 +34,7 @@ function progressCopy(s: DaySummary): string {
     case 'empty':
       return '오늘의 첫 끼를 기다려요';
     case 'room':
-      return '목표까지 잘 하고 있어요!';
+      return '잘 채워가고 있어요';
     case 'almost':
       return '오늘 거의 다 채웠어요';
     case 'over':
@@ -43,7 +42,7 @@ function progressCopy(s: DaySummary): string {
   }
 }
 
-/** E1 기록 목록 — 시안 docs/design/E1-log.png */
+/** E1 기록 목록 — 주간 캘린더 스트립 · 하루 요약(링·미니바) · 끼니별 기록 */
 export default function LogScreen() {
   const today = toDateKey();
   const targets = useProfile((s) => s.targets);
@@ -141,24 +140,23 @@ export default function LogScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text variant="h1" style={styles.title}>
+            <Text variant="h1" accessibilityRole="header">
               기록
             </Text>
-            <Text variant="body" color="ink2" style={styles.sub}>
+            <Text variant="caption" color="ink3">
               오늘도 건강한 습관을 이어가요.
             </Text>
           </View>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/log/add')} style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}>
-            <Ionicons name="add" size={22} color={colors.primaryText} />
-            <Text variant="bodyMedium" color="primaryText">
-              기록 추가
+          <Pressable accessibilityRole="button" accessibilityLabel="기록 추가" onPress={() => router.push('/log/add')} style={styles.addBtn}>
+            <Text variant="bodyMedium" color="primaryText" style={styles.addText}>
+              추가
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.week} {...pan.panHandlers}>
           <Pressable accessibilityRole="button" accessibilityLabel="이전 주" hitSlop={8} onPress={() => moveWeek(-1)} style={styles.weekNav}>
-            <Ionicons name="chevron-back" size={16} color={colors.ink3} />
+            <BackIcon size={16} color={colors.ink3} />
           </Pressable>
           {days.map((d, i) => {
             const key = toDateKey(d);
@@ -166,90 +164,84 @@ export default function LogScreen() {
             const isT = key === today;
             const future = key > today;
             return (
-              <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: on }} disabled={future} onPress={() => setSelected(key)} style={styles.day}>
-                <Text variant="caption" color={isT ? 'primaryText' : 'ink2'}>
+              <Pressable key={key} accessibilityRole="button" accessibilityLabel={`${d.getMonth() + 1}월 ${d.getDate()}일`} accessibilityState={{ selected: on }} disabled={future} onPress={() => setSelected(key)} style={styles.day}>
+                <Text variant="small" color={isT ? 'primaryText' : 'ink3'} style={isT ? styles.todayLabel : undefined}>
                   {WEEK[i]}
                 </Text>
                 <View style={[styles.dayCircle, on && styles.dayOn]}>
-                  <Text style={[styles.dayNum, { color: on ? colors.primaryText : future ? colors.ink3 : colors.ink2 }]}>{d.getDate()}</Text>
+                  <Text style={[styles.dayNum, { color: on ? colors.inkOnPrimary : future ? colors.border : colors.ink }]}>{d.getDate()}</Text>
                 </View>
                 <View style={[styles.dot, { opacity: dots.includes(key) ? 1 : 0 }]} />
               </Pressable>
             );
           })}
           <Pressable accessibilityRole="button" accessibilityLabel="다음 주" hitSlop={8} onPress={() => moveWeek(1)} style={styles.weekNav}>
-            <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
+            <ChevronRightIcon size={16} color={colors.ink3} />
           </Pressable>
         </View>
 
-        <Card padding={18} style={styles.card}>
+        <Card style={styles.card}>
           <View style={styles.cardHead}>
-            <Pressable accessibilityRole="button" onPress={() => router.navigate('/(tabs)/today')} style={styles.cardTitle}>
-              <Text style={styles.cardTitleText}>{title}의 섭취 현황</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.ink} />
-            </Pressable>
+            <Text variant="h3">{title} 섭취 현황</Text>
             {summary ? (
-              <View style={styles.cheer}>
-                <Text variant="caption" color="ink2" numberOfLines={1} style={styles.cheerText}>
-                  {progressCopy(summary)}
-                </Text>
-                <MaterialCommunityIcons name="sprout" size={20} color={summary.status === 'over' ? colors.ok : colors.primary} />
-              </View>
+              <Text variant="small" color="ink3" numberOfLines={1} style={styles.cheerText}>
+                {progressCopy(summary)}
+              </Text>
             ) : null}
           </View>
           {loading ? (
             <View style={styles.gaugeRow}>
-              <Skeleton width={128} height={128} borderRadius={64} />
+              <Skeleton width={120} height={120} borderRadius={60} />
               <View style={styles.bars}>
-                <Skeleton height={14} />
-                <Skeleton height={14} />
-                <Skeleton height={14} />
+                <Skeleton height={12} />
+                <Skeleton height={12} />
+                <Skeleton height={12} />
               </View>
             </View>
           ) : summary && targets ? (
             <View style={styles.gaugeRow}>
               <KcalRing
                 value={summary.consumed.kcal}
+                caption="kcal 먹었어요"
                 progress={targets.kcal > 0 ? summary.consumed.kcal / targets.kcal : 0}
                 target={targets.kcal}
-                size={128}
-                stroke={12}
-                numberSize={summary.consumed.kcal >= 1000 ? 30 : 36}
-                color={summary.status === 'over' ? colors.ok : undefined}
+                size={120}
+                stroke={11}
+                numberSize={summary.consumed.kcal >= 1000 ? 26 : 30}
               />
               <View style={styles.bars}>
                 {bars.map((k) => (
-                  <NutrientBar key={k} nutrient={k} value={Math.round(summary.consumed[k] ?? 0)} max={targets[k]} compact style={styles.bar} />
+                  <NutrientBar key={k} nutrient={k} value={Math.round((summary.consumed[k] ?? 0) * 10) / 10} max={targets[k]} />
                 ))}
               </View>
             </View>
           ) : (
-            <EmptyState emoji="🧮" title="목표량을 아직 계산하지 못했어요" description="마이 탭에서 신체 정보를 확인해 주세요." style={styles.emptyInner} />
+            <EmptyState pose="sorry" title="목표량을 아직 계산하지 못했어요" description="마이 탭에서 신체 정보를 확인해 주세요." style={styles.emptyInner} />
           )}
         </Card>
 
-        <Card padding={18} style={styles.card}>
+        <Card padding={0} style={[styles.card, styles.logCard]}>
           <View style={styles.cardHead}>
-            <Text style={styles.cardTitleText}>{title}의 식사 기록</Text>
+            <Text variant="h3">{title} 식사 기록</Text>
             {summary && summary.logs.length > 0 ? (
-              <Text variant="body" color="ink2">
-                총 {summary.logs.length} 끼 · {formatNumber(summary.consumed.kcal)} kcal
+              <Text variant="small" color="ink3">
+                {summary.logs.length}끼 · {formatNumber(summary.consumed.kcal)} kcal
               </Text>
             ) : null}
           </View>
           {summary && summary.logs.length > 0 ? (
             <View style={styles.rows}>
-              {summary.logs.map((l) => (
-                <LogRow key={l.id} log={l} onPress={() => setEditing(l)} />
+              {summary.logs.map((l, i) => (
+                <LogRow key={l.id} log={l} first={i === 0} onPress={() => setEditing(l)} />
               ))}
             </View>
           ) : loading ? (
             <View style={styles.rows}>
-              <Skeleton height={72} borderRadius={radius.md} />
+              <Skeleton height={56} borderRadius={radius.md} />
             </View>
           ) : (
             <EmptyState
-              emoji="🍽️"
+              pose={isToday ? 'base' : 'sleep'}
               title={isToday ? '아직 기록이 없어요' : '이 날은 기록이 없어요'}
               description={isToday ? '먹은 메뉴를 가볍게 남겨 보세요.' : undefined}
               actionLabel={isToday ? '기록 추가' : undefined}
@@ -268,17 +260,19 @@ export default function LogScreen() {
         footer={
           <View style={styles.sheetFooter}>
             <Button title="삭제" variant="ghost" onPress={remove} style={styles.sheetBtn} />
-            <Button title="완료" height={48} onPress={() => setEditing(null)} style={styles.sheetBtn} />
+            <Button title="완료" onPress={() => setEditing(null)} style={styles.sheetBtn} />
           </View>
         }
       >
-        <Text variant="h3">끼니</Text>
+        <Text variant="captionMedium" color="ink2">
+          끼니
+        </Text>
         <View style={styles.sheetChips}>
           {MEALS.map((m) => (
             <Chip key={m} label={MEAL_LABEL[m]} variant="option" selected={editing?.mealType === m} onPress={() => void applyEdit({ mealType: m })} />
           ))}
         </View>
-        <Text variant="h3" style={styles.sheetLabel}>
+        <Text variant="captionMedium" color="ink2" style={styles.sheetLabel}>
           수량
         </Text>
         <View style={styles.sheetChips}>
@@ -291,34 +285,30 @@ export default function LogScreen() {
   );
 }
 
-function LogRow({ log, onPress }: { log: MealLog; onPress: () => void }) {
+function LogRow({ log, first, onPress }: { log: MealLog; first: boolean; onPress: () => void }) {
   const menu = log.menuId ? getMenu(log.menuId) : undefined;
   const tileMenu = menu ?? { name: log.name, category: 'meal' as MenuCategory };
-  const sub = [log.storeName, ...(log.optionLabels ?? []), log.qty !== 1 ? `${log.qty}인분` : undefined].filter(Boolean).join(' · ');
+  const sub = [`${MEAL_LABEL[log.mealType]} ${hhmm(log.time)}`, log.storeName, ...(log.optionLabels ?? []), log.qty !== 1 ? `${log.qty}인분` : undefined].filter(Boolean).join(' · ');
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}>
-      <View style={styles.rowMeal}>
-        <Text variant="bodyMedium">{MEAL_LABEL[log.mealType]}</Text>
-        <Text variant="caption" color="ink2">
-          {hhmm(log.time)}
-        </Text>
-      </View>
-      <MenuTile menu={tileMenu} size={52} />
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, !first && styles.rowLine, pressed && { opacity: 0.7 }]}>
+      <MenuTile menu={tileMenu} size={44} />
       <View style={styles.rowBody}>
-        <Text variant="bodyMedium" numberOfLines={1}>
+        <Text variant="body" numberOfLines={1} style={styles.rowName}>
           {log.name}
         </Text>
-        {sub ? (
-          <Text variant="caption" color="ink2" numberOfLines={1}>
-            {sub}
-          </Text>
-        ) : null}
+        <Text variant="small" color="ink3" numberOfLines={1}>
+          {sub}
+        </Text>
       </View>
       <View style={styles.rowRight}>
-        <Text variant="bodyMedium">{formatNumber(log.nutrients.kcal)} kcal</Text>
-        {log.verdict ? <VerdictBadge verdict={log.verdict} size="sm" style={styles.rowBadge} /> : null}
+        <Text variant="caption" color="ink2">
+          <Text variant="captionMedium" color="ink" style={styles.bold}>
+            {formatNumber(log.nutrients.kcal)}
+          </Text>{' '}
+          kcal
+        </Text>
+        {log.verdict ? <VerdictBadge verdict={log.verdict} size="sm" /> : null}
       </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.ink2} />
     </Pressable>
   );
 }
@@ -326,34 +316,32 @@ function LogRow({ log, onPress }: { log: MealLog; onPress: () => void }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: spacing.page, paddingBottom: spacing.xxxl },
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.xl },
+  header: { flexDirection: 'row', alignItems: 'center', paddingTop: spacing.lg, minHeight: size.header },
   headerText: { flex: 1 },
-  title: { fontSize: 30, lineHeight: 38 },
-  sub: { marginTop: 2 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 38, paddingHorizontal: spacing.lg, borderRadius: radius.pill, backgroundColor: colors.primarySoft },
-  week: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, marginHorizontal: -spacing.md },
-  weekNav: { width: 18, alignItems: 'center' },
+  addBtn: { minHeight: size.touch, minWidth: size.touch, alignItems: 'flex-end', justifyContent: 'center' },
+  addText: { fontSize: 14, fontFamily: fonts.semibold },
+  week: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, marginHorizontal: -spacing.md },
+  weekNav: { width: 20, alignItems: 'center' },
   day: { flex: 1, alignItems: 'center' },
+  todayLabel: { fontFamily: fonts.semibold },
   dayCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  dayOn: { backgroundColor: colors.primarySoft },
-  dayNum: { fontFamily: fonts.medium, fontSize: 18, lineHeight: 22 },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.dot, marginTop: 3 },
+  dayOn: { backgroundColor: colors.primary },
+  dayNum: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 20 },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary, marginTop: 4 },
   card: { marginTop: spacing.lg },
+  logCard: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: spacing.xl },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  cardTitle: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  cardTitleText: { fontFamily: fonts.semibold, fontSize: 18, lineHeight: 24, color: colors.ink },
-  cheer: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 1 },
   cheerText: { flexShrink: 1 },
-  gaugeRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, gap: spacing.md },
-  bars: { flex: 1, gap: spacing.lg },
-  bar: {},
+  gaugeRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, gap: spacing.xl },
+  bars: { flex: 1, gap: 14, minWidth: 0 },
   emptyInner: { paddingVertical: spacing.lg },
-  rows: { marginTop: spacing.md, gap: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.lineSoft, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm },
-  rowMeal: { width: 42, marginRight: spacing.xs },
-  rowBody: { flex: 1, marginLeft: spacing.sm, marginRight: spacing.xs },
-  rowRight: { alignItems: 'flex-end', marginRight: spacing.xs },
-  rowBadge: { marginTop: 4 },
+  rows: { marginTop: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  rowLine: { borderTopWidth: 1, borderTopColor: colors.line },
+  rowBody: { flex: 1, minWidth: 0 },
+  rowName: { fontSize: 14 },
+  rowRight: { alignItems: 'flex-end', gap: 4 },
+  bold: { fontFamily: fonts.bold },
   sheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   sheetLabel: { marginTop: spacing.xl },
   sheetFooter: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },

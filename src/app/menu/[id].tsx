@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
@@ -14,10 +14,13 @@ import {
   MenuTile,
   NUTRIENT_META,
   NoInfoState,
-  NutrientIcon,
+  SproutIcon,
   StackHeader,
   Text,
+  TrustBadge,
+  UnknownBadge,
   VerdictBadge,
+  formatNutrient,
   showToast,
   type NutrientKey,
 } from '@/components';
@@ -30,7 +33,7 @@ import { newId } from '@/services/id';
 import { judgeProfile } from '@/state/bootstrap';
 import { defaultMealType, useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
-import { colors, fonts, radius, shadow, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -43,7 +46,7 @@ function defaultSelection(menu?: MenuItem): Record<string, string> {
   return out;
 }
 
-/** D4 메뉴 상세·구매 가이드 — 시안 docs/design/D4-menu-detail.png */
+/** D4 메뉴 상세·구매 가이드 — 판정 배지 대형 · 영양 vs 여유 비교 바 · 판정 이유 · 옵션 칩 즉시 갱신 · 대안 · CTA "이걸로 기록" */
 export default function MenuDetail() {
   const params = useLocalSearchParams<{ id: string; store?: string }>();
   const menu = getMenu(params.id);
@@ -88,7 +91,7 @@ export default function MenuDetail() {
         <View style={styles.pad}>
           <StackHeader />
         </View>
-        <EmptyState emoji="🔎" title="메뉴를 찾지 못했어요" description="목록에서 다시 골라 주세요." actionLabel="주변으로 가기" onAction={() => router.replace('/(tabs)/nearby')} />
+        <EmptyState pose="sorry" title="메뉴를 찾지 못했어요" description="목록에서 다시 골라 주세요." actionLabel="주변으로 가기" onAction={() => router.replace('/(tabs)/nearby')} />
       </SafeAreaView>
     );
   }
@@ -153,49 +156,44 @@ export default function MenuDetail() {
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.top}>
-          <MenuTile menu={menu} size={148} radiusSize={20} />
-          <View style={styles.topText}>
-            <Text variant="caption" color="ink3">
-              {categoryLabel}
+          <MenuTile menu={menu} size={64} />
+          <Text variant="caption" color="ink3" style={styles.category}>
+            {[storeName, categoryLabel].filter(Boolean).join(' · ')}
+          </Text>
+          <Text style={styles.name}>{menu.name}</Text>
+          {price != null ? (
+            <Text variant="bodyMedium" color="ink2" style={styles.price}>
+              {formatPrice(price)}
             </Text>
-            <Text style={styles.name}>{menu.name}</Text>
-            {price != null ? (
-              <Text variant="h2" color="ink2" style={styles.price}>
-                {formatPrice(price)}
-              </Text>
-            ) : null}
+          ) : null}
+          <View style={styles.badges}>
             {!unknown && judgement ? (
-              <Animated.View style={[styles.badge, { transform: [{ scale: pop }] }]}>
+              <Animated.View style={{ transform: [{ scale: pop }] }}>
                 <VerdictBadge verdict={judgement.verdict} size="lg" />
               </Animated.View>
             ) : (
-              <View style={[styles.badge, styles.unknownPill]}>
-                <Text variant="captionMedium" color="coverNone">
-                  정보 없음
-                </Text>
-              </View>
+              <UnknownBadge />
             )}
-            {menu.blurb ? (
-              <Text variant="caption" color="ink2" style={styles.blurb}>
-                {menu.blurb}
-              </Text>
-            ) : null}
+            <TrustBadge trust={menu.trust} />
           </View>
+          {menu.blurb ? (
+            <Text variant="caption" color="ink2" style={styles.blurb}>
+              {menu.blurb}
+            </Text>
+          ) : null}
         </View>
 
         {unknown ? (
-          <Card style={styles.card}>
-            <NoInfoState
-              onOtherStores={() => router.replace('/(tabs)/nearby')}
-              onManualLog={() => router.push({ pathname: '/log/add', params: { name: menu.name, store: storeName ?? '' } })}
-            />
-          </Card>
+          <NoInfoState
+            onOtherStores={() => router.replace('/(tabs)/nearby')}
+            onManualLog={() => router.push({ pathname: '/log/add', params: { name: menu.name, store: storeName ?? '' } })}
+          />
         ) : (
           <>
-            <Card padding={18} style={styles.card}>
+            <Card style={styles.card}>
               <View style={styles.cardHead}>
-                <Text variant="h2">영양 vs 여유</Text>
-                <Text variant="caption" color="ink3">
+                <Text variant="h3">영양 vs 오늘 여유</Text>
+                <Text variant="small" color="ink3">
                   {servingLabel(menu, selected)}
                 </Text>
               </View>
@@ -205,12 +203,14 @@ export default function MenuDetail() {
               {judgement ? (
                 <View style={styles.reason}>
                   <View style={styles.reasonIcon}>
-                    <MaterialCommunityIcons name="sprout" size={20} color={colors.primary} />
+                    <SproutIcon size={18} color={colors.primaryText} />
                   </View>
                   <View style={styles.reasonText}>
-                    <Text variant="bodyMedium">{judgement.reasons[0]}</Text>
+                    <Text variant="captionMedium" color="ink">
+                      {judgement.reasons[0]}
+                    </Text>
                     {judgement.reasons[1] ? (
-                      <Text variant="caption" color="ink2" style={styles.reasonSub}>
+                      <Text variant="small" color="ink2" style={styles.reasonSub}>
                         {judgement.reasons[1]}
                       </Text>
                     ) : null}
@@ -220,19 +220,19 @@ export default function MenuDetail() {
             </Card>
 
             {menu.options?.length ? (
-              <Card padding={18} style={styles.card}>
-                <Text variant="h2">옵션 선택</Text>
+              <Card style={styles.card}>
+                <Text variant="h3">옵션 선택</Text>
                 {judgement?.guide ? (
                   <View style={styles.guide}>
                     <Ionicons name="bulb-outline" size={14} color={colors.primaryText} />
-                    <Text variant="captionMedium" color="primaryText">
+                    <Text variant="small" color="primaryText" style={styles.guideText}>
                       {judgement.guide}
                     </Text>
                   </View>
                 ) : null}
                 {menu.options.map((g) => (
                   <View key={g.id} style={styles.optRow}>
-                    <Text variant="body" color="ink2" style={styles.optLabel}>
+                    <Text variant="caption" color="ink3" style={styles.optLabel}>
                       {g.label}
                     </Text>
                     <View style={styles.optChips}>
@@ -244,7 +244,6 @@ export default function MenuDetail() {
                           label={c.priceDelta && g.id !== 'size' && g.id !== 'bread' ? `${c.label} (+${formatNumber(c.priceDelta)}원)` : c.label}
                           selected={selected[g.id] === c.label}
                           onPress={() => setSelected((s) => ({ ...s, [g.id]: c.label }))}
-                          style={styles.optChip}
                         />
                       ))}
                     </View>
@@ -254,38 +253,38 @@ export default function MenuDetail() {
             ) : null}
 
             {alternatives.length > 0 ? (
-              <Card padding={18} style={styles.card}>
+              <Card style={styles.card}>
                 <View style={styles.cardHead}>
-                  <Text variant="h2">대안 추천</Text>
-                  <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/nearby'))} style={styles.more}>
-                    <Text variant="caption" color="ink2">
+                  <Text variant="h3">이런 메뉴는 어때요?</Text>
+                  <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/nearby'))} style={styles.more} hitSlop={8}>
+                    <Text variant="caption" color="ink3">
                       다른 메뉴 보기
                     </Text>
-                    <Ionicons name="chevron-forward" size={14} color={colors.ink2} />
                   </Pressable>
                 </View>
                 <View style={styles.alts}>
-                  {alternatives.map(({ menu: alt, judgement: aj }) => (
-                    <Pressable
-                      key={alt.id}
-                      accessibilityRole="button"
-                      onPress={() => router.replace({ pathname: '/menu/[id]', params: { id: alt.id, store: params.store ?? '' } })}
-                      style={({ pressed }) => [styles.alt, pressed && { opacity: 0.85 }]}
-                    >
-                      <MenuTile menu={alt} size={48} />
-                      <View style={styles.altBody}>
-                        <Text variant="captionMedium" numberOfLines={1}>
-                          {alt.name}
-                        </Text>
-                        {alt.price != null ? (
-                          <Text variant="label" color="ink2" style={styles.altPrice}>
-                            {formatPrice(alt.price)}
+                  {alternatives.map(({ menu: alt, judgement: aj }) => {
+                    const an = applyOptions(alt);
+                    return (
+                      <Pressable
+                        key={alt.id}
+                        accessibilityRole="button"
+                        onPress={() => router.replace({ pathname: '/menu/[id]', params: { id: alt.id, store: params.store ?? '' } })}
+                        style={({ pressed }) => [styles.alt, pressed && { opacity: 0.8 }]}
+                      >
+                        <MenuTile menu={alt} size={40} />
+                        <View style={styles.altBody}>
+                          <Text variant="captionMedium" color="ink" numberOfLines={1}>
+                            {alt.name}
                           </Text>
-                        ) : null}
-                        <VerdictBadge verdict={aj.verdict} size="sm" style={styles.altBadge} />
-                      </View>
-                    </Pressable>
-                  ))}
+                          <Text variant="small" color="ink3" numberOfLines={1}>
+                            {[an ? `${formatNumber(an.kcal)} kcal` : undefined, alt.price != null ? formatPrice(alt.price) : undefined].filter(Boolean).join(' · ')}
+                          </Text>
+                        </View>
+                        <VerdictBadge verdict={aj.verdict} size="sm" />
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </Card>
             ) : null}
@@ -295,7 +294,7 @@ export default function MenuDetail() {
 
       {!unknown ? (
         <View style={styles.footer}>
-          <Button title="이걸로 기록" variant="cta" onPress={() => setSheet(true)} />
+          <Button title="이걸로 기록" onPress={() => setSheet(true)} />
         </View>
       ) : null}
 
@@ -328,9 +327,10 @@ function rowCaption(k: NutrientKey, value: number, left: number): string {
   if (k === 'protein') return value >= left ? '오늘 필요한 만큼 채워요' : '조금씩 채워보세요';
   if (value <= left * 0.5) return '지금도 여유가 있어요';
   if (value <= left) return '여유 안에 들어가요';
-  return '오늘 남은 여유보다 조금 커요';
+  return '오늘 여유보다 조금 커요';
 }
 
+/** 한 줄: 라벨 · 이 메뉴 값(Bold) · 그린 바(오늘 여유 대비) · "여유 / 목표" */
 function CompareRow({ nutrient, nutrients, remaining, targets }: { nutrient: NutrientKey; nutrients: Nutrients; remaining: DailyTargets; targets: DailyTargets }) {
   const meta = NUTRIENT_META[nutrient];
   const value = nutrients[nutrient];
@@ -340,43 +340,35 @@ function CompareRow({ nutrient, nutrients, remaining, targets }: { nutrient: Nut
   useEffect(() => {
     Animated.timing(anim, { toValue: share, duration: 260, useNativeDriver: false }).start();
   }, [share, anim]);
-  const barColor = nutrient === 'kcal' ? colors.gaugeFill : colors[nutrient];
 
   return (
     <View style={styles.cmpRow}>
-      <NutrientIcon nutrient={nutrient} size={40} />
-      <View style={styles.cmpLeft}>
-        <Text variant="caption" color="ink2">
+      <View style={styles.cmpTop}>
+        <Text variant="small" color="ink3" style={styles.cmpLabel}>
           {meta.label}
         </Text>
         {typeof value === 'number' ? (
-          <Text style={styles.cmpValue}>
-            {formatNumber(value)} {meta.unit}
+          <Text variant="caption" color="ink2" style={styles.cmpValueWrap}>
+            <Text style={styles.cmpValue}>{formatNutrient(nutrient, value)}</Text> {meta.unit}
           </Text>
         ) : (
-          <Text variant="captionMedium" color="ink3" style={styles.cmpNone}>
+          <Text variant="small" color="ink3" style={styles.cmpValueWrap}>
             정보 없음
           </Text>
         )}
+        <Text variant="small" color="ink3">
+          여유 {formatNutrient(nutrient, left)} / {formatNutrient(nutrient, targets[nutrient])}
+          {meta.unit}
+        </Text>
       </View>
       <View style={styles.cmpTrack}>
-        {typeof value === 'number' ? (
-          <Animated.View style={[styles.cmpFill, { backgroundColor: barColor, width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
-        ) : null}
+        {typeof value === 'number' ? <Animated.View style={[styles.cmpFill, { width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} /> : null}
       </View>
-      <View style={styles.cmpRight}>
-        <Text variant="captionMedium">
-          {formatNumber(left)}
-          <Text variant="caption" color="ink3">
-            {' '}/ {formatNumber(targets[nutrient])} {meta.unit}
-          </Text>
+      {typeof value === 'number' ? (
+        <Text variant="small" color="ink3" numberOfLines={1}>
+          {rowCaption(nutrient, value, left)}
         </Text>
-        {typeof value === 'number' ? (
-          <Text variant="label" color="ink3" style={styles.cmpCaption} numberOfLines={1}>
-            {rowCaption(nutrient, value, left)}
-          </Text>
-        ) : null}
-      </View>
+      ) : null}
     </View>
   );
 }
@@ -385,39 +377,35 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: spacing.page },
   scroll: { paddingHorizontal: spacing.page, paddingBottom: spacing.xxl },
-  top: { flexDirection: 'row', alignItems: 'center' },
-  topText: { flex: 1, marginLeft: spacing.lg },
-  name: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 31, color: colors.ink, marginTop: 2 },
-  price: { marginTop: 2, fontFamily: fonts.semibold },
-  badge: { marginTop: spacing.sm, alignSelf: 'flex-start' },
-  unknownPill: { height: 32, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.coverNoneBg, justifyContent: 'center' },
-  blurb: { marginTop: spacing.sm },
-  card: { marginTop: spacing.md },
+  top: { alignItems: 'flex-start', paddingTop: spacing.sm },
+  category: { marginTop: spacing.lg },
+  name: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 30, letterSpacing: -0.4, color: colors.ink, marginTop: 2 },
+  price: { marginTop: 2 },
+  badges: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  blurb: { marginTop: spacing.md },
+  card: { marginTop: spacing.lg },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
-  cmpRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
-  cmpLeft: { width: 72, marginLeft: spacing.md },
+  cmpRow: { paddingVertical: spacing.sm + 2, gap: 6 },
+  cmpTop: { flexDirection: 'row', alignItems: 'baseline' },
+  cmpLabel: { width: 56 },
+  cmpValueWrap: { flex: 1 },
   cmpValue: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 22, color: colors.ink },
-  cmpNone: { marginTop: 2 },
-  cmpTrack: { flex: 1, height: 8, borderRadius: radius.pill, backgroundColor: colors.gaugeTrack, overflow: 'hidden', marginHorizontal: spacing.sm },
-  cmpFill: { height: 8, borderRadius: radius.pill },
-  cmpRight: { alignItems: 'flex-end', minWidth: 96 },
-  cmpCaption: { marginTop: 2, fontFamily: fonts.regular },
-  reason: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md, backgroundColor: colors.primarySofter, borderRadius: radius.md, padding: spacing.md },
-  reasonIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  cmpTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
+  cmpFill: { height: 6, borderRadius: radius.pill, backgroundColor: colors.primary },
+  reason: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md, backgroundColor: colors.section, borderRadius: radius.md, padding: 14 },
+  reasonIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
   reasonText: { flex: 1, marginLeft: spacing.md },
-  reasonSub: { marginTop: 1 },
-  guide: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: spacing.sm, backgroundColor: colors.primarySofter, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 4 },
+  reasonSub: { marginTop: 2 },
+  guide: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5 },
+  guideText: { fontFamily: fonts.semibold },
   optRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
-  optLabel: { width: 64 },
+  optLabel: { width: 56 },
   optChips: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  optChip: { minWidth: 56 },
-  more: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  alts: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  alt: { flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.lineSoft, borderRadius: radius.md, padding: spacing.sm, backgroundColor: colors.surface },
-  altBody: { flex: 1, marginLeft: spacing.sm },
-  altPrice: { fontFamily: fonts.regular, marginTop: 1 },
-  altBadge: { marginTop: 4, height: 22 },
-  footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.sm, backgroundColor: colors.bg, ...shadow.card, shadowOpacity: 0 },
+  more: { minHeight: 32, justifyContent: 'center' },
+  alts: { marginTop: spacing.xs },
+  alt: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  altBody: { flex: 1, minWidth: 0 },
+  footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.lg, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
   meals: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   mealChip: { flexGrow: 1, flexBasis: '45%' },
 });
