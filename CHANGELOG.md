@@ -1,8 +1,21 @@
-> 2026-09-23: App Store Connect 앱을 새로 만들며(번들 ID app.mealing.mvp) 버전을 0.1.0, 빌드 번호를 1부터 다시 시작. 아래 0.x 기록은 이전 앱(app.mealfit.mvp) 시절 이력.
-
 # 패치노트
 
 mealing(mealfit) 버전별 변경 사항. `npm run release` 로 자동 생성.
+
+## 0.2.0 (2026-09-24)
+
+### 새 기능
+- **nearby** 위치 설정 지도를 움직이면 가운데 핀이 따라와요 (6540403)
+- **search** 시판 제품 검색을 서버(Supabase)로 확장 — 전체 26만 개 (b94fd48)
+- **search** 식약처 전체 가공식품(59만 건)에서 제품 3.7만 개 선별 수록 (1a17fda)
+- **search** 라면·과자 같은 시판 가공식품 2.3만 개를 검색에 추가 (4af9484)
+
+### 기타
+- **ios** 빌드 2 업로드 — 다음 번호 3 (11ce285)
+- **ios** 빌드 1 업로드 — 다음 번호 2 (10b5ac4)
+- **brand** 새 App Store Connect 앱으로 이전 — 번들 app.mealing.mvp, v0.1.0, 빌드 1부터 (1441a0f)
+
+> 2026-09-23: App Store Connect 앱을 새로 만들며(번들 ID app.mealing.mvp) 버전을 0.1.0, 빌드 번호를 1부터 다시 시작. 아래 0.x 기록은 이전 앱(app.mealfit.mvp) 시절 이력.
 
 ## 0.5.1 (2026-09-23)
 
