@@ -1,7 +1,7 @@
 {
   "name": "mealfit",
   "main": "expo-router/entry",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "dependencies": {
     "@expo/ui": "~57.0.18",
     "@expo/vector-icons": "^15.1.1",
