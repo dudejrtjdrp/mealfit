@@ -15,11 +15,11 @@ export type MillyPose = 'base' | 'thinking' | 'cheer' | 'sorry' | 'sleep';
  * 한 포즈만 먼저 들어와도 된다: 없는 포즈는 아래 플레이스홀더(틴트 원 + 새싹)로 그린다.
  */
 const MILLY_IMAGES: Partial<Record<MillyPose, ImageSourcePropType>> = {
-  // base: require('@/assets/character/milly-base.png'),
-  // thinking: require('@/assets/character/milly-thinking.png'),
-  // cheer: require('@/assets/character/milly-cheer.png'),
-  // sorry: require('@/assets/character/milly-sorry.png'),
-  // sleep: require('@/assets/character/milly-sleep.png'),
+  base: require('@/assets/character/milly-base.png'),
+  thinking: require('@/assets/character/milly-thinking.png'),
+  cheer: require('@/assets/character/milly-cheer.png'),
+  sorry: require('@/assets/character/milly-sorry.png'),
+  sleep: require('@/assets/character/milly-sleep.png'),
 };
 
 export interface MillyAvatarProps {
