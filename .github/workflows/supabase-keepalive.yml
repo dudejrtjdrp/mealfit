@@ -1,0 +1,24 @@
+# Supabase 무료 플랜은 7일간 활동이 없으면 프로젝트를 일시정지한다.
+# 3일마다 products 테이블을 1행 읽어 DB 활동을 만든다 (2026-09-24 효님 결정: Pro 대신 keepalive).
+name: supabase-keepalive
+
+on:
+  schedule:
+    - cron: '17 3 */3 * *' # UTC 03:17 = 한국 12:17, 3일마다
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: products 1행 읽기
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' --retry 3 --retry-delay 10 \
+            "$SUPABASE_URL/rest/v1/products?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          test "$code" = "200"
