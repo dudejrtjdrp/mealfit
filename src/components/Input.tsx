@@ -16,13 +16,13 @@ export interface InputProps {
   /** 오른쪽 단위: 년 / cm / kg */
   unit?: string;
   placeholder?: string;
-  /** 오류·안내 문구 (있으면 빨간 테두리 대신 아래 문구) */
+  /** 안내 문구 (범위 밖 값 등) — 빨강 대신 호박색 테두리 + 아래 문구 */
   error?: string;
   /** number: 큰 숫자·숫자 키패드 (기본) / text: 일반 글자 */
   kind?: 'number' | 'text';
   keyboardType?: KeyboardTypeOptions;
   maxLength?: number;
-  /** 카드로 감싸기 (기본 true). 시트 안에서는 false */
+  /** 카드로 감싸기 (기본 false) */
   card?: boolean;
   style?: StyleProp<ViewStyle>;
   autoCapitalize?: 'none' | 'sentences';
@@ -30,7 +30,7 @@ export interface InputProps {
   secureTextEntry?: boolean;
 }
 
-/** B2 라벨 카드형 입력 — 카드 안 라벨 + 테두리 박스(아이콘·큰 숫자·단위) */
+/** 라벨 + 회색 바탕 입력칸(아이콘·값·단위). 포커스 시 그린 테두리 */
 export function Input({
   label,
   value,
@@ -42,7 +42,7 @@ export function Input({
   kind = 'number',
   keyboardType,
   maxLength,
-  card = true,
+  card = false,
   style,
   autoCapitalize = 'none',
   secureTextEntry,
@@ -52,11 +52,11 @@ export function Input({
 
   const body = (
     <>
-      <Text variant="h3" style={styles.label}>
+      <Text variant="captionMedium" color="ink2" style={styles.label}>
         {label}
       </Text>
       <View style={[styles.box, focused && styles.boxFocused, !!error && styles.boxError]}>
-        {icon ? <Ionicons name={icon} size={22} color={colors.ink2} style={styles.icon} /> : null}
+        {icon ? <Ionicons name={icon} size={20} color={colors.ink3} style={styles.icon} /> : null}
         <TextInput
           accessibilityLabel={label}
           value={value}
@@ -73,13 +73,13 @@ export function Input({
           style={[styles.input, isNum ? styles.inputNum : styles.inputText]}
         />
         {unit ? (
-          <Text variant="h3" color="ink2" style={styles.unit}>
+          <Text variant="body" color="ink3" style={styles.unit}>
             {unit}
           </Text>
         ) : null}
       </View>
       {error ? (
-        <Text variant="caption" color="danger" style={styles.error}>
+        <Text variant="small" color="notice" style={styles.error}>
           {error}
         </Text>
       ) : null}
@@ -96,23 +96,23 @@ export function Input({
 }
 
 const styles = StyleSheet.create({
-  label: { marginBottom: spacing.md, marginLeft: 0 },
+  label: { marginBottom: spacing.sm },
   box: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 52,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderRadius: radius.button,
+    borderWidth: 1.5,
+    borderColor: colors.section,
+    backgroundColor: colors.section,
     paddingHorizontal: spacing.lg,
   },
-  boxFocused: { borderColor: colors.primaryBorder },
-  boxError: { borderColor: colors.danger },
-  icon: { marginRight: spacing.lg },
+  boxFocused: { borderColor: colors.primary, backgroundColor: colors.surface },
+  boxError: { borderColor: colors.notice },
+  icon: { marginRight: spacing.md },
   input: { flex: 1, width: 0, minWidth: 0, height: '100%', color: colors.ink, padding: 0, outlineStyle: 'none' } as never,
-  inputNum: { ...type.numberSm, fontSize: 22 },
+  inputNum: { ...type.numberSm, fontSize: 18 },
   inputText: { ...type.bodyMedium, fontSize: 16 },
-  unit: { marginLeft: spacing.sm, fontFamily: type.body.fontFamily },
-  error: { marginTop: spacing.sm, marginLeft: 2 },
+  unit: { marginLeft: spacing.sm },
+  error: { marginTop: spacing.xs + 2, marginLeft: 2 },
 });

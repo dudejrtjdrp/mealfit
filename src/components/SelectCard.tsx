@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, radius, shadow, spacing } from '@/theme';
+import { colors, radius, spacing } from '@/theme';
 
 import { Text } from './Text';
 
@@ -14,28 +14,24 @@ export interface SelectCardProps {
   /** 아이콘 렌더 함수 — 선택 상태에 맞는 색을 받는다 */
   icon?: (color: string) => ReactNode;
   /**
-   * tile : B2 성별 — 회색/연초록 바탕 타일, 아이콘+글자 가로 배치
-   * row  : B3 활동량 — 흰 카드 세로 리스트, 제목+설명+우측 체크
-   * grid : B4 목적 — 흰 카드 2열, 위 아이콘 아래 제목
+   * tile : 성별 — 가로 타일, 아이콘+글자
+   * row  : 활동량 — 세로 리스트, 제목+설명+우측 체크
+   * grid : 목적 — 2열 카드, 위 아이콘 아래 제목
    */
   layout?: 'tile' | 'row' | 'grid';
   style?: StyleProp<ViewStyle>;
 }
 
-/** 단일/복수 선택 카드 (B2·B3·B4 공용) */
+/** 단일/복수 선택 카드 (F2 신체 정보·목표) — 선택 시 틴트 바탕 + 그린 테두리 */
 export function SelectCard({ title, description, selected, onPress, icon, layout = 'row', style }: SelectCardProps) {
   const accent = selected ? colors.primaryText : colors.ink2;
+  const frame = [styles.base, selected ? styles.selected : styles.unselected];
 
   if (layout === 'tile') {
     return (
-      <Pressable
-        accessibilityRole="radio"
-        accessibilityState={{ selected: !!selected }}
-        onPress={onPress}
-        style={[styles.tile, { backgroundColor: selected ? colors.primarySoft : colors.lineSoft }, style]}
-      >
+      <Pressable accessibilityRole="radio" accessibilityState={{ selected: !!selected }} onPress={onPress} style={[frame, styles.tile, style]}>
         {icon?.(accent)}
-        <Text variant="h3" style={{ color: accent, marginLeft: spacing.lg }}>
+        <Text variant="h3" style={{ color: selected ? colors.primaryText : colors.ink, marginLeft: spacing.sm }}>
           {title}
         </Text>
       </Pressable>
@@ -44,58 +40,49 @@ export function SelectCard({ title, description, selected, onPress, icon, layout
 
   if (layout === 'grid') {
     return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: !!selected }}
-        onPress={onPress}
-        style={[styles.grid, selected ? styles.selected : styles.unselected, style]}
-      >
-        <View style={[styles.iconCircle, { backgroundColor: selected ? colors.surface : colors.primarySofter }]}>{icon?.(selected ? colors.primaryText : colors.primary)}</View>
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected }} onPress={onPress} style={[frame, styles.grid, style]}>
+        {icon ? <View style={[styles.iconCircle, { backgroundColor: selected ? colors.surface : colors.line }]}>{icon(accent)}</View> : null}
         <Text variant="h3" style={{ color: selected ? colors.primaryText : colors.ink, marginTop: spacing.md }}>
           {title}
         </Text>
         {description ? (
-          <Text variant="caption" color="ink2" style={{ marginTop: 2 }}>
+          <Text variant="small" color="ink3" style={{ marginTop: 2 }}>
             {description}
           </Text>
         ) : null}
-        {selected ? <Ionicons name="checkmark-circle" size={22} color={colors.primary} style={styles.gridCheck} /> : null}
+        {selected ? <Ionicons name="checkmark-circle" size={20} color={colors.primary} style={styles.gridCheck} /> : null}
       </Pressable>
     );
   }
 
   return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ selected: !!selected }}
-      onPress={onPress}
-      style={[styles.row, selected ? styles.selected : styles.unselected, style]}
-    >
-      {icon ? <View style={[styles.iconCircle, { backgroundColor: selected ? colors.surface : colors.primarySofter }]}>{icon(selected ? colors.primaryText : colors.primary)}</View> : null}
-      <View style={styles.rowBody}>
+    <Pressable accessibilityRole="radio" accessibilityState={{ selected: !!selected }} onPress={onPress} style={[frame, styles.row, style]}>
+      {icon ? <View style={[styles.iconCircle, { backgroundColor: selected ? colors.surface : colors.line }]}>{icon(accent)}</View> : null}
+      <View style={[styles.rowBody, !icon && { marginLeft: 0 }]}>
         <Text variant="h3" style={{ color: selected ? colors.primaryText : colors.ink }}>
           {title}
         </Text>
         {description ? (
-          <Text variant="caption" color="ink2" style={{ marginTop: 2 }}>
+          <Text variant="caption" color="ink3" style={{ marginTop: 2 }}>
             {description}
           </Text>
         ) : null}
       </View>
-      <View style={[styles.radio, selected && styles.radioOn]}>{selected ? <Ionicons name="checkmark" size={16} color={colors.inkOnPrimary} /> : null}</View>
+      <View style={[styles.radio, selected && styles.radioOn]}>{selected ? <Ionicons name="checkmark" size={14} color={colors.inkOnPrimary} /> : null}</View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  tile: { flex: 1, height: 64, borderRadius: radius.md + 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  grid: { flex: 1, borderRadius: radius.lg, padding: spacing.lg, minHeight: 118, borderWidth: 1.5 },
+  base: { borderRadius: radius.lg },
+  selected: { backgroundColor: colors.primaryTint, borderWidth: 1.5, borderColor: colors.primary },
+  unselected: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  tile: { flex: 1, height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  grid: { flex: 1, padding: spacing.lg, minHeight: 112 },
   gridCheck: { position: 'absolute', top: 12, right: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.lg, paddingVertical: 16, paddingHorizontal: 18, borderWidth: 1.5 },
-  selected: { backgroundColor: colors.primarySofter, borderColor: colors.primaryBorder },
-  unselected: { backgroundColor: colors.surface, borderColor: colors.surface, ...shadow.card },
-  iconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: spacing.lg },
+  iconCircle: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   rowBody: { flex: 1, marginLeft: spacing.md, marginRight: spacing.md },
-  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   radioOn: { backgroundColor: colors.primary, borderColor: colors.primary },
 });

@@ -19,7 +19,7 @@ export function showToast(text: string, kind: ToastMsg['kind'] = 'success') {
   listeners.forEach((l) => l(msg));
 }
 
-/** 루트 레이아웃에 한 번 배치 */
+/** 루트 레이아웃에 한 번 배치 — 진한 알약 + 그린 체크 */
 export function ToastHost() {
   const insets = useSafeAreaInsets();
   const [msg, setMsg] = useState<ToastMsg | null>(null);
@@ -50,8 +50,8 @@ export function ToastHost() {
         accessibilityLiveRegion="polite"
         style={[styles.toast, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}
       >
-        <Ionicons name={msg.kind === 'success' ? 'checkmark-circle' : 'information-circle'} size={20} color={colors.gaugeFill} />
-        <Text variant="bodyMedium" color="inkOnPrimary" style={{ marginLeft: spacing.sm }}>
+        <Ionicons name={msg.kind === 'success' ? 'checkmark-circle' : 'information-circle'} size={20} color={msg.kind === 'success' ? colors.primary : colors.ink3} />
+        <Text variant="bodyMedium" color="inkOnPrimary" style={{ marginLeft: spacing.sm, flexShrink: 1 }}>
           {msg.text}
         </Text>
       </Animated.View>
@@ -60,6 +60,6 @@ export function ToastHost() {
 }
 
 const styles = StyleSheet.create({
-  host: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  host: { position: 'absolute', left: spacing.page, right: spacing.page, alignItems: 'center' },
   toast: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.ink, borderRadius: radius.pill, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, ...shadow.float },
 });

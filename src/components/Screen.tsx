@@ -8,7 +8,7 @@ export interface ScreenProps {
   children: ReactNode;
   /** 내용 스크롤 여부 */
   scroll?: boolean;
-  /** 하단 고정 영역(주 버튼 등) — 스크롤 밖에 붙는다 */
+  /** 하단 고정 영역(풀폭 CTA 등) — 스크롤 밖에 붙는다 */
   footer?: ReactNode;
   /** 좌우 padding 20 적용 (기본 true) */
   padded?: boolean;
@@ -19,7 +19,7 @@ export interface ScreenProps {
   header?: ReactNode;
 }
 
-/** 페이지 틀: SafeArea + 배경색 + 좌우 여백 20 */
+/** 페이지 틀: SafeArea + 흰 바탕 + 좌우 여백 20 */
 export function Screen({ children, scroll, footer, padded = true, edges = ['top', 'bottom'], style, contentStyle, header }: ScreenProps) {
   const pad = padded ? { paddingHorizontal: spacing.page } : null;
   return (
@@ -48,5 +48,5 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   scrollContent: { paddingBottom: spacing.xxl },
-  footer: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  footer: { paddingTop: spacing.sm, paddingBottom: spacing.lg },
 });

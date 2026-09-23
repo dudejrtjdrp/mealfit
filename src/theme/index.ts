@@ -1,99 +1,81 @@
 /**
- * 디자인 토큰 — 2026-09-15 확정 시안 10장에서 추출. 화면 코드는 색·간격·글꼴을 여기서만 가져온다.
+ * mealing 디자인 토큰 — 2026-09 리디자인 확정 시안(프레시 그린 A안) 기준.
+ * 규율: 흰 바탕 + 무채색 UI + 포인트 그린 1색(CTA·선택·강조·게이지). 그림자 대신 헤어라인·배경색 차이로 구획.
+ * 화면 코드는 색·간격·글꼴·radius 를 여기서만 가져온다 (하드코딩 금지).
  */
 export const colors = {
-  // 바탕
-  bg: '#F4F6FA', // 페이지 (아주 연한 블루그레이)
+  // 바탕·구획
+  bg: '#FFFFFF', // 페이지 바탕
   surface: '#FFFFFF', // 카드
-  surfaceAlt: '#F7F9FB', // 카드 안의 서브 영역 (B6 리스트 등)
-  line: '#E6EAF0',
-  lineSoft: '#F0F2F5',
+  section: '#F7F8FA', // 섹션 배경 · 밀리 말풍선 · 입력칸 바탕
+  line: '#F2F4F6', // 헤어라인 (카드 테두리·구분선) · 게이지 트랙 · 아이콘 원
+  border: '#D7DCE2', // 컨트롤 테두리 (칩·아웃라인 배지·버튼)
 
   // 글자
-  ink: '#1E2430',
-  ink2: '#5C6675',
-  ink3: '#9AA3AF',
+  ink: '#191F28', // 제목 · 사용자 말풍선 바탕
+  ink2: '#4E5968', // 본문
+  ink3: '#8B95A1', // 보조
   inkOnPrimary: '#FFFFFF',
 
-  // 브랜드 그린
-  primary: '#3DAE85', // 주 버튼(다음·시작하기)
-  primaryDark: '#2F9C75', // "이걸로 기록" 등 강조 CTA
-  primaryText: '#2E8B6A', // 초록 글자
-  primarySoft: '#E4F5EC', // 선택 칩·배지 바탕
-  primarySofter: '#EEF8F3', // 연한 배너 배경
-  primaryBorder: '#9DDBBF',
+  // 포인트 그린 (단일 포인트)
+  primary: '#17A05E', // 채움 (CTA·게이지·선택 칩)
+  primaryText: '#0E8A4D', // 흰 바탕 위 강조 글자
+  primaryTint: '#E6F6EE', // 틴트 바탕 (선택 칩·여유 미니카드·밀리 아바타)
 
-  // 판정 (시안 기준: 좋음 초록 · 괜찮음 호박 · 오늘은 패스 빨강)
-  good: '#2E8B57',
-  goodBg: '#E3F5EA',
-  ok: '#C48A1A',
-  okBg: '#FCF0D8',
-  pass: '#E04848',
-  passBg: '#FDE8E8',
+  // 판정 배지 — 빨강 금지. fg / bg
+  good: '#158A4C',
+  goodBg: '#E8F7EE',
+  ok: '#B45309',
+  okBg: '#FEF3DC',
+  pass: '#6B7280',
+  passBg: '#F1F2F4',
 
-  // 신뢰·커버리지
-  coverFull: '#2E8B57',
-  coverFullBg: '#E3F5EA',
-  coverPartial: '#C48A1A',
-  coverPartialBg: '#FCF0D8',
-  coverNone: '#6B7684',
-  coverNoneBg: '#EEF0F3',
+  /** 입력 안내(범위 밖 값 등) — 빨강 대신 호박색 */
+  notice: '#B45309',
 
-  // 영양소
-  kcal: '#F58A3A',
-  kcalBg: '#FEF0E6',
-  carbs: '#F5A146',
-  carbsBg: '#FEF3E6',
-  protein: '#F06A6A',
-  proteinBg: '#FDEBEB',
-  fat: '#4D8DF5',
-  fatBg: '#E8F0FE',
-  sugar: '#D96BB0',
-  sugarBg: '#FBE9F4',
-  sodium: '#7A8AA6',
-  sodiumBg: '#EDF0F5',
+  // 비활성
+  disabledBg: '#F2F4F6',
+  disabledInk: '#B0B8C1',
 
-  // 소셜
+  // 소셜 로그인 (브랜드 가이드 색)
   kakao: '#FEE500',
   kakaoInk: '#191919',
   apple: '#000000',
 
-  // 기타
-  gaugeTrack: '#E9EDF2',
-  gaugeFill: '#6FCF97',
-  dot: '#3DAE85',
-  danger: '#E04848',
-  shadow: 'rgba(30, 36, 48, 0.06)',
+  overlay: 'rgba(25, 31, 40, 0.4)',
+
+  // ── 이전 토큰 이름 (화면 리스타일 동안만 유지, 값은 새 토큰으로 매핑) ──
+  /** @deprecated primaryTint */ primarySoft: '#E6F6EE',
+  /** @deprecated primaryTint */ primarySofter: '#E6F6EE',
+  /** @deprecated primary */ primaryDark: '#17A05E',
+  /** @deprecated primary */ primaryBorder: '#17A05E',
+  /** @deprecated section */ surfaceAlt: '#F7F8FA',
+  /** @deprecated line */ lineSoft: '#F2F4F6',
+  /** @deprecated line */ gaugeTrack: '#F2F4F6',
+  /** @deprecated primary */ gaugeFill: '#17A05E',
+  /** @deprecated primary */ dot: '#17A05E',
+  /** @deprecated notice */ danger: '#B45309',
+  /** @deprecated */ coverFull: '#4E5968',
+  /** @deprecated */ coverFullBg: '#FFFFFF',
+  /** @deprecated */ coverPartial: '#4E5968',
+  /** @deprecated */ coverPartialBg: '#FFFFFF',
+  /** @deprecated */ coverNone: '#8B95A1',
+  /** @deprecated */ coverNoneBg: '#F2F4F6',
+  /** @deprecated */ kcal: '#17A05E',
+  /** @deprecated */ kcalBg: '#F2F4F6',
+  /** @deprecated */ carbs: '#17A05E',
+  /** @deprecated */ carbsBg: '#F2F4F6',
+  /** @deprecated */ protein: '#17A05E',
+  /** @deprecated */ proteinBg: '#F2F4F6',
+  /** @deprecated */ fat: '#17A05E',
+  /** @deprecated */ fatBg: '#F2F4F6',
+  /** @deprecated */ sugar: '#17A05E',
+  /** @deprecated */ sugarBg: '#F2F4F6',
+  /** @deprecated */ sodium: '#17A05E',
+  /** @deprecated */ sodiumBg: '#F2F4F6',
 } as const;
 
-/**
- * 브랜드 타일(D1·D3) 색 — 사진 대신 쓰는 이니셜 타일. fg 글자색 · bg 연한 바탕.
- * 로고를 흉내 내지 않고 브랜드 계열색만 연하게 쓴다.
- */
-export const brandColors: Record<string, { fg: string; bg: string }> = {
-  gs25: { fg: '#1C8FD8', bg: '#E3F2FC' },
-  cu: { fg: '#7A3FA0', bg: '#F1E8F7' },
-  seven_eleven: { fg: '#E8702A', bg: '#FDEEE3' },
-  starbucks: { fg: '#1E7A50', bg: '#E1F2E9' },
-  mega: { fg: '#B8860B', bg: '#FBF3D9' },
-  ediya: { fg: '#2B4C8C', bg: '#E6ECF7' },
-  compose: { fg: '#C49A1A', bg: '#FBF3D9' },
-  subway: { fg: '#2E8B3E', bg: '#FFF6CC' },
-  salady: { fg: '#4E9A3A', bg: '#EAF5E3' },
-  paris_baguette: { fg: '#1F4E9A', bg: '#E6EDF8' },
-  bonjuk: { fg: '#A0522D', bg: '#F7ECE3' },
-  mom_touch: { fg: '#D9442F', bg: '#FCE9E6' },
-  _default: { fg: '#5C6675', bg: '#EEF0F3' },
-};
-
-/** 메뉴 카테고리 타일 바탕 */
-export const menuTileColors = {
-  drink: '#F5EDE4',
-  meal: '#FEF3E6',
-  snack: '#FBEFE9',
-  salad: '#E8F5EC',
-  side: '#EDF0F5',
-} as const;
+export type ColorKey = keyof typeof colors;
 
 export const spacing = {
   xs: 4,
@@ -108,11 +90,30 @@ export const spacing = {
 } as const;
 
 export const radius = {
-  sm: 10,
-  md: 14, // 입력창·작은 카드
-  lg: 20, // 카드
-  xl: 24, // 큰 카드·시트
+  xs: 8,
+  /** 버튼·입력칸 */
+  button: 12,
+  /** 여유분 미니카드 */
+  md: 14,
+  /** 리스트 카드(메뉴·매장) */
+  lg: 16,
+  /** 큰 카드 (게이지·기록) */
+  card: 20,
+  /** 바텀시트 */
+  sheet: 24,
   pill: 999,
+  /** @deprecated button */ sm: 12,
+  /** @deprecated sheet */ xl: 24,
+} as const;
+
+/** 컴포넌트 치수 */
+export const size = {
+  /** 풀폭 CTA 높이 */
+  button: 54,
+  /** 헤더 높이 */
+  header: 56,
+  /** 최소 터치 영역 */
+  touch: 44,
 } as const;
 
 export const fonts = {
@@ -122,39 +123,37 @@ export const fonts = {
   bold: 'Pretendard-Bold',
 } as const;
 
-/** 타입 스케일 (fontSize / lineHeight) */
+/** 타입 스케일 (fontSize / lineHeight / letterSpacing) */
 export const type = {
-  display: { fontSize: 32, lineHeight: 42, fontFamily: fonts.bold }, // 온보딩 제목
-  h1: { fontSize: 26, lineHeight: 34, fontFamily: fonts.bold }, // 탭 타이틀 "기록"
-  h2: { fontSize: 20, lineHeight: 28, fontFamily: fonts.bold }, // 카드 제목
-  h3: { fontSize: 17, lineHeight: 24, fontFamily: fonts.semibold },
+  display: { fontSize: 26, lineHeight: 36, fontFamily: fonts.bold, letterSpacing: -0.5 }, // 로그인 헤드라인
+  h1: { fontSize: 22, lineHeight: 32, fontFamily: fonts.bold, letterSpacing: -0.4 }, // 인사 헤드라인 · 탭 타이틀
+  h2: { fontSize: 17, lineHeight: 24, fontFamily: fonts.bold, letterSpacing: -0.3 }, // 헤더 제목 · 카드 큰 제목
+  h3: { fontSize: 15, lineHeight: 22, fontFamily: fonts.bold, letterSpacing: -0.2 }, // 섹션 제목 · 메뉴 이름
   body: { fontSize: 15, lineHeight: 22, fontFamily: fonts.regular },
   bodyMedium: { fontSize: 15, lineHeight: 22, fontFamily: fonts.medium },
   caption: { fontSize: 13, lineHeight: 18, fontFamily: fonts.regular },
   captionMedium: { fontSize: 13, lineHeight: 18, fontFamily: fonts.medium },
+  small: { fontSize: 12, lineHeight: 16, fontFamily: fonts.regular },
   label: { fontSize: 12, lineHeight: 16, fontFamily: fonts.semibold },
-  number: { fontSize: 40, lineHeight: 46, fontFamily: fonts.bold }, // 842
-  numberSm: { fontSize: 24, lineHeight: 30, fontFamily: fonts.bold },
+  button: { fontSize: 17, lineHeight: 22, fontFamily: fonts.bold, letterSpacing: -0.2 },
+  number: { fontSize: 30, lineHeight: 34, fontFamily: fonts.bold, letterSpacing: -0.6 }, // 링 가운데 540
+  numberSm: { fontSize: 20, lineHeight: 26, fontFamily: fonts.bold, letterSpacing: -0.4 },
 } as const;
 
+/** 그림자는 최소화 — 떠 있는 요소(토스트)에만 */
 export const shadow = {
-  card: {
-    shadowColor: '#1E2430',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
+  /** @deprecated 카드는 그림자 없이 헤어라인으로 */
+  card: {},
   float: {
-    shadowColor: '#1E2430',
+    shadowColor: '#191F28',
     shadowOpacity: 0.12,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
 } as const;
 
 export const hit = { top: 8, bottom: 8, left: 8, right: 8 };
 
-export const theme = { colors, spacing, radius, fonts, type, shadow };
+export const theme = { colors, spacing, radius, size, fonts, type, shadow };
 export type Theme = typeof theme;

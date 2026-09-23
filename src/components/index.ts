@@ -20,3 +20,5 @@ export * from './Sprout';
 export * from './BrandTile';
 export * from './NoInfoState';
 export * from './Header';
+export * from './icons';
+export * from './MillyAvatar';

@@ -3,30 +3,51 @@ import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, hit, spacing } from '@/theme';
+import { colors, hit, size as sizes, spacing } from '@/theme';
 
+import { BackIcon } from './icons';
 import { Text } from './Text';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-/** 아이콘 버튼 (헤더 우측 검색·하트·공유·톱니) */
-export function IconButton({ name, onPress, label, size = 26, color = colors.ink, style }: { name: IconName; onPress?: () => void; label: string; size?: number; color?: string; style?: StyleProp<ViewStyle> }) {
+/** 아이콘 버튼 (헤더 우측 공유·하트·톱니) — 44×44 터치 영역, 회색 아이콘 */
+export function IconButton({
+  name,
+  icon,
+  onPress,
+  label,
+  size = 24,
+  color = colors.ink2,
+  style,
+}: {
+  name?: IconName;
+  /** SVG 아이콘 노드 (name 대신) */
+  icon?: ReactNode;
+  onPress?: () => void;
+  label: string;
+  size?: number;
+  color?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={hit} onPress={onPress} style={({ pressed }) => [styles.icon, pressed && { opacity: 0.6 }, style]}>
-      <Ionicons name={name} size={size} color={color} />
+      {icon ?? (name ? <Ionicons name={name} size={size} color={color} /> : null)}
     </Pressable>
   );
 }
 
-/** 스택 화면 상단: 뒤로가기 + (가운데 제목) + 우측 아이콘들 */
-export function StackHeader({ title, right, onBack, style }: { title?: string; right?: ReactNode; onBack?: () => void; style?: StyleProp<ViewStyle> }) {
+/**
+ * 스택 화면 상단 (높이 56): 뒤로 + 제목(왼쪽 정렬, 17 Bold) + 우측 슬롯.
+ * 화면 좌우 여백 20 안에 놓이며, 뒤로 버튼은 터치 영역만큼 왼쪽으로 당겨 시안(8px)과 맞춘다.
+ */
+export function StackHeader({ title, right, onBack, align = 'left', style }: { title?: string; right?: ReactNode; onBack?: () => void; align?: 'left' | 'center'; style?: StyleProp<ViewStyle> }) {
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/today')));
   return (
     <View style={[styles.row, style]}>
-      <IconButton name="chevron-back" label="뒤로 가기" size={28} onPress={back} style={styles.back} />
-      <View style={styles.center}>
+      <IconButton icon={<BackIcon size={24} color={colors.ink} />} label="뒤로 가기" onPress={back} style={styles.back} />
+      <View style={[styles.center, align === 'center' && styles.centered]}>
         {title ? (
-          <Text variant="h3" numberOfLines={1}>
+          <Text variant="h2" numberOfLines={1}>
             {title}
           </Text>
         ) : null}
@@ -37,9 +58,10 @@ export function StackHeader({ title, right, onBack, style }: { title?: string; r
 }
 
 const styles = StyleSheet.create({
-  row: { height: 52, flexDirection: 'row', alignItems: 'center' },
-  back: { marginLeft: -6 },
-  center: { flex: 1, alignItems: 'center' },
-  right: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, minWidth: 32, justifyContent: 'flex-end' },
-  icon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  row: { height: sizes.header, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  back: { marginLeft: -12 },
+  center: { flex: 1 },
+  centered: { alignItems: 'center' },
+  right: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minWidth: 32, justifyContent: 'flex-end', flexShrink: 0 },
+  icon: { width: sizes.touch, height: sizes.touch, alignItems: 'center', justifyContent: 'center' },
 });

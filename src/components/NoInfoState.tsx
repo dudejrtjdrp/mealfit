@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, spacing } from '@/theme';
+import { spacing } from '@/theme';
 
 import { Button } from './Button';
+import { MillyAvatar } from './MillyAvatar';
 import { Text } from './Text';
 
 export interface NoInfoStateProps {
@@ -20,29 +20,23 @@ export interface NoInfoStateProps {
 export function NoInfoState({ onOtherStores, onManualLog, reason = '영양표시 의무가 없는 매장이에요.\n확인된 정보만 보여드려요.', style }: NoInfoStateProps) {
   return (
     <View style={[styles.wrap, style]} accessibilityRole="summary">
-      <View style={styles.outer}>
-        <View style={styles.inner}>
-          <Ionicons name="information" size={44} color={colors.coverNone} />
-        </View>
-      </View>
+      <MillyAvatar pose="sorry" size={80} />
       <Text variant="h2" align="center" style={styles.title}>
         아직 추가되지 않은 정보입니다
       </Text>
-      <Text variant="body" color="ink2" align="center" style={styles.desc}>
+      <Text variant="caption" color="ink2" align="center" style={styles.desc}>
         {reason}
       </Text>
       <View style={styles.actions}>
-        {onOtherStores ? <Button title="근처 다른 매장 보기" height={52} onPress={onOtherStores} /> : null}
-        {onManualLog ? <Button title="직접 기록하기" variant="outline" height={52} onPress={onManualLog} /> : null}
+        {onOtherStores ? <Button title="근처 다른 매장 보기" onPress={onOtherStores} /> : null}
+        {onManualLog ? <Button title="직접 기록하기" variant="outline" onPress={onManualLog} /> : null}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center', paddingVertical: spacing.xxxl, paddingHorizontal: spacing.lg },
-  outer: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.coverNoneBg, alignItems: 'center', justifyContent: 'center' },
-  inner: { width: 76, height: 76, borderRadius: 38, borderWidth: 4, borderColor: colors.coverNone, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  wrap: { alignItems: 'center', paddingVertical: spacing.xxxl, paddingHorizontal: spacing.xs },
   title: { marginTop: spacing.xl },
   desc: { marginTop: spacing.sm },
   actions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.xxl },

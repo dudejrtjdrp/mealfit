@@ -16,7 +16,7 @@ export interface BottomSheetProps {
   footer?: ReactNode;
 }
 
-/** Modal 기반 바텀시트 — 상단 핸들, 바깥 탭하면 닫힘 */
+/** Modal 기반 바텀시트 — 흰 바탕, 상단 핸들, 바깥 탭하면 닫힘 */
 export function BottomSheet({ visible, onClose, title, subtitle, children, footer }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
   return (
@@ -25,13 +25,9 @@ export function BottomSheet({ visible, onClose, title, subtitle, children, foote
         <Pressable style={styles.backdrop} accessibilityLabel="닫기" onPress={onClose} />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
           <View style={styles.handle} />
-          {title ? (
-            <Text variant="h2" style={styles.title}>
-              {title}
-            </Text>
-          ) : null}
+          {title ? <Text variant="h2">{title}</Text> : null}
           {subtitle ? (
-            <Text variant="body" color="ink2" style={styles.subtitle}>
+            <Text variant="caption" color="ink3" style={styles.subtitle}>
               {subtitle}
             </Text>
           ) : null}
@@ -47,10 +43,9 @@ export function BottomSheet({ visible, onClose, title, subtitle, children, foote
 
 const styles = StyleSheet.create({
   flex: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(30, 36, 48, 0.4)' },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: spacing.page, maxHeight: '88%' },
-  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: radius.pill, backgroundColor: colors.line, marginTop: 10, marginBottom: spacing.lg },
-  title: {},
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.overlay },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, paddingHorizontal: spacing.page, maxHeight: '88%' },
+  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: radius.pill, backgroundColor: colors.border, marginTop: 10, marginBottom: spacing.lg },
   subtitle: { marginTop: spacing.xs },
   scroll: { marginTop: spacing.lg, flexGrow: 0 },
   footer: { marginTop: spacing.lg },
