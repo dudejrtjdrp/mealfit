@@ -479,18 +479,22 @@ export function dedupeMenus(menus: IngestedMenu[]): MenuItem[] {
 
 // ───────────────────────── 시드와 합치기 ─────────────────────────
 
-/** 공공데이터 official 메뉴가 이만큼 이상인 브랜드는 시드 estimated 메뉴를 목록에서 뺀다 */
+/** 공공데이터 official 메뉴가 이만큼 이상인 브랜드는 옵션 없는 시드 estimated 메뉴를 목록에서 뺀다 */
 export const SEED_ESTIMATED_CUTOFF = 20;
 
 export interface SeedPolicyStats {
   /** 적용 기준 (공공데이터 official 메뉴 수) */
   cutoff: number;
-  /** 시드 estimated 를 뺀 브랜드 → 뺀 개수 */
+  /** 옵션 없는 시드 estimated 를 뺀 브랜드 → 뺀 개수 */
   excludedByBrand: Record<string, number>;
   /** 목록에서 뺀 시드 메뉴 수 */
   excluded: number;
   /** 목록에 남은 시드 메뉴 수 (교체된 것 포함) */
   kept: number;
+  /** 커버 브랜드인데 옵션이 있어 남긴 시드 estimated → 브랜드별 개수 */
+  keptWithOptionsByBrand: Record<string, number>;
+  /** 커버 브랜드인데 옵션이 있어 남긴 시드 estimated 수 (kept 에 포함) */
+  keptWithOptions: number;
 }
 
 export interface MergeResult {
@@ -505,9 +509,12 @@ export interface MergeResult {
 
 /**
  * 시드(menus.json) + 공공데이터 메뉴를 합친다.
- * - (우선) 공공데이터 official 메뉴가 cutoff(기본 20)개 이상인 브랜드는 시드 estimated 메뉴를 목록에서 뺀다.
- *   시드 추정 메뉴와 공공데이터 메뉴는 이름 표기가 달라("카페 아메리카노" vs "아메리카노 (Tall)") 교체 매칭이
- *   거의 안 되고, 두면 같은 메뉴가 추정·공식으로 두 번 보인다. 시드 none·user·official 은 그대로 둔다.
+ * - (우선) 공공데이터 official 메뉴가 cutoff(기본 20)개 이상인 브랜드("커버 브랜드")는 옵션 없는 시드 estimated
+ *   메뉴를 목록에서 뺀다. 시드 추정 메뉴와 공공데이터 메뉴는 이름 표기가 달라("카페 아메리카노" vs "아메리카노 (Tall)")
+ *   교체 매칭이 거의 안 되고, 두면 같은 메뉴가 추정·공식으로 두 번 보인다. 시드 none·user·official 은 그대로 둔다.
+ * - 단 옵션(사이즈·시럽 등)이 정의된 시드 estimated 는 커버 브랜드에서도 남기고 교체하지도 않는다 — 옵션 칩 즉시 갱신(D4)과
+ *   구매 가이드("시럽 빼면…")가 이 옵션에서 나오고, 공공데이터 메뉴엔 옵션이 없다. 같은 음료가 추정(옵션)·공식(사이즈별)으로
+ *   함께 보이는 중복은 감수한다.
  * - 같은 브랜드 + 정규화 이름의 시드 메뉴가 estimated/none 이면 공공데이터 값으로 교체한다.
  *   기존 기록(menuId)이 깨지지 않게 시드 id·가격·소개·태그는 유지하고, 추정치로 만든 옵션 차이(delta)는
  *   공식 기준값과 섞이면 신뢰등급이 흐려지므로 버린다.
@@ -517,10 +524,17 @@ export function mergeMenus(seed: MenuItem[], official: MenuItem[], opts: { cutof
   const cutoff = opts.cutoff ?? SEED_ESTIMATED_CUTOFF;
   const officialCount = new Map<string, number>();
   for (const o of official) if (o.trust === 'official') officialCount.set(o.brandId, (officialCount.get(o.brandId) ?? 0) + 1);
+  const covered = (brandId: string) => (officialCount.get(brandId) ?? 0) >= cutoff;
+  const hasOptions = (m: MenuItem) => (m.options?.length ?? 0) > 0;
   const hidden: MenuItem[] = [];
   const excludedByBrand: Record<string, number> = {};
+  const keptWithOptionsByBrand: Record<string, number> = {};
   const listed = seed.filter((s) => {
-    if (s.trust !== 'estimated' || (officialCount.get(s.brandId) ?? 0) < cutoff) return true;
+    if (s.trust !== 'estimated' || !covered(s.brandId)) return true;
+    if (hasOptions(s)) {
+      keptWithOptionsByBrand[s.brandId] = (keptWithOptionsByBrand[s.brandId] ?? 0) + 1;
+      return true;
+    }
     hidden.push(s);
     excludedByBrand[s.brandId] = (excludedByBrand[s.brandId] ?? 0) + 1;
     return false;
@@ -533,6 +547,8 @@ export function mergeMenus(seed: MenuItem[], official: MenuItem[], opts: { cutof
     const key = `${s.brandId}|${normalizeMenuName(s.name)}`;
     const o = officialByKey.get(key);
     if (!o) return s;
+    // 커버 브랜드의 옵션 시드는 교체하지 않는다(옵션 보존) — 공공데이터 항목도 따로 넣는다
+    if (s.trust === 'estimated' && hasOptions(s) && covered(s.brandId)) return s;
     consumed.add(key);
     if (s.trust === 'official' || s.trust === 'user') return s;
     replaced++;
@@ -553,7 +569,14 @@ export function mergeMenus(seed: MenuItem[], official: MenuItem[], opts: { cutof
     menus,
     replaced,
     hidden,
-    seedPolicy: { cutoff, excludedByBrand, excluded: hidden.length, kept: listed.length },
+    seedPolicy: {
+      cutoff,
+      excludedByBrand,
+      excluded: hidden.length,
+      kept: listed.length,
+      keptWithOptionsByBrand,
+      keptWithOptions: Object.values(keptWithOptionsByBrand).reduce((a, b) => a + b, 0),
+    },
   };
 }
 

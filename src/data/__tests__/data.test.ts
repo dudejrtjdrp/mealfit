@@ -70,19 +70,28 @@ describe('공공데이터 번들 (src/data/generated/mfds.json)', () => {
 });
 
 describe('시드 정리 정책 (로더)', () => {
-  it('공공데이터 official 20개 이상 브랜드는 시드 estimated 가 목록에 없고, id 로는 여전히 찾힌다', () => {
+  it('공공데이터 official 20개 이상 브랜드는 옵션 없는 시드 estimated 가 목록에 없고, id 로는 여전히 찾힌다', () => {
     const policy = getSeedPolicy();
     expect(policy.cutoff).toBe(20);
     for (const brandId of Object.keys(policy.excludedByBrand)) {
       const ms = getMenusByBrand(brandId);
       expect(ms.filter((m) => m.trust === 'official').length).toBeGreaterThanOrEqual(20);
-      expect(ms.some((m) => m.trust === 'estimated')).toBe(false);
+      // 남은 추정 메뉴는 전부 옵션이 있다 (D4 옵션 칩·구매 가이드용)
+      expect(ms.filter((m) => m.trust === 'estimated').every((m) => (m.options?.length ?? 0) > 0)).toBe(true);
     }
     expect(policy.excluded + policy.kept).toBe((require('../menus.json') as unknown[]).length);
     if (policy.excludedByBrand.starbucks) {
-      expect(getMenusByBrand('starbucks').some((m) => m.id === 'starbucks-iced-latte')).toBe(false);
-      expect(getMenu('starbucks-iced-latte')?.trust).toBe('estimated'); // 예전 기록이 깨지지 않게
+      expect(getMenusByBrand('starbucks').some((m) => m.id === 'starbucks-ham-cheese-sandwich')).toBe(false);
+      expect(getMenu('starbucks-ham-cheese-sandwich')?.trust).toBe('estimated'); // 예전 기록이 깨지지 않게
     }
+  });
+
+  it('스타벅스 D3 목록에 옵션 있는 시드(아이스 카페 라떼 등)가 옵션째 보인다', () => {
+    const latte = getMenusByBrand('starbucks').find((m) => m.id === 'starbucks-iced-latte');
+    expect(latte?.trust).toBe('estimated');
+    expect(latte?.options?.map((g) => g.label)).toEqual(['사이즈', '우유 변경']);
+    expect(getMenusByBrand('starbucks').filter((m) => m.options?.some((g) => g.id === 'syrup')).length).toBeGreaterThan(0);
+    expect(getSeedPolicy().keptWithOptionsByBrand.starbucks).toBeGreaterThan(0);
   });
 });
 

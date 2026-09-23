@@ -14,7 +14,7 @@ interface MfdsBundle {
 const MFDS = mfdsJson as unknown as MfdsBundle;
 
 // 손으로 만든 시드 + 공공데이터 (정책은 mergeMenus 참고):
-// 공공데이터 official 20개 이상 브랜드는 시드 estimated 를 목록에서 빼고, 같은 브랜드·메뉴명의 추정치는 공식값으로 교체, 나머지는 추가
+// 공공데이터 official 20개 이상 브랜드는 옵션 없는 시드 estimated 를 목록에서 빼고(옵션 시드는 D4 옵션 칩·구매 가이드용으로 유지), 같은 브랜드·메뉴명의 추정치는 공식값으로 교체, 나머지는 추가
 const MERGED = mergeMenus(menusJson as unknown as MenuItem[], MFDS.menus);
 const MENUS = MERGED.menus;
 const BRANDS = mergeBrands(brandsJson as Brand[], MFDS.brands, MENUS);

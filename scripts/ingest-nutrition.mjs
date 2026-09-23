@@ -15,7 +15,7 @@
  * 인코딩(UTF-8/CP949)과 음식·가공식품 구분은 파일 헤더로 자동 판별한다.
  *
  * 재실행 안전: 매번 원본에서 mfds.json 을 통째로 다시 만든다. 손으로 고친 시드(menus.json·brands.json)는 건드리지 않고,
- * 합치기(official 20개 이상 브랜드의 시드 estimated 제외 → 같은 브랜드+메뉴명 estimated → official 교체)는
+ * 합치기(official 20개 이상 브랜드의 옵션 없는 시드 estimated 제외 → 같은 브랜드+메뉴명 estimated → official 교체)는
  * 앱 로더(src/data/index.ts)가 mergeMenus 로 한다. 식품명의 분류 접두어("기타차_")는 여기서 뗀다(cleanMenuName).
  */
 import { createHash } from 'node:crypto';
@@ -74,10 +74,12 @@ function stats(bundle) {
     estimated: `${trust.estimated ?? 0} (${pct(trust.estimated)})`,
     none: `${trust.none ?? 0} (${pct(trust.none)})`,
     user: trust.user ?? 0,
-    // 공공데이터 official 이 cutoff 개 이상인 브랜드의 시드 estimated 는 목록에서 뺀다 (src/data/ingest/nutrition.ts mergeMenus)
+    // 공공데이터 official 이 cutoff 개 이상인 브랜드의 옵션 없는 시드 estimated 는 목록에서 뺀다 (src/data/ingest/nutrition.ts mergeMenus)
     seedExcluded: seedPolicy.excluded,
     seedKept: seedPolicy.kept,
     seedExcludedByBrand: seedPolicy.excludedByBrand,
+    seedKeptWithOptions: seedPolicy.keptWithOptions,
+    seedKeptWithOptionsByBrand: seedPolicy.keptWithOptionsByBrand,
     jsonBytes: bytes,
     jsonMB: (bytes / 1024 / 1024).toFixed(2),
   };
@@ -199,8 +201,9 @@ if (top.length) console.log('\n매칭 안 된 업체명 상위 (brandRegistry �
 const { replaced, seedPolicy } = lib.mergeMenus(seedMenus, bundle.menus);
 console.log(`\n시드 estimated/none → official 교체: ${replaced}개`);
 console.log(
-  `시드 정리(공공데이터 official ${seedPolicy.cutoff}개 이상 브랜드의 시드 estimated 제외): 제외 ${seedPolicy.excluded}개 · 유지 ${seedPolicy.kept}개`,
-  seedPolicy.excludedByBrand,
+  `시드 정리(공공데이터 official ${seedPolicy.cutoff}개 이상 브랜드의 옵션 없는 시드 estimated 제외): 제외 ${seedPolicy.excluded}개 · 유지 ${seedPolicy.kept}개` +
+    ` (그중 옵션 있어 남긴 추정 ${seedPolicy.keptWithOptions}개)`,
+  { 제외: seedPolicy.excludedByBrand, 옵션유지: seedPolicy.keptWithOptionsByBrand },
 );
 console.log('전:', stats(current));
 console.log('후:', stats(bundle));

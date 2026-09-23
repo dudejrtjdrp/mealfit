@@ -341,7 +341,7 @@ describe('시드와 합치기', () => {
     expect(seed[0].options).toHaveLength(1);
   });
 
-  describe('시드 정리 정책: 공공데이터 official 이 cutoff 개 이상인 브랜드는 시드 estimated 를 목록에서 뺀다', () => {
+  describe('시드 정리 정책: 공공데이터 official 이 cutoff 개 이상인 브랜드는 옵션 없는 시드 estimated 를 목록에서 뺀다', () => {
     const sb = (id: string, name: string, trust: MenuItem['trust']): MenuItem => ({
       id, brandId: 'starbucks', name, category: 'drink', serving: '1잔', nutrients: trust === 'none' ? null : { kcal: 100 }, trust,
       ...(trust === 'official' ? { sourceUrl: 'https://x' } : {}),
@@ -352,35 +352,55 @@ describe('시드와 합치기', () => {
       sb('starbucks-none', '시즌 음료', 'none'),
       sb('starbucks-user', '내 음료', 'user'),
       sb('starbucks-official', '공식 시드', 'official'),
+      // 옵션 있는 추정 시드 — 옵션 칩(D4)·구매 가이드 데모용이라 남기고, 같은 이름의 공공데이터가 있어도 교체하지 않는다
+      {
+        ...sb('starbucks-mocha', '카페 모카', 'estimated'),
+        options: [{ id: 'syrup', label: '시럽', choices: [{ label: '기본', delta: {}, isDefault: true }, { label: '빼기', delta: { kcal: -40 } }] }],
+      },
       ...seed,
     ];
     const mfds = (n: number): MenuItem[] =>
       Array.from({ length: n }, (_, i) => ({
-        id: `starbucks-mfds-${i}`, brandId: 'starbucks', name: i === 0 ? '카페 라떼 (Tall)' : `공공 메뉴 ${i}`, category: 'drink' as const,
+        id: `starbucks-mfds-${i}`, brandId: 'starbucks', name: i === 0 ? '카페 라떼 (Tall)' : i === 1 ? '카페 모카 (Tall)' : `공공 메뉴 ${i}`, category: 'drink' as const,
         serving: '1인분', nutrients: { kcal: 200 }, trust: 'official' as const, sourceUrl: 'https://www.data.go.kr/data/15100070/standard.do',
       }));
 
-    it('20개 이상이면 estimated 만 빼고 none·user·official 시드는 유지, 뺀 것은 hidden 으로 돌려준다', () => {
+    it('20개 이상이면 옵션 없는 estimated 만 빼고 옵션 있는 estimated·none·user·official 시드는 유지, 뺀 것은 hidden 으로 돌려준다', () => {
       const r = mergeMenus(seedSb, [...mfds(20), ...official]);
       const ids = r.menus.map((m) => m.id);
       expect(ids).not.toContain('starbucks-americano');
       expect(ids).not.toContain('starbucks-latte');
       expect(ids).toEqual(expect.arrayContaining(['starbucks-none', 'starbucks-user', 'starbucks-official', 'starbucks-mfds-0']));
       expect(r.hidden.map((m) => m.id)).toEqual(['starbucks-americano', 'starbucks-latte']);
-      expect(r.seedPolicy).toEqual({ cutoff: 20, excludedByBrand: { starbucks: 2 }, excluded: 2, kept: 6 });
+      expect(r.seedPolicy).toEqual({
+        cutoff: 20,
+        excludedByBrand: { starbucks: 2 },
+        excluded: 2,
+        kept: 7,
+        keptWithOptionsByBrand: { starbucks: 1 },
+        keptWithOptions: 1,
+      });
+      // 옵션 시드는 교체하지 않고 옵션째 남기며, 같은 이름의 공공데이터 항목도 따로 들어간다 (중복 감수)
+      const mocha = r.menus.find((m) => m.id === 'starbucks-mocha')!;
+      expect(mocha.trust).toBe('estimated');
+      expect(mocha.options?.[0].id).toBe('syrup');
+      expect(ids).toContain('starbucks-mfds-1');
       // 다른 브랜드(cu: official 3개)는 기존 교체 로직 그대로
       expect(r.replaced).toBe(1);
       expect(r.menus.find((m) => m.id === 'cu-tuna')?.trust).toBe('official');
-      // 같은 브랜드에 추정·공식이 함께 보이지 않는다
-      expect(r.menus.filter((m) => m.brandId === 'starbucks' && m.trust === 'estimated')).toHaveLength(0);
+      // 커버 브랜드에 남은 추정 메뉴는 전부 옵션이 있다
+      expect(r.menus.filter((m) => m.brandId === 'starbucks' && m.trust === 'estimated').map((m) => m.id)).toEqual(['starbucks-mocha']);
     });
 
     it('19개면 빼지 않고 기존처럼 이름이 같은 estimated 를 교체한다', () => {
       const r = mergeMenus(seedSb, mfds(19));
-      expect(r.seedPolicy).toMatchObject({ excluded: 0, kept: seedSb.length, excludedByBrand: {} });
+      expect(r.seedPolicy).toMatchObject({ excluded: 0, kept: seedSb.length, excludedByBrand: {}, keptWithOptions: 0 });
       expect(r.hidden).toEqual([]);
       expect(r.menus.find((m) => m.id === 'starbucks-latte')).toMatchObject({ trust: 'official', nutrients: { kcal: 200 } });
       expect(r.menus.find((m) => m.id === 'starbucks-americano')?.trust).toBe('estimated');
+      // 커버 브랜드가 아니면 옵션 시드도 기존처럼 교체(추정 옵션 제거)
+      expect(r.menus.find((m) => m.id === 'starbucks-mocha')).toMatchObject({ trust: 'official' });
+      expect(r.menus.find((m) => m.id === 'starbucks-mocha')?.options).toBeUndefined();
     });
 
     it('cutoff 는 옵션으로 바꿀 수 있고, official 이 아닌 공공데이터 항목은 세지 않는다', () => {
