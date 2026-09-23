@@ -2,10 +2,11 @@
  * 판정 분포 회귀 테스트 — 시드 데이터 전체에 대해 good/ok/pass 가 고르게 나오는지 본다.
  * 기준: 남 35세 175cm/68kg 활동 3, 유지, 균형형. 시안(E1) 수치대로 탄 122/250 · 단 56/100 · 지 28/70 소비 후 842 kcal 남음.
  */
-import { getMenusByBrand } from '../../data';
+import { getMenu, getMenusByBrand } from '../../data';
+import seedMenus from '../../data/menus.json';
 import { judgeMenu, rankMenus, type JudgeContext } from '../judge';
 import { computeTargets } from '../targets';
-import type { DailyTargets, Verdict } from '../types';
+import type { DailyTargets, MenuItem, Verdict } from '../types';
 
 const today = new Date(2026, 8, 15);
 const targets = computeTargets(
@@ -36,8 +37,11 @@ const remaining = (kcal: number): DailyTargets => ({
   emphasis: targets.emphasis,
 });
 
+// 스타벅스처럼 공공데이터 official 이 충분한 브랜드는 시드 estimated 가 목록에서 빠지지만(mergeMenus), id 로는 찾을 수 있다
 const verdictOf = (brand: string, id: string, kcal: number): Verdict => {
-  const m = getMenusByBrand(brand).find((x) => x.id === id);
+  const m = getMenu(id);
+  expect(m?.brandId).toBe(brand);
+  if (!m) throw new Error(`시드에 ${id} 없음`);
   if (!m) throw new Error(`시드에 ${id} 없음`);
   return judgeMenu(m, remaining(kcal), ctx).verdict;
 };
@@ -77,8 +81,9 @@ describe('판정 분포 (편의점)', () => {
 
 describe('구매 가이드 (시드)', () => {
   it('라떼 "시럽 빼기" 로 판정이 한 단계 좋아지는 경우가 시드에 있다', () => {
-    const syrupLattes = getMenusByBrand('starbucks').filter(
-      (m) => /라떼|마키아또/.test(m.name) && m.options?.some((g) => g.id === 'syrup'),
+    // 시럽 옵션은 시드 추정 메뉴에만 있다 (공공데이터 메뉴는 옵션 없음) — 목록 노출과 무관하게 시드로 본다
+    const syrupLattes = (seedMenus as unknown as MenuItem[]).filter(
+      (m) => m.brandId === 'starbucks' && /라떼|마키아또/.test(m.name) && m.options?.some((g) => g.id === 'syrup'),
     );
     const hit = syrupLattes.some((m) =>
       [250, 300, 350, 400, 450, 500].some((kcal) => judgeMenu(m, remaining(kcal), ctx).guide?.startsWith('시럽 빼면')),

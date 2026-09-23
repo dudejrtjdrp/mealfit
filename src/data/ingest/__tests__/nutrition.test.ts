@@ -3,6 +3,7 @@ import type { Brand, MenuItem } from '../../../domain/types';
 import { BRAND_REGISTRY } from '../brandRegistry';
 import {
   buildBrandMatcher,
+  categoryPrefixes,
   cleanMenuName,
   coverageOf,
   decodeKoreanText,
@@ -13,6 +14,7 @@ import {
   mergeBrands,
   mergeMenus,
   normalizeCompany,
+  normalizeDisplayText,
   normalizeMenuName,
   parseAmount,
   parseCsv,
@@ -28,7 +30,7 @@ const matcher = buildBrandMatcher(BRAND_REGISTRY);
 // 전국통합식품영양성분정보(음식) 표준데이터 헤더 (필드 순서·표기는 배포판 기준)
 const FOOD_HEADER = [
   '식품코드', '식품명', '데이터구분코드', '데이터구분명', '식품기원코드', '식품기원명', '식품대분류코드', '식품대분류명',
-  '대표식품코드', '대표식품명', '식품중분류코드', '식품중분류명', '영양성분함량기준량', '에너지(kcal)', '수분(g)',
+  '대표식품코드', '대표식품명', '식품중분류코드', '식품중분류명', '식품소분류코드', '식품소분류명', '영양성분함량기준량', '에너지(kcal)', '수분(g)',
   '단백질(g)', '지방(g)', '회분(g)', '탄수화물(g)', '당류(g)', '식이섬유(g)', '나트륨(mg)', '콜레스테롤(mg)',
   '포화지방산(g)', '트랜스지방산(g)', '출처명', '식품중량', '업체명', '데이터기준일자',
 ];
@@ -116,6 +118,42 @@ describe('값 정규화', () => {
     expect(cleanMenuName('[CU] 백종원 도시락', ['CU'])).toBe('백종원 도시락');
     expect(cleanMenuName('cucumber 샐러드', ['CU'])).toBe('cucumber 샐러드');
     expect(cleanMenuName('닭가슴살_샐러드', ['버거킹'])).toBe('닭가슴살 샐러드');
+  });
+
+  it('아래아 가운뎃점(ㆍ·ᆞ)을 · 로', () => {
+    expect(normalizeDisplayText('과\u318D채주스')).toBe('과·채주스');
+    expect(normalizeDisplayText('과\u119E채주스')).toBe('과·채주스');
+  });
+
+  it('분류 접두어 후보: 해당없음은 빼고 대표식품명 첫 토큰까지, 긴 것부터', () => {
+    expect(categoryPrefixes('해당없음', '해당없음', '기타차')).toEqual(['기타차']);
+    expect(categoryPrefixes('딸기', undefined, '과\u318D채주스')).toEqual(['과·채주스', '딸기']);
+    expect(categoryPrefixes('', '-', '기타 커피')).toEqual(['기타 커피', '기타']);
+  });
+
+  it.each([
+    // [원본 식품명, 중분류, 소분류, 대표식품명, 기대]
+    ['기타차_제주 그린티 브리즈 (Grande)', '해당없음', '해당없음', '기타차', '제주 그린티 브리즈 (Grande)'],
+    ['과\u318D채주스_딸기 주스 병음료', '해당없음', '해당없음', '과\u318D채주스', '딸기 주스 병음료'],
+    ['과\u119E채주스 딸기 주스 병음료', '해당없음', '해당없음', '과\u318D채주스', '딸기 주스 병음료'],
+    ['밀크티/버블티_흑당 버블티 (L)', '해당없음', '해당없음', '밀크티/버블티', '흑당 버블티 (L)'],
+    ['크로켓(고로케)_카레 고로케', '해당없음', '해당없음', '크로켓(고로케)', '카레 고로케'],
+    ['과\u318D채주스_딸기 바나나 주스', '딸기', '해당없음', '과\u318D채주스', '딸기 바나나 주스'], // 한 번만 뗀다
+    ['커피_커피 아이스(ICED) (Tall)', '해당없음', '해당없음', '커피', '커피 아이스(ICED) (Tall)'],
+    ['기타 커피_아인슈페너', '해당없음', '해당없음', '기타 커피', '아인슈페너'],
+    ['기타  즉석식품   세트', '해당없음', '해당없음', '기타 즉석식품', '세트'],
+    // 단어 경계가 없으면 두고, 떼면 빈 문자열이 되면 두고, 분류가 없으면 공백만 정리
+    ['녹차라떼 (Tall)', '해당없음', '해당없음', '녹차', '녹차라떼 (Tall)'],
+    ['달걀찜', '해당없음', '해당없음', '달걀찜', '달걀찜'],
+    ['피자_', '해당없음', '해당없음', '피자', '피자'],
+    ['  제주  유기 녹차  ', '해당없음', '해당없음', '해당없음', '제주 유기 녹차'],
+  ])('분류 접두어: %s → %s', (raw, mid, sub, rep, want) => {
+    expect(cleanMenuName(raw, ['스타벅스'], categoryPrefixes(mid, sub, rep))).toBe(want);
+  });
+
+  it('브랜드 접두어를 먼저 떼고 분류 접두어를 뗀다, 메뉴명 속 브랜드명은 둔다', () => {
+    expect(cleanMenuName('스타벅스_커피_카페 아메리카노', ['스타벅스'], ['커피'])).toBe('카페 아메리카노');
+    expect(cleanMenuName('기타음료_스타벅스 슬래머 (Grande)', ['스타벅스'], ['기타음료'])).toBe('스타벅스 슬래머 (Grande)');
   });
 });
 
@@ -225,6 +263,23 @@ describe('행 → 메뉴', () => {
     expect(m.nutrients?.satFat).toBeUndefined(); // "Tr" 은 숫자가 아니므로 비움
   });
 
+  it('식품명의 대표식품명 접두어를 떼고, 카테고리는 대표식품명까지 보고 추정한다', () => {
+    const r = rowToMenu(
+      { kind: 'food', cols, cells: foodRow({ ...base, 식품명: '버거_와퍼 주니어', 대표식품명: '버거', 식품중분류명: '해당없음', 식품소분류명: '해당없음' }) },
+      matcher,
+    );
+    expect((r as { menu: IngestedMenu }).menu).toMatchObject({ name: '와퍼 주니어', category: 'meal' });
+    const tea = rowToMenu(
+      {
+        kind: 'food',
+        cols,
+        cells: foodRow({ ...base, 업체명: '스타벅스', 식품대분류명: '음료 및 차류', 식품명: '과\u318D채주스_딸기 주스 병음료', 대표식품명: '과\u318D채주스', 식품중분류명: '해당없음' }),
+      },
+      matcher,
+    );
+    expect((tea as { menu: IngestedMenu }).menu).toMatchObject({ brandId: 'starbucks', name: '딸기 주스 병음료', category: 'drink' });
+  });
+
   it('브랜드 없음·kcal 없음은 건너뛴다', () => {
     expect(rowToMenu({ kind: 'food', cols, cells: foodRow({ ...base, 식품명: '김치찌개', 업체명: '' }) }, matcher)).toEqual({ skip: 'no-brand' });
     expect(rowToMenu({ kind: 'food', cols, cells: foodRow({ ...base, 식품명: '와퍼', '에너지(kcal)': '-' }) }, matcher)).toEqual({ skip: 'no-kcal' });
@@ -284,6 +339,55 @@ describe('시드와 합치기', () => {
     expect(menus.map((m) => m.id)).toEqual(['cu-tuna', 'cu-official', 'mega-a', 'cu-mfds-3']);
     // 입력을 바꾸지 않는다
     expect(seed[0].options).toHaveLength(1);
+  });
+
+  describe('시드 정리 정책: 공공데이터 official 이 cutoff 개 이상인 브랜드는 시드 estimated 를 목록에서 뺀다', () => {
+    const sb = (id: string, name: string, trust: MenuItem['trust']): MenuItem => ({
+      id, brandId: 'starbucks', name, category: 'drink', serving: '1잔', nutrients: trust === 'none' ? null : { kcal: 100 }, trust,
+      ...(trust === 'official' ? { sourceUrl: 'https://x' } : {}),
+    });
+    const seedSb: MenuItem[] = [
+      sb('starbucks-americano', '카페 아메리카노', 'estimated'),
+      sb('starbucks-latte', '카페 라떼', 'estimated'), // 공공데이터에 같은 이름이 있어도 정책이 먼저 — 교체하지 않고 뺀다
+      sb('starbucks-none', '시즌 음료', 'none'),
+      sb('starbucks-user', '내 음료', 'user'),
+      sb('starbucks-official', '공식 시드', 'official'),
+      ...seed,
+    ];
+    const mfds = (n: number): MenuItem[] =>
+      Array.from({ length: n }, (_, i) => ({
+        id: `starbucks-mfds-${i}`, brandId: 'starbucks', name: i === 0 ? '카페 라떼 (Tall)' : `공공 메뉴 ${i}`, category: 'drink' as const,
+        serving: '1인분', nutrients: { kcal: 200 }, trust: 'official' as const, sourceUrl: 'https://www.data.go.kr/data/15100070/standard.do',
+      }));
+
+    it('20개 이상이면 estimated 만 빼고 none·user·official 시드는 유지, 뺀 것은 hidden 으로 돌려준다', () => {
+      const r = mergeMenus(seedSb, [...mfds(20), ...official]);
+      const ids = r.menus.map((m) => m.id);
+      expect(ids).not.toContain('starbucks-americano');
+      expect(ids).not.toContain('starbucks-latte');
+      expect(ids).toEqual(expect.arrayContaining(['starbucks-none', 'starbucks-user', 'starbucks-official', 'starbucks-mfds-0']));
+      expect(r.hidden.map((m) => m.id)).toEqual(['starbucks-americano', 'starbucks-latte']);
+      expect(r.seedPolicy).toEqual({ cutoff: 20, excludedByBrand: { starbucks: 2 }, excluded: 2, kept: 6 });
+      // 다른 브랜드(cu: official 3개)는 기존 교체 로직 그대로
+      expect(r.replaced).toBe(1);
+      expect(r.menus.find((m) => m.id === 'cu-tuna')?.trust).toBe('official');
+      // 같은 브랜드에 추정·공식이 함께 보이지 않는다
+      expect(r.menus.filter((m) => m.brandId === 'starbucks' && m.trust === 'estimated')).toHaveLength(0);
+    });
+
+    it('19개면 빼지 않고 기존처럼 이름이 같은 estimated 를 교체한다', () => {
+      const r = mergeMenus(seedSb, mfds(19));
+      expect(r.seedPolicy).toMatchObject({ excluded: 0, kept: seedSb.length, excludedByBrand: {} });
+      expect(r.hidden).toEqual([]);
+      expect(r.menus.find((m) => m.id === 'starbucks-latte')).toMatchObject({ trust: 'official', nutrients: { kcal: 200 } });
+      expect(r.menus.find((m) => m.id === 'starbucks-americano')?.trust).toBe('estimated');
+    });
+
+    it('cutoff 는 옵션으로 바꿀 수 있고, official 이 아닌 공공데이터 항목은 세지 않는다', () => {
+      expect(mergeMenus(seedSb, mfds(5), { cutoff: 5 }).seedPolicy.excluded).toBe(2);
+      const notOfficial = mfds(25).map((m) => ({ ...m, trust: 'estimated' as const }));
+      expect(mergeMenus(seedSb, notOfficial).seedPolicy.excluded).toBe(0);
+    });
   });
 
   it('커버리지를 메뉴 신뢰등급으로 다시 매긴다 (공공데이터가 들어온 브랜드만)', () => {

@@ -1,6 +1,6 @@
 import { haversineM } from '../../domain/geo';
 import { judgeMenu } from '../../domain/judge';
-import { getBrand, getBrands, getMenu, getMenus, getMenusByBrand, getMockStores, matchBrand } from '../index';
+import { getBrand, getBrands, getMenu, getMenus, getMenusByBrand, getMockStores, getSeedPolicy, matchBrand } from '../index';
 
 const CENTER = { lat: 37.5006, lng: 127.0366 };
 
@@ -65,6 +65,23 @@ describe('공공데이터 번들 (src/data/generated/mfds.json)', () => {
       expect(m.trust).toBe('official');
       expect(m.sourceUrl).toMatch(/^https:\/\/www\.data\.go\.kr\/data\/151000(70|66)\/standard\.do$/);
       expect(m.name.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('시드 정리 정책 (로더)', () => {
+  it('공공데이터 official 20개 이상 브랜드는 시드 estimated 가 목록에 없고, id 로는 여전히 찾힌다', () => {
+    const policy = getSeedPolicy();
+    expect(policy.cutoff).toBe(20);
+    for (const brandId of Object.keys(policy.excludedByBrand)) {
+      const ms = getMenusByBrand(brandId);
+      expect(ms.filter((m) => m.trust === 'official').length).toBeGreaterThanOrEqual(20);
+      expect(ms.some((m) => m.trust === 'estimated')).toBe(false);
+    }
+    expect(policy.excluded + policy.kept).toBe((require('../menus.json') as unknown[]).length);
+    if (policy.excludedByBrand.starbucks) {
+      expect(getMenusByBrand('starbucks').some((m) => m.id === 'starbucks-iced-latte')).toBe(false);
+      expect(getMenu('starbucks-iced-latte')?.trust).toBe('estimated'); // 예전 기록이 깨지지 않게
     }
   });
 });

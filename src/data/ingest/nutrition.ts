@@ -86,6 +86,8 @@ type Field =
   | 'distributor'
   | 'majorCat'
   | 'midCat'
+  | 'subCat'
+  | 'repName'
   | 'basis'
   | 'weight'
   | 'servingRef'
@@ -107,6 +109,8 @@ const FIELD_ALIASES: Record<Field, string[]> = {
   distributor: ['유통업체명'],
   majorCat: ['식품대분류명', '대분류명', '식품대분류'],
   midCat: ['식품중분류명', '중분류명', '식품중분류'],
+  subCat: ['식품소분류명', '소분류명'],
+  repName: ['대표식품명'],
   basis: ['영양성분함량기준량', '영양성분기준량', '1회제공량기준', '기준량'],
   weight: ['식품중량', '총내용량', '내용량'],
   servingRef: ['1회섭취참고량', '1인분', '1회제공량'],
@@ -204,17 +208,59 @@ export function normalizeMenuName(raw: string): string {
     .replace(/[\s\p{P}\p{S}]/gu, '');
 }
 
-/** 원본 식품명의 "브랜드_메뉴" · "[브랜드] 메뉴" 접두어를 떼어 화면용 이름으로 */
-export function cleanMenuName(raw: string, brandNames: string[]): string {
-  let s = raw.normalize('NFKC').trim();
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * 화면용 텍스트 정규화: NFKC + 아래아 가운뎃점(ㆍ U+318D · ᆞ U+119E, NFKC 가 앞을 뒤로 바꾼다)을 '·' 로.
+ * 원본은 "과ㆍ채주스" 처럼 한글 자모 아래아를 가운뎃점 대신 쓴다.
+ */
+export function normalizeDisplayText(raw: string): string {
+  return raw.normalize('NFKC').replace(/[ㆍᆞ]/g, '·');
+}
+
+/** 분류명이 "없음"을 뜻하는 표준데이터 자리표시 값 */
+const NO_CATEGORY = new Set(['', '-', '해당없음', '해당 없음', '없음']);
+
+/**
+ * 원본 식품명 앞에 붙은 분류 접두어 후보 — 그 행의 식품중분류명·식품소분류명·대표식품명(과 그 첫 토큰).
+ * 음식 DB 식품명은 "대표식품명_메뉴명" 꼴이다 ("기타차_제주 그린티 브리즈 (Grande)").
+ */
+export function categoryPrefixes(...names: (string | undefined)[]): string[] {
+  const out = new Set<string>();
+  for (const raw of names) {
+    const n = normalizeDisplayText(raw ?? '').trim();
+    if (NO_CATEGORY.has(n)) continue;
+    out.add(n);
+    const first = n.split(/\s+/)[0];
+    if (first && !NO_CATEGORY.has(first)) out.add(first);
+  }
+  // 긴 것부터 — "기타 커피" 가 "기타" 보다 먼저 잡히게
+  return [...out].sort((a, b) => b.length - a.length);
+}
+
+/**
+ * 원본 식품명의 접두어를 떼어 화면용 이름으로.
+ * 1) "브랜드_메뉴" · "[브랜드] 메뉴" 의 브랜드 접두어
+ * 2) "기타차_메뉴" · "과·채주스 메뉴" 의 분류 접두어 (categoryPrefixes) — 뒤에 '_' 나 공백이 있어야 뗀다("녹차라떼" 의 "녹차" 는 두고)
+ * 떼고 나서 빈 문자열이 되면 떼지 않는다. 사이즈 같은 뒤쪽 괄호 "(Grande)" 는 유용한 정보라 남긴다.
+ */
+export function cleanMenuName(raw: string, brandNames: string[], categoryNames: string[] = []): string {
+  let s = normalizeDisplayText(raw).trim();
   for (const b of brandNames) {
     // 브랜드명 뒤에 닫는 괄호·_·:·- 또는 공백이 있어야 뗀다 ("CU" 가 "cucumber" 앞을 먹지 않게)
-    const esc = b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`^\\s*[\\[(]?\\s*${esc}(?:\\s*[\\])]\\s*[_:\\-]?|\\s*[_:\\-]|\\s+)\\s*`, 'i');
+    const re = new RegExp(`^\\s*[\\[(]?\\s*${escapeRe(b)}(?:\\s*[\\])]\\s*[_:\\-]?|\\s*[_:\\-]|\\s+)\\s*`, 'i');
     if (re.test(s) && s.replace(re, '').length > 0) {
       s = s.replace(re, '');
       break;
     }
+  }
+  s = s.replace(/\s+/g, ' ');
+  for (const c of categoryNames) {
+    const re = new RegExp(`^${escapeRe(normalizeDisplayText(c).replace(/\s+/g, ' '))}(?:\\s*_|\\s+)`, 'i');
+    if (!re.test(s)) continue;
+    const rest = s.replace(re, '').replace(/^[\s_]+/, '');
+    if (rest.length > 0) s = rest;
+    break;
   }
   return s.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -364,7 +410,7 @@ export function rowToMenu(row: IngestRow, matcher: BrandMatcher): { menu: Ingest
   const brand = matcher.registry.get(brandId)!;
   const rawName = cell('name');
   if (!rawName) return { skip: 'no-name' };
-  const name = cleanMenuName(rawName, [brand.name, ...brand.companyAliases]);
+  const name = cleanMenuName(rawName, [brand.name, ...brand.companyAliases], categoryPrefixes(cell('midCat'), cell('subCat'), cell('repName')));
   if (!name) return { skip: 'no-name' };
 
   const num = (f: Field) => parseNumber(cell(f));
@@ -385,7 +431,10 @@ export function rowToMenu(row: IngestRow, matcher: BrandMatcher): { menu: Ingest
   );
   if (!serving) return { skip: 'no-kcal' };
 
-  const category = inferCategory(name, cell('majorCat'), cell('midCat'), brand.category);
+  // 분류 접두어를 뗀 이름엔 "커피"·"피자" 같은 단서가 빠질 수 있어 대표식품명을 붙여 추정한다
+  const repName = cell('repName');
+  const hint = repName && !NO_CATEGORY.has(repName) ? `${normalizeDisplayText(repName)} ${name}` : name;
+  const category = inferCategory(hint, cell('majorCat'), cell('midCat'), brand.category);
   const code = cell('code');
   const ds = DATASETS[row.kind];
   const menu: IngestedMenu = {
@@ -430,18 +479,57 @@ export function dedupeMenus(menus: IngestedMenu[]): MenuItem[] {
 
 // ───────────────────────── 시드와 합치기 ─────────────────────────
 
+/** 공공데이터 official 메뉴가 이만큼 이상인 브랜드는 시드 estimated 메뉴를 목록에서 뺀다 */
+export const SEED_ESTIMATED_CUTOFF = 20;
+
+export interface SeedPolicyStats {
+  /** 적용 기준 (공공데이터 official 메뉴 수) */
+  cutoff: number;
+  /** 시드 estimated 를 뺀 브랜드 → 뺀 개수 */
+  excludedByBrand: Record<string, number>;
+  /** 목록에서 뺀 시드 메뉴 수 */
+  excluded: number;
+  /** 목록에 남은 시드 메뉴 수 (교체된 것 포함) */
+  kept: number;
+}
+
+export interface MergeResult {
+  menus: MenuItem[];
+  replaced: number;
+  /**
+   * 정책으로 목록에서 뺀 시드 메뉴. 예전 기록(menuId)·딥링크가 깨지지 않게 로더는 id 조회에만 남긴다.
+   */
+  hidden: MenuItem[];
+  seedPolicy: SeedPolicyStats;
+}
+
 /**
  * 시드(menus.json) + 공공데이터 메뉴를 합친다.
+ * - (우선) 공공데이터 official 메뉴가 cutoff(기본 20)개 이상인 브랜드는 시드 estimated 메뉴를 목록에서 뺀다.
+ *   시드 추정 메뉴와 공공데이터 메뉴는 이름 표기가 달라("카페 아메리카노" vs "아메리카노 (Tall)") 교체 매칭이
+ *   거의 안 되고, 두면 같은 메뉴가 추정·공식으로 두 번 보인다. 시드 none·user·official 은 그대로 둔다.
  * - 같은 브랜드 + 정규화 이름의 시드 메뉴가 estimated/none 이면 공공데이터 값으로 교체한다.
  *   기존 기록(menuId)이 깨지지 않게 시드 id·가격·소개·태그는 유지하고, 추정치로 만든 옵션 차이(delta)는
  *   공식 기준값과 섞이면 신뢰등급이 흐려지므로 버린다.
  * - 시드가 official/user 면 시드를 그대로 두고 공공데이터 항목은 넣지 않는다.
  */
-export function mergeMenus(seed: MenuItem[], official: MenuItem[]): { menus: MenuItem[]; replaced: number } {
+export function mergeMenus(seed: MenuItem[], official: MenuItem[], opts: { cutoff?: number } = {}): MergeResult {
+  const cutoff = opts.cutoff ?? SEED_ESTIMATED_CUTOFF;
+  const officialCount = new Map<string, number>();
+  for (const o of official) if (o.trust === 'official') officialCount.set(o.brandId, (officialCount.get(o.brandId) ?? 0) + 1);
+  const hidden: MenuItem[] = [];
+  const excludedByBrand: Record<string, number> = {};
+  const listed = seed.filter((s) => {
+    if (s.trust !== 'estimated' || (officialCount.get(s.brandId) ?? 0) < cutoff) return true;
+    hidden.push(s);
+    excludedByBrand[s.brandId] = (excludedByBrand[s.brandId] ?? 0) + 1;
+    return false;
+  });
+
   const officialByKey = new Map(official.map((m) => [`${m.brandId}|${normalizeMenuName(m.name)}`, m]));
   const consumed = new Set<string>();
   let replaced = 0;
-  const menus = seed.map((s) => {
+  const menus = listed.map((s) => {
     const key = `${s.brandId}|${normalizeMenuName(s.name)}`;
     const o = officialByKey.get(key);
     if (!o) return s;
@@ -461,7 +549,12 @@ export function mergeMenus(seed: MenuItem[], official: MenuItem[]): { menus: Men
     return merged;
   });
   for (const o of official) if (!consumed.has(`${o.brandId}|${normalizeMenuName(o.name)}`)) menus.push(o);
-  return { menus, replaced };
+  return {
+    menus,
+    replaced,
+    hidden,
+    seedPolicy: { cutoff, excludedByBrand, excluded: hidden.length, kept: listed.length },
+  };
 }
 
 /** 메뉴 신뢰등급 분포로 브랜드 커버리지를 다시 매긴다 */

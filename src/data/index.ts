@@ -13,12 +13,15 @@ interface MfdsBundle {
 }
 const MFDS = mfdsJson as unknown as MfdsBundle;
 
-// 손으로 만든 시드 + 공공데이터: 같은 브랜드·메뉴명의 추정치는 공식값으로 교체, 나머지는 추가
-const MENUS = mergeMenus(menusJson as unknown as MenuItem[], MFDS.menus).menus;
+// 손으로 만든 시드 + 공공데이터 (정책은 mergeMenus 참고):
+// 공공데이터 official 20개 이상 브랜드는 시드 estimated 를 목록에서 빼고, 같은 브랜드·메뉴명의 추정치는 공식값으로 교체, 나머지는 추가
+const MERGED = mergeMenus(menusJson as unknown as MenuItem[], MFDS.menus);
+const MENUS = MERGED.menus;
 const BRANDS = mergeBrands(brandsJson as Brand[], MFDS.brands, MENUS);
 
 const brandById = new Map(BRANDS.map((b) => [b.id, b]));
-const menuById = new Map(MENUS.map((m) => [m.id, m]));
+// 목록에서 뺀 시드 메뉴도 id 로는 찾을 수 있게 둔다 — 예전 기록(menuId)·딥링크가 "정보 없음"으로 바뀌지 않게
+const menuById = new Map([...MERGED.hidden, ...MENUS].map((m) => [m.id, m]));
 const menusByBrand = new Map<string, MenuItem[]>();
 for (const m of MENUS) {
   const list = menusByBrand.get(m.brandId) ?? [];
@@ -51,6 +54,11 @@ export function getMenusByBrand(brandId: string): MenuItem[] {
 export function getMenu(id: string): MenuItem | undefined {
   return menuById.get(id);
 }
+/** 시드 정리 정책 결과 (목록에서 뺀/남긴 시드 메뉴 수) — 검증·디버그용 */
+export function getSeedPolicy() {
+  return MERGED.seedPolicy;
+}
+
 /** 카카오 place_name → 브랜드 매칭 ("GS25 역삼센터점" → gs25) */
 export function matchBrand(placeName: string): Brand | undefined {
   const name = normalizeName(placeName ?? '');

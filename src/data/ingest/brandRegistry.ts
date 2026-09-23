@@ -90,6 +90,25 @@ export const BRAND_REGISTRY: RegistryBrand[] = [
 
   // ── 샐러드 ──
   { id: 'poke_all_day', name: '포케올데이', category: 'salad', matchKeywords: ['포케올데이', 'POKE ALL DAY'], companyAliases: ['포케올데이'], blurb: '포케와 샐러드가 있어요.' },
+
+  // ── 2026-09-23 공공데이터(음식) 매칭 안 된 업체명 상위에서 추가한 단일 브랜드 체인 ──
+  { id: 'coffee_banhada', name: '커피에반하다', category: 'cafe', matchKeywords: ['커피에반하다'], companyAliases: ['커피에반하다'], blurb: '커피와 음료가 있어요.' },
+  { id: 'yogerpresso', name: '요거프레소', category: 'cafe', matchKeywords: ['요거프레소', 'YOGERPRESSO'], companyAliases: ['요거프레소'], blurb: '요거트와 음료가 있어요.' },
+  { id: 'the_liter', name: '더리터', category: 'cafe', matchKeywords: ['더리터', 'THE LITER'], companyAliases: ['더리터'], blurb: '큰 사이즈 음료가 있어요.' },
+  { id: 'banapresso', name: '바나프레소', category: 'cafe', matchKeywords: ['바나프레소', 'BANAPRESSO'], companyAliases: ['바나프레소'], blurb: '커피와 음료가 있어요.' },
+  { id: 'palgongtea', name: '팔공티', category: 'cafe', matchKeywords: ['팔공티'], companyAliases: ['팔공티'], blurb: '밀크티와 티 음료가 있어요.' },
+  { id: 'coffeebay', name: '커피베이', category: 'cafe', matchKeywords: ['커피베이', 'COFFEEBAY'], companyAliases: ['커피베이'], blurb: '커피와 음료가 있어요.' },
+  { id: 'coffeemama', name: '커피마마', category: 'cafe', matchKeywords: ['커피마마'], companyAliases: ['커피마마'], blurb: '커피와 음료가 있어요.' },
+  { id: 'caffebene', name: '카페베네', category: 'cafe', matchKeywords: ['카페베네', 'CAFFEBENE'], companyAliases: ['카페베네'], blurb: '커피와 디저트가 있어요.' },
+  { id: 'dalkomm', name: '달콤커피', category: 'cafe', matchKeywords: ['달콤커피', 'DALKOMM'], companyAliases: ['달콤', '달콤커피'], blurb: '커피와 음료가 있어요.' },
+  { id: 'im_a_liter', name: '아임일리터', category: 'cafe', matchKeywords: ['아임일리터'], companyAliases: ['아임일리터'], blurb: '큰 사이즈 음료가 있어요.' },
+  { id: 'droptop', name: '드롭탑', category: 'cafe', matchKeywords: ['드롭탑', 'DROPTOP'], companyAliases: ['드롭탑', '카페드롭탑'], blurb: '커피와 디저트가 있어요.' },
+  { id: 'coffee_nie', name: '커피니', category: 'cafe', matchKeywords: ['커피니'], companyAliases: ['커피니', '커피:니'], blurb: '커피와 음료가 있어요.' },
+  { id: 'jijeonghwan', name: '지정환피자', category: 'fastfood', matchKeywords: ['지정환피자'], companyAliases: ['지정환피자'], blurb: '피자와 사이드가 있어요.' },
+  { id: 'pizza7', name: '7번가피자', category: 'fastfood', matchKeywords: ['7번가피자'], companyAliases: ['7번가피자', '칠번가피자'], blurb: '피자와 사이드가 있어요.' },
+  { id: 'pizza_maru', name: '피자마루', category: 'fastfood', matchKeywords: ['피자마루'], companyAliases: ['피자마루'], blurb: '피자와 사이드가 있어요.' },
+  { id: 'pizza_paneun', name: '피자파는집', category: 'fastfood', matchKeywords: ['피자파는집'], companyAliases: ['피자파는집'], blurb: '피자와 사이드가 있어요.' },
+  { id: 'alvolo', name: '피자알볼로', category: 'fastfood', matchKeywords: ['피자알볼로', 'ALVOLO'], companyAliases: ['피자알볼로', '알볼로에프앤씨'], blurb: '피자와 사이드가 있어요.' },
 ];
 
 export const REGISTRY_BY_ID = new Map(BRAND_REGISTRY.map((b) => [b.id, b]));
