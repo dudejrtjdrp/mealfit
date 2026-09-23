@@ -18,6 +18,12 @@ WS=$(ls -d ios/*.xcworkspace | head -1)
 SCHEME=$(basename "$WS" .xcworkspace)
 echo "▶ workspace: $WS / scheme: $SCHEME"
 
+# --clean 재생성 시 Info.plist 의 CFBundleVersion 이 app.json 의 "1" 로 고정됨 →
+# 업로드가 "이미 사용된 빌드 번호" 로 거절되므로 타임스탬프 빌드 번호를 plist 에 직접 쓴다.
+PLIST="ios/$SCHEME/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
+echo "▶ CFBundleVersion=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
+
 echo "▶ archive (build $BUILD_NUMBER)"
 xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
   -destination generic/platform=iOS -archivePath "$OUT/app.xcarchive" \
