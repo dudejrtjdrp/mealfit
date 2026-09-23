@@ -53,5 +53,5 @@ docs/                    IA, 시안, 결정 기록
 
 ## 릴리스·패치노트
 - 사용자에게 보이는 변화(feat/fix)가 쌓여 한 번 배포할 만하면 `npm run release` 로 버전업 + `CHANGELOG.md` 패치노트 + `release/whats-new.txt`(TestFlight "테스트할 내용") 를 만들고 `chore(release): vX.Y.Z` 로 커밋한다.
-- 버전 규칙: feat 포함 → minor, fix/기타만 → patch. 빌드 번호는 `npm run testflight` 가 시각으로 자동 부여.
+- 버전 규칙: feat 포함 → minor, fix/기타만 → patch. 빌드 번호는 순번(app.json ios.buildNumber): `npm run testflight` 가 사용 후 +1 커밋. 릴리스 때도 초기화하지 않는다 (애플은 앱 전체에서 이전 업로드보다 큰 번호만 허용 — 2026-09-23 효님 확정).
 - 그래서 커밋 제목은 사용자가 읽을 수 있는 한국어 한 줄로 쓴다 — 그대로 패치노트가 된다.

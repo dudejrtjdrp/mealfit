@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 버전업 + 패치노트 — node scripts/release.mjs [patch|minor|major] [--dry]
 // 마지막 `chore(release):` 커밋 이후의 커밋을 Angular 타입별로 모아 CHANGELOG.md 맨 위에 추가하고,
-// app.json(version, ios.buildNumber 초기화)·package.json 버전을 올린 뒤 커밋한다.
+// app.json(version)·package.json 버전을 올린 뒤 커밋한다. (빌드 번호는 건드리지 않는다 — 애플이 앱 전체에서 이전 업로드보다 큰 번호를 요구)
 // --current: 버전은 그대로 두고 현재 버전으로 패치노트만 기록 (첫 릴리스용).
 // 레벨 생략 시: feat 가 있으면 minor, 아니면 patch (1.0 전까지 major 자동 없음).
 import { execSync } from 'node:child_process';
@@ -58,7 +58,6 @@ fs.mkdirSync('release', { recursive: true });
 fs.writeFileSync('release/whats-new.txt', `v${next}\n${whatsNew}\n`);
 
 app.expo.version = next;
-if (!keep) app.expo.ios = { ...app.expo.ios, buildNumber: '1' };
 pkg.version = next;
 fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
 fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');

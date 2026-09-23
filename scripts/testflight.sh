@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # TestFlight 업로드 — 맥에서 실행: npm run testflight
-# Xcode에 Apple ID(팀 AW9XRML8T7)가 로그인돼 있어야 한다. 빌드 번호는 시각(YYYYMMDDHHMM)으로 자동 증가.
+# Xcode에 Apple ID(팀 AW9XRML8T7)가 로그인돼 있어야 한다.
+# 빌드 번호는 순번: app.json ios.buildNumber 를 쓰고, 업로드 성공 시 +1 로 올려 커밋한다.
+# (애플은 앱 전체에서 이전 업로드보다 큰 번호만 허용 — 절대 초기화하지 말 것)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
+BUILD_NUMBER="${BUILD_NUMBER:-$(node -p "require('./app.json').expo.ios.buildNumber")}"
 TEAM_ID="AW9XRML8T7"
 OUT="build/testflight"
 rm -rf "$OUT" && mkdir -p "$OUT"
@@ -46,6 +48,12 @@ echo "▶ upload to App Store Connect"
 xcodebuild -exportArchive -archivePath "$OUT/app.xcarchive" \
   -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" \
   -allowProvisioningUpdates | tail -n 20
+
+# 업로드 성공 → 다음 빌드 번호 +1 커밋
+NEXT=$((BUILD_NUMBER + 1))
+node -e "const f='app.json',j=require('./'+f);j.expo.ios.buildNumber=String($NEXT);require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
+git -c user.name=dudejrtjdrp -c user.email=dudejrtjdrp@naver.com add app.json
+git -c user.name=dudejrtjdrp -c user.email=dudejrtjdrp@naver.com commit -q -m "chore(ios): 빌드 $BUILD_NUMBER 업로드 — 다음 번호 $NEXT" || true
 
 [ -f release/whats-new.txt ] && { echo "── TestFlight '테스트할 내용'에 붙여넣기 ──"; cat release/whats-new.txt; }
 echo "✅ 업로드 완료 (build $BUILD_NUMBER). App Store Connect → TestFlight에서 처리(10~30분) 후 테스터에게 배포됩니다."
