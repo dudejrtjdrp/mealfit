@@ -118,3 +118,17 @@ drop policy if exists "diet_type_cache_select" on public.diet_type_cache;
 drop policy if exists "diet_type_cache_insert" on public.diet_type_cache;
 create policy "diet_type_cache_select" on public.diet_type_cache for select to authenticated using (true);
 create policy "diet_type_cache_insert" on public.diet_type_cache for insert to authenticated with check (true);
+
+-- ---------------------------------------------------------------------
+-- Data API 권한 (GRANT)
+--   2026-10-30부터 Supabase가 public 새 테이블에 권한을 자동으로 주지 않는다.
+--   새 프로젝트·db reset 에서도 앱이 접근할 수 있게 테이블 만든 파일에서 직접 준다.
+--   개인 데이터는 anon 에게 주지 않는다 (행 단위 제한은 위 RLS 가 담당).
+-- ---------------------------------------------------------------------
+grant select, insert, update, delete on public.profiles  to authenticated;
+grant select, insert, update, delete on public.meal_logs to authenticated;
+grant select, insert                 on public.diet_type_cache to authenticated;
+
+grant select, insert, update, delete on public.profiles        to service_role;
+grant select, insert, update, delete on public.meal_logs       to service_role;
+grant select, insert, update, delete on public.diet_type_cache to service_role;

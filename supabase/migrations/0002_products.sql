@@ -39,3 +39,10 @@ alter table public.products enable row level security;
 -- 카탈로그는 공개 데이터: 누구나 읽기, 쓰기는 service_role 만 (정책 없음 = 차단)
 drop policy if exists "products_read_all" on public.products;
 create policy "products_read_all" on public.products for select using (true);
+
+-- ---------------------------------------------------------------------
+-- Data API 권한 (GRANT) — 2026-10-30 Supabase 자동 권한 부여 중단 대비
+--   공개 카탈로그라 anon·authenticated 는 읽기만, 업로드는 service_role.
+-- ---------------------------------------------------------------------
+grant select on public.products to anon, authenticated;
+grant select, insert, update, delete on public.products to service_role;
