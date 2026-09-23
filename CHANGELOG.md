@@ -1,3 +1,5 @@
+> 2026-09-23: App Store Connect 앱을 새로 만들며(번들 ID app.mealing.mvp) 버전을 0.1.0, 빌드 번호를 1부터 다시 시작. 아래 0.x 기록은 이전 앱(app.mealfit.mvp) 시절 이력.
+
 # 패치노트
 
 mealing(mealfit) 버전별 변경 사항. `npm run release` 로 자동 생성.

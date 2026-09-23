@@ -55,7 +55,7 @@ npx expo start              # Expo Go / 웹(w 키)
    - 공통: **Authentication → URL Configuration → Redirect URLs** 에 `mealfit://auth` 와 `mealfit://**` 를 추가합니다. (Expo Go 로 시험한다면 터미널에 찍히는 `exp://…/--/auth` 주소도)
    - **Apple (iOS 네이티브 Sign in with Apple)**
      - 앱은 `expo-apple-authentication` 으로 시스템 Apple 시트를 띄우고, 받은 `identityToken` 을 `supabase.auth.signInWithIdToken({ provider: 'apple' })` 로 넘깁니다. 브라우저를 거치지 않아 Apple 콘솔의 Services ID·Secret Key 는 필요 없습니다.
-     - Supabase **Sign In / Providers → Apple** 을 켜고 **Client IDs** 에 번들 ID `app.mealfit.mvp` 를 넣습니다.
+     - Supabase **Sign In / Providers → Apple** 을 켜고 **Client IDs** 에 번들 ID `app.mealing.mvp` 를 넣습니다.
      - `app.json` 에 `ios.usesAppleSignIn: true` 와 `expo-apple-authentication` 플러그인이 들어 있어, `npx expo run:ios` 로 prebuild 하면 **Xcode 자동 서명이 Sign in with Apple capability 를 추가**합니다. (유료 Apple Developer 팀으로 서명해야 하고, 시뮬레이터에서는 iCloud 로그인이 필요)
      - 이름은 **첫 로그인 때만** 옵니다. 앱이 `user_metadata.nickname` 에 저장하고, 없으면 닉네임은 "회원". 이메일은 `…@privaterelay.appleid.com` 일 수 있습니다.
      - Android·웹에서는 Apple 버튼을 숨깁니다.
