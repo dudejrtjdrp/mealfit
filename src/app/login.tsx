@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { BottomSheet, Button, Input, Screen, Sprout, Text, showToast } from '@/components';
+import { BottomSheet, Button, Input, LogoMark, Screen, Text, Wordmark, showToast } from '@/components';
 import { isAppleSignInAvailable, PASSWORD_MIN } from '@/services/auth';
 import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
@@ -117,10 +117,8 @@ export default function LoginScreen() {
   return (
     <Screen>
       <View style={styles.brand}>
-        <Sprout size={42} />
-        <Text variant="display" style={styles.wordmark}>
-          식사 개인화
-        </Text>
+        <LogoMark size={48} />
+        <Wordmark size={34} style={styles.wordmark} />
         <Text variant="body" color="ink2" style={styles.tagline}>
           오늘도, 나에게 맞는 한 끼
         </Text>

@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
-import { BottomSheet, Button, Card, ListRow, Screen, StackHeader, Text, TrustBadge, showToast } from '@/components';
+import { APP_NAME, BottomSheet, Button, Card, ListRow, Screen, StackHeader, Text, TrustBadge, showToast } from '@/components';
 import { getRepos } from '@/services/repo';
 import { getPermissionStatus, requestPermission, type PermissionStatus } from '@/services/location';
 import { useDay } from '@/state/day';
@@ -116,7 +117,7 @@ export default function Settings() {
       </Card>
 
       <Text variant="caption" color="ink3" align="center" style={styles.version}>
-        식사 개인화 · 0.1.0
+        {APP_NAME} · {Constants.expoConfig?.version ?? ''}
       </Text>
 
       <BottomSheet

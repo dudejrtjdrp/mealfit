@@ -51,7 +51,7 @@ const whatsNew = commits.filter((c) => c.type === 'feat' || c.type === 'fix')
 
 if (dry) { console.log(`→ ${app.expo.version} → ${next} (${level})\n\n${md}\n---\n${whatsNew}`); process.exit(0); }
 
-const head = '# 패치노트\n\n식사 개인화(mealfit) 버전별 변경 사항. `npm run release` 로 자동 생성.\n\n';
+const head = '# 패치노트\n\nmealing(mealfit) 버전별 변경 사항. `npm run release` 로 자동 생성.\n\n';
 const prev = fs.existsSync('CHANGELOG.md') ? fs.readFileSync('CHANGELOG.md', 'utf8').replace(head, '') : '';
 fs.writeFileSync('CHANGELOG.md', head + md + (prev ? '\n' + prev : ''));
 fs.mkdirSync('release', { recursive: true });

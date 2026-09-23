@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "식사 개인화",
+    "name": "mealing",
     "slug": "mealfit",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -42,7 +42,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F4F6FA",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 120
         }
@@ -70,7 +70,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "appName": "식사 개인화"
+      "appName": "mealing"
     }
   }
 }

@@ -1,6 +1,6 @@
 # 패치노트
 
-식사 개인화(mealfit) 버전별 변경 사항. `npm run release` 로 자동 생성.
+mealing(mealfit) 버전별 변경 사항. `npm run release` 로 자동 생성.
 
 ## 0.1.0 (2026-09-16)
 
