@@ -27,6 +27,7 @@ import {
 import { getBrand, getMenu, getMenusByBrand } from '@/data';
 import { STORE_CATEGORY_LABEL, formatPrice } from '@/data/labels';
 import { applyOptions, judgeMenu, suggestAlternatives } from '@/domain/judge';
+import { QTY_OPTIONS, menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
 import { formatNumber } from '@/domain/summary';
 import { MEAL_LABEL, VERDICT_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients } from '@/domain/types';
 import { newId } from '@/services/id';
@@ -62,6 +63,7 @@ export default function MenuDetail() {
   const [selected, setSelected] = useState<Record<string, string>>(() => defaultSelection(menu));
   const [sheet, setSheet] = useState(false);
   const [meal, setMeal] = useState<MealType>(() => defaultMealType());
+  const [qty, setQty] = useState(1);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -129,9 +131,9 @@ export default function MenuDetail() {
       storeName,
       menuId: menu.id,
       optionLabels: optionLabels.length ? optionLabels : undefined,
-      nutrients,
+      nutrients: scaleNutrients(nutrients, qty),
       trust: menu.trust,
-      qty: 1,
+      qty,
       verdict: judgement && !judgement.unknown ? judgement.verdict : undefined,
       createdAt: now.toISOString(),
     };
@@ -309,12 +311,20 @@ export default function MenuDetail() {
         visible={sheet}
         onClose={() => setSheet(false)}
         title="어느 끼니로 기록할까요?"
-        subtitle={nutrients ? `${menu.name} · ${formatNumber(nutrients.kcal)} kcal` : menu.name}
+        subtitle={nutrients ? `${menu.name} · ${qtyLabel(qty, menuQtyUnit(menu))} ${formatNumber(scaleNutrients(nutrients, qty).kcal)} kcal` : menu.name}
         footer={<Button title="기록하기" loading={saving} onPress={save} />}
       >
         <View style={styles.meals}>
           {MEALS.map((m) => (
             <Chip key={m} label={MEAL_LABEL[m]} variant="option" size="lg" selected={meal === m} onPress={() => setMeal(m)} style={styles.mealChip} />
+          ))}
+        </View>
+        <Text variant="captionMedium" color="ink2" style={styles.qtyLabel}>
+          얼마나 먹었나요?
+        </Text>
+        <View style={styles.qtys}>
+          {QTY_OPTIONS.map((q) => (
+            <Chip key={q} label={qtyLabel(q, menuQtyUnit(menu))} variant="option" selected={qty === q} onPress={() => setQty(q)} />
           ))}
         </View>
       </BottomSheet>
@@ -416,4 +426,6 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.lg, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
   meals: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   mealChip: { flexGrow: 1, flexBasis: '45%' },
+  qtyLabel: { marginTop: spacing.lg },
+  qtys: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
 });

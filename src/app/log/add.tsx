@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, Chip, EmptyState, IconButton, Input, MenuTile, Text, TrustBadge, UnknownBadge, VerdictBadge, showToast } from '@/components';
 import { getBrand, getMenu, getMenus, getProductCount, normalizeName, searchMenus } from '@/data';
 import { applyOptions, judgeMenu } from '@/domain/judge';
+import { QTY_OPTIONS, menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
 import { formatNumber, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type MealLog, type MealType, type MenuItem, type Nutrients } from '@/domain/types';
 import { hasSupabase } from '@/services/env';
@@ -44,6 +45,12 @@ export default function AddLog() {
   const [recent, setRecent] = useState<MealLog[] | null>(null);
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<{ kind: 'menu'; menu: MenuItem } | { kind: 'recent'; log: MealLog } | null>(null);
+  const [qty, setQty] = useState(1);
+  // 고른 항목이 바뀌면 수량을 다시: 메뉴는 1, 최근 기록은 그때 먹은 양
+  useEffect(() => {
+    setQty(picked?.kind === 'recent' && picked.log.qty > 0 ? picked.log.qty : 1);
+  }, [picked]);
+  const pickedUnit = picked?.kind === 'menu' ? menuQtyUnit(picked.menu) : picked?.kind === 'recent' && picked.log.menuId ? menuQtyUnit(getMenu(picked.log.menuId)) : '인분';
 
   const [name, setName] = useState(params.name ?? '');
   const [kcal, setKcal] = useState('');
@@ -135,10 +142,12 @@ export default function AddLog() {
         return;
       }
       const j = remaining ? judgeMenu(picked.menu, remaining, { profile: judgeProfile(profile) }) : null;
-      log = { ...base, name: picked.menu.name, brandId: picked.menu.brandId, storeName: picked.menu.maker ?? getBrand(picked.menu.brandId)?.name, menuId: picked.menu.id, nutrients: n, trust: picked.menu.trust, verdict: j && !j.unknown ? j.verdict : undefined };
+      log = { ...base, qty, name: picked.menu.name, brandId: picked.menu.brandId, storeName: picked.menu.maker ?? getBrand(picked.menu.brandId)?.name, menuId: picked.menu.id, nutrients: scaleNutrients(n, qty), trust: picked.menu.trust, verdict: j && !j.unknown ? j.verdict : undefined };
     } else if (picked?.kind === 'recent') {
       const { id: _id, date: _d, mealType: _m, time: _t, createdAt: _c, ...rest } = picked.log;
-      log = { ...rest, ...base, qty: picked.log.qty };
+      // 최근 기록의 영양은 그때 수량이 곱해진 값 → 1개 기준으로 되돌려 새 수량을 곱한다
+      const prevQty = picked.log.qty > 0 ? picked.log.qty : 1;
+      log = { ...rest, ...base, qty, nutrients: scaleNutrients(rest.nutrients, qty / prevQty) };
     }
     if (!log) return;
     setSaving(true);
@@ -279,6 +288,13 @@ export default function AddLog() {
       </ScrollView>
 
       <View style={styles.footer}>
+        {tab !== 'manual' && picked ? (
+          <View style={styles.qtys} accessibilityLabel="먹은 양">
+            {QTY_OPTIONS.map((q) => (
+              <Chip key={q} label={qtyLabel(q, pickedUnit)} variant="option" size="sm" selected={qty === q} onPress={() => setQty(q)} />
+            ))}
+          </View>
+        ) : null}
         <Button title="저장" disabled={!canSave} loading={saving} onPress={save} />
       </View>
     </SafeAreaView>
@@ -311,5 +327,6 @@ const styles = StyleSheet.create({
   macro: { flex: 1 },
   userHint: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   userHintText: { flex: 1 },
+  qtys: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.lg, borderTopWidth: 1, borderTopColor: colors.line },
 });

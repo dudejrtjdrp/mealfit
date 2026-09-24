@@ -5,8 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackIcon, BottomSheet, Button, Card, ChevronRightIcon, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, Skeleton, Text, VerdictBadge, showToast, type NutrientKey } from '@/components';
 import { getMenu } from '@/data';
+import { QTY_OPTIONS, menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
 import { formatNumber, summarizeDay, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type DaySummary, type MealLog, type MealType, type MenuCategory } from '@/domain/types';
+import { getCachedRemoteProduct } from '@/services/products';
 import { getRepos } from '@/services/repo';
 import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
@@ -14,7 +16,8 @@ import { colors, fonts, radius, size, spacing } from '@/theme';
 
 const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
-const QTYS = [0.5, 1, 1.5, 2];
+/** 기록의 제공 단위(개·잔·인분…) — 서버 제품은 세션 캐시에 있을 때만 알 수 있다 */
+const logUnit = (log: MealLog) => menuQtyUnit(log.menuId ? getMenu(log.menuId) ?? getCachedRemoteProduct(log.menuId) : undefined);
 
 function mondayOf(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -107,7 +110,7 @@ export default function LogScreen() {
     const base = editing.qty > 0 ? editing.qty : 1;
     const qty = patch.qty ?? editing.qty;
     const factor = qty / base;
-    const scaled = Object.fromEntries(Object.entries(editing.nutrients).map(([k, v]) => [k, typeof v === 'number' ? Math.round(v * factor * 10) / 10 : v])) as MealLog['nutrients'];
+    const scaled = scaleNutrients(editing.nutrients, factor);
     const next: MealLog = { ...editing, ...patch, qty, nutrients: scaled };
     setEditing(next);
     await persist(next);
@@ -276,8 +279,8 @@ export default function LogScreen() {
           수량
         </Text>
         <View style={styles.sheetChips}>
-          {QTYS.map((q) => (
-            <Chip key={q} label={`${q}인분`} variant="option" selected={editing?.qty === q} onPress={() => void applyEdit({ qty: q })} />
+          {QTY_OPTIONS.map((q) => (
+            <Chip key={q} label={qtyLabel(q, editing ? logUnit(editing) : undefined)} variant="option" selected={editing?.qty === q} onPress={() => void applyEdit({ qty: q })} />
           ))}
         </View>
       </BottomSheet>
@@ -288,7 +291,7 @@ export default function LogScreen() {
 function LogRow({ log, first, onPress }: { log: MealLog; first: boolean; onPress: () => void }) {
   const menu = log.menuId ? getMenu(log.menuId) : undefined;
   const tileMenu = menu ?? { name: log.name, category: 'meal' as MenuCategory };
-  const sub = [`${MEAL_LABEL[log.mealType]} ${hhmm(log.time)}`, log.storeName, ...(log.optionLabels ?? []), log.qty !== 1 ? `${log.qty}인분` : undefined].filter(Boolean).join(' · ');
+  const sub = [`${MEAL_LABEL[log.mealType]} ${hhmm(log.time)}`, log.storeName, ...(log.optionLabels ?? []), log.qty !== 1 ? qtyLabel(log.qty, logUnit(log)) : undefined].filter(Boolean).join(' · ');
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, !first && styles.rowLine, pressed && { opacity: 0.7 }]}>
       <MenuTile menu={tileMenu} size={44} />
