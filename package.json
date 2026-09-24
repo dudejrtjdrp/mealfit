@@ -55,6 +55,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "export:web": "expo export --platform web",
+    "upload:products": "node scripts/upload-products.mjs",
     "ingest:nutrition": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning scripts/ingest-nutrition.mjs",
     "testflight": "bash scripts/testflight.sh",
     "release": "node scripts/release.mjs"
