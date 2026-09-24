@@ -125,7 +125,7 @@ const all = [];
 const allProducts = [];
 const sources = [];
 const skips = { 'no-brand': 0, 'no-name': 0, 'no-kcal': 0 };
-const productSkips = { 'not-consumer': 0, 'no-name': 0, 'no-kcal': 0 };
+const productSkips = { 'not-consumer': 0, bulk: 0, 'no-name': 0, 'no-kcal': 0 };
 const unmatched = new Map();
 
 for (const file of files) {

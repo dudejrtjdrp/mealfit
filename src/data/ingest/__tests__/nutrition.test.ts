@@ -35,7 +35,7 @@ const FOOD_HEADER = [
   '포화지방산(g)', '트랜스지방산(g)', '출처명', '식품중량', '업체명', '데이터기준일자',
 ];
 const PROCESSED_HEADER = [
-  '식품코드', '식품명', '식품대분류명', '식품중분류명', '영양성분함량기준량', '에너지(kcal)', '단백질(g)', '지방(g)',
+  '식품코드', '식품명', '식품대분류명', '식품중분류명', '식품소분류명', '영양성분함량기준량', '에너지(kcal)', '단백질(g)', '지방(g)',
   '탄수화물(g)', '당류(g)', '나트륨(mg)', '포화지방산(g)', '1회 섭취참고량', '식품중량', '제조사명', '유통업체명', '데이터기준일자',
 ];
 
@@ -432,7 +432,7 @@ describe('시드와 합치기', () => {
 });
 
 // ───────────────────────── 시판 가공식품(제품) ─────────────────────────
-import { PACKAGED_BRAND_ID, dedupeProducts, displayCompany, rowToProduct, type IngestedProduct } from '../nutrition';
+import { PACKAGED_BRAND_ID, dedupeProducts, displayCompany, resolveServingRef, rowToProduct, type IngestedProduct } from '../nutrition';
 
 describe('시판 제품 (rowToProduct)', () => {
   const cols = resolveColumns(PROCESSED_HEADER);
@@ -490,5 +490,77 @@ describe('시판 제품 (rowToProduct)', () => {
     const out = dedupeProducts([make('pkg-a', '2024-01-01'), make('pkg-b', '2026-06-26'), make('pkg-c', '2025-01-01', '오뚜기')]);
     expect(out.map((m) => m.id).sort()).toEqual(['pkg-b', 'pkg-c']);
     expect(out.every((m) => !('_refDate' in m))).toBe(true);
+  });
+});
+
+describe('시판 제품 — 업소용·묶음 처리', () => {
+  const cols = resolveColumns(PROCESSED_HEADER);
+  const RAMEN_REF = '생·숙면 200g, 건면 100g, 당면 30g, 유탕면(봉지)120g, 유탕면(용기)80';
+  const row = (over: Record<string, string>) => {
+    const base: Record<string, string> = {
+      식품코드: 'P200-001', 식품명: '안성탕면', 식품대분류명: '면류', 식품중분류명: '해당없음', 식품소분류명: '유탕면',
+      영양성분함량기준량: '100g', '에너지(kcal)': '420', '나트륨(mg)': '1432',
+      '1회 섭취참고량': RAMEN_REF, 식품중량: '125g', 제조사명: '(주)농심', 유통업체명: '해당없음', 데이터기준일자: '2026-06-26',
+    };
+    const cells = PROCESSED_HEADER.map((h) => ({ ...base, ...over })[h] ?? '');
+    return rowToProduct({ kind: 'processed', cols, cells });
+  };
+  const ok = (r: ReturnType<typeof rowToProduct>) => {
+    if ('skip' in r) throw new Error(`skip 되면 안 됨: ${r.skip}`);
+    return r.menu;
+  };
+
+  it('여러 기준이 섞인 1회 섭취참고량에서 소분류·이름으로 하나를 고르고, 못 고르면 null', () => {
+    expect(resolveServingRef(RAMEN_REF, { name: '안성탕면', subCat: '유탕면' })).toEqual({ value: 120, unit: 'g' });
+    expect(resolveServingRef(RAMEN_REF, { name: '신라면컵', subCat: '유탕면' })).toEqual({ value: 80, unit: 'g' });
+    expect(resolveServingRef(RAMEN_REF, { name: '칼국수', subCat: '건면' })).toEqual({ value: 100, unit: 'g' });
+    expect(resolveServingRef(RAMEN_REF, { name: '우동', subCat: '숙면' })).toEqual({ value: 200, unit: 'g' });
+    expect(resolveServingRef(RAMEN_REF, { name: '국수' })).toBeNull();
+    expect(resolveServingRef('200ml', { name: '콜라' })).toEqual({ value: 200, unit: 'ml' });
+    expect(resolveServingRef('5g(ml)', { name: '소스' })).toEqual({ value: 5, unit: 'g' });
+    expect(resolveServingRef('', { name: 'x' })).toBeNull();
+  });
+
+  it('단품은 포장 중량 = 1개, 공식값', () => {
+    expect(ok(row({}))).toMatchObject({ serving: '1개 (125 g)', trust: 'official', nutrients: { kcal: 525 }, _weight: 125 });
+  });
+
+  it('묶음(참고량의 3배 초과)은 나누지 않고 1회 섭취참고량 기준 + 추정', () => {
+    const m = ok(row({ 식품중량: '625g' }));
+    expect(m).toMatchObject({ serving: '1회 섭취참고량 (120 g)', trust: 'estimated', nutrients: { kcal: 504 } });
+    expect(m.servingNote).toContain('625g');
+  });
+
+  it('중량이 없으면 참고량 기준 추정, 참고량도 모르면 100 g 기준 그대로', () => {
+    expect(ok(row({ 식품중량: '' }))).toMatchObject({ serving: '1회 섭취참고량 (120 g)', trust: 'estimated' });
+    expect(ok(row({ 식품중량: '', '1회 섭취참고량': '' }))).toMatchObject({ serving: '100 g 기준', trust: 'official' });
+  });
+
+  it('150 g 이하 포장은 참고량이 작아도 1개 (닭가슴살·초콜릿)', () => {
+    expect(ok(row({ 식품명: '오리지널 닭가슴살', 식품대분류명: '식육가공품 및 포장육', 식품소분류명: '', '1회 섭취참고량': '30g', 식품중량: '120g' })))
+      .toMatchObject({ serving: '1개 (120 g)', trust: 'official' });
+  });
+
+  it('과자 한 봉지처럼 참고량의 3배 이하면 그대로 1개', () => {
+    expect(ok(row({ 식품명: '새우깡', 식품대분류명: '과자류·빵류 또는 떡류', 식품소분류명: '과자', '1회 섭취참고량': '30g', 식품중량: '90g' })))
+      .toMatchObject({ serving: '1개 (90 g)', trust: 'official' });
+  });
+
+  it('업소용 이름·3 kg 이상 중량은 bulk 로 뺀다', () => {
+    expect(row({ 식품명: '진라면 매운맛 업소용' })).toEqual({ skip: 'bulk' });
+    expect(row({ 식품명: '초코 벌크 아이스크림' })).toEqual({ skip: 'bulk' });
+    expect(row({ 식품명: '참라면', 식품중량: '5520g' })).toEqual({ skip: 'bulk' });
+    expect(row({ 식품명: '츄러스크림', 식품중량: '3.6kg' })).toEqual({ skip: 'bulk' });
+    // "원료"는 소비자 제품에도 붙어 이름만으로 빼지 않는다
+    expect('skip' in row({ 식품명: '무농약원료 다진표고버섯', 식품중량: '45g' })).toBe(false);
+  });
+
+  it('같은 이름에 단품과 묶음이 있으면 단품(공식)을 남긴다', () => {
+    const single = ok(row({ 식품코드: 'A', 데이터기준일자: '2024-01-01' }));
+    const pack = ok(row({ 식품코드: 'B', 식품중량: '625g', 데이터기준일자: '2026-06-26' }));
+    const out = dedupeProducts([pack, single]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ serving: '1개 (125 g)', trust: 'official' });
+    expect('_weight' in out[0]).toBe(false);
   });
 });

@@ -202,6 +202,11 @@ export default function MenuDetail() {
               {remaining && targets && nutrients
                 ? rows.map((k) => <CompareRow key={k} nutrient={k} nutrients={nutrients} remaining={remaining} targets={targets} />)
                 : null}
+              {menu.servingNote ? (
+                <Text variant="small" color="ink3" style={styles.servingNote}>
+                  {menu.servingNote}
+                </Text>
+              ) : null}
               {judgement ? (
                 <View style={styles.reason}>
                   <View style={styles.reasonIcon}>
@@ -376,6 +381,7 @@ function CompareRow({ nutrient, nutrients, remaining, targets }: { nutrient: Nut
 }
 
 const styles = StyleSheet.create({
+  servingNote: { marginTop: 8 },
   root: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: spacing.page },
   scroll: { paddingHorizontal: spacing.page, paddingBottom: spacing.xxl },

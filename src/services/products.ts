@@ -48,7 +48,8 @@ export function productRowToMenu(row: ProductRow): MenuItem {
     category,
     serving: row.serving,
     nutrients,
-    trust: 'official',
+    // 1회 섭취참고량 기준 행은 "한 번 먹는 양"이 추정이다 (ingest rowToProduct 와 같은 규칙, 테이블에 trust 열이 없어 serving 으로 판별)
+    trust: row.serving.startsWith('1회 섭취참고량') ? 'estimated' : 'official',
     sourceUrl: ds.url,
     sourceName: ds.sourceName,
     imageKey: category,

@@ -510,15 +510,72 @@ export function displayCompany(raw: string | undefined): string | undefined {
 
 export interface IngestedProduct extends MenuItem {
   _refDate?: string;
+  /** 포장 중량 (같은 이름 묶음·단품 중 단품을 고르기 위한 내부 값) */
+  _weight?: number;
   /** 용량 초과 시 뒤 카테고리부터 빼기 위한 우선순위 */
   _priority?: number;
+}
+
+/**
+ * 업소용·식자재 제품 — 개인이 한 번에 먹는 단위가 아니라 시판 제품 카탈로그에서 뺀다.
+ * "원료"는 "무농약원료 표고버섯 45g" 같은 소비자 제품에도 붙어 이름 키워드로는 쓰지 않는다(중량 상한이 거른다).
+ */
+const BULK_NAME_RE = /(업소용|업무용|업체용|대용량|식자재|급식용?|벌크|\(업\))/;
+/** 이 중량(g·ml) 이상이면 업소용으로 본다 — 소비자 최대 포장(2 L 음료·2.3 L 아이스크림)보다 크다 */
+export const BULK_WEIGHT_MIN = 3000;
+/** 포장 중량이 1회 섭취참고량의 이 배수를 넘으면 "1개 = 한 번 먹는 양"으로 보지 않는다 (묶음·가족용) */
+export const MULTI_SERVING_RATIO = 3;
+/** 이 중량(g·ml) 이하 포장은 참고량과 상관없이 1개로 본다 — 닭가슴살 120 g·초콜릿 72 g 처럼 참고량이 작아도 한 번에 먹는 단위 */
+export const SINGLE_PACK_MAX = 150;
+
+const CUP_RE = /(컵|사발|용기|왕뚜껑|도시락|큰그릇|볼$)/;
+
+/**
+ * 식약처 "1회 섭취참고량" → 이 제품에 해당하는 양.
+ * 한 칸에 여러 기준이 섞여 오기도 한다: "생·숙면 200g, 건면 100g, 당면 30g, 유탕면(봉지)120g, 유탕면(용기)80"
+ * → 소분류(건면·유탕면…)와 이름(컵·사발 → 용기)으로 하나를 고르고, 못 고르면 null (추측하지 않는다).
+ */
+export function resolveServingRef(
+  raw: string | undefined,
+  ctx: { name: string; subCat?: string; midCat?: string },
+): Amount | null {
+  if (!raw || !raw.trim()) return null;
+  const pieces = raw.split(',').map((t) => t.trim()).filter(Boolean);
+  const parsed = pieces.map((t) => {
+    const m = t.match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|l)?(?:\([^)]*\))?\s*$/i);
+    const label = m ? t.slice(0, m.index).trim() : t;
+    const lp = label.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+    return {
+      base: (lp ? lp[1] : label).trim(),
+      qual: lp ? lp[2].trim() : '',
+      value: m ? Number(m[1]) : NaN,
+      unit: m?.[2]?.toLowerCase(),
+    };
+  });
+  // 단위가 잘린 항목("…(용기)80")은 같은 칸의 다른 항목 단위를 따른다
+  const knownUnit = parsed.find((p) => p.unit)?.unit ?? 'g';
+  const toAmount = (p: (typeof parsed)[number]): Amount | null => {
+    if (!(p.value > 0)) return null;
+    const u = p.unit ?? knownUnit;
+    return { value: u === 'kg' || u === 'l' ? p.value * 1000 : p.value, unit: u === 'g' || u === 'kg' ? 'g' : 'ml' };
+  };
+  if (parsed.length === 1) return parsed[0].base === '' || pieces.length === 1 ? toAmount(parsed[0]) : null;
+
+  const sub = [ctx.subCat, ctx.midCat].filter((v) => v && v !== '해당없음') as string[];
+  const tokens = (base: string) => base.split(/[·・/]/).map((t) => t.trim()).filter(Boolean);
+  let cands = parsed.filter((p) => p.base && tokens(p.base).some((t) => sub.some((c) => c.startsWith(t)) || (t.length >= 2 && ctx.name.includes(t))));
+  if (cands.length > 1 && cands.every((p) => p.qual)) {
+    const wantCup = CUP_RE.test(ctx.name);
+    cands = cands.filter((p) => (wantCup ? /용기|컵/.test(p.qual) : /봉지/.test(p.qual)));
+  }
+  return cands.length === 1 ? toAmount(cands[0]) : null;
 }
 
 /**
  * 가공식품 표준데이터 행 → 시판 제품 MenuItem (매장 브랜드에 매칭되지 않은 행용).
  * 소비자 제품 대분류만 받는다 — 식용유·장류·조미식품 같은 재료성 분류는 "지금 사 먹을 것"이 아니라 뺀다.
  */
-export function rowToProduct(row: IngestRow): { menu: IngestedProduct } | { skip: SkipReason | 'not-consumer' } {
+export function rowToProduct(row: IngestRow): { menu: IngestedProduct } | { skip: SkipReason | 'not-consumer' | 'bulk' } {
   const cell = (f: Field) => (row.cols[f] == null ? undefined : row.cells[row.cols[f]!]?.trim());
   const majorCat = cell('majorCat') ?? '';
   const priority = PRODUCT_MAJOR_CATEGORIES[majorCat];
@@ -527,6 +584,19 @@ export function rowToProduct(row: IngestRow): { menu: IngestedProduct } | { skip
   if (!rawName) return { skip: 'no-name' };
   const name = normalizeDisplayText(rawName).replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
   if (!name) return { skip: 'no-name' };
+  if (BULK_NAME_RE.test(name)) return { skip: 'bulk' };
+  const weight = parseAmount(cell('weight'));
+  if (weight && weight.value >= BULK_WEIGHT_MIN) return { skip: 'bulk' };
+
+  // 1개 = 포장 중량. 단, 포장이 1회 섭취참고량의 여러 배(묶음·가족용)이거나 중량이 없으면
+  // 개수를 지어내 나누지 않고 식약처 1회 섭취참고량 기준으로 보여주고 "추정"으로 표시한다.
+  // (같은 이름의 단품 행이 있으면 dedupeProducts 가 그 단품을 고른다 — 그쪽은 정확한 공식값)
+  const basisUnit = (parseAmount(cell('basis')) ?? { unit: 'g' }).unit;
+  const refRaw = resolveServingRef(cell('servingRef'), { name, subCat: cell('subCat'), midCat: cell('midCat') });
+  const ref = refRaw && refRaw.unit === basisUnit ? refRaw : null;
+  const multi = !!(weight && ref && weight.unit === ref.unit && weight.value > SINGLE_PACK_MAX && weight.value > ref.value * MULTI_SERVING_RATIO);
+  const useRef = !!ref && (multi || !weight || weight.unit !== basisUnit);
+  const fmtAmt = (a: Amount) => `${Number.isInteger(a.value) ? a.value : Math.round(a.value * 10) / 10}${a.unit === 'g' ? 'g' : 'ml'}`;
 
   const num = (f: Field) => parseNumber(cell(f));
   const serving = toServing(
@@ -541,8 +611,8 @@ export function rowToProduct(row: IngestRow): { menu: IngestedProduct } | { skip
       caffeine: num('caffeine'),
     },
     cell('basis'),
-    cell('weight'),
-    undefined, // 1회 섭취참고량은 표("유탕면(봉지)120g…") 텍스트라 수치로 오독하기 쉬워 쓰지 않는다
+    useRef ? fmtAmt(ref!) : cell('weight'),
+    undefined, // 1회 섭취참고량은 위 resolveServingRef 로 골라 쓴다 (원문은 여러 기준이 섞인 텍스트)
   );
   if (!serving) return { skip: 'no-kcal' };
 
@@ -557,35 +627,54 @@ export function rowToProduct(row: IngestRow): { menu: IngestedProduct } | { skip
     name,
     category,
     // 시판 제품의 식품중량은 포장 단위라 "1인분" 대신 "1개"로 부른다
-    serving: serving.serving.replace(/^1인분/, '1개'),
+    serving: useRef ? `1회 섭취참고량 (${fmtAmt(ref!).replace(/(g|ml)$/, ' $1')})` : serving.serving.replace(/^1인분/, '1개'),
     nutrients: serving.nutrients,
-    trust: 'official',
+    // 100 g 당 수치는 공식값이지만 "한 번 먹는 양"이 추정이라 estimated
+    trust: useRef ? 'estimated' : 'official',
     sourceUrl: ds.url,
     sourceName: ds.sourceName,
     imageKey: category,
   };
-  if (serving.servingNote) menu.servingNote = serving.servingNote;
+  if (useRef) {
+    // 번들 용량을 아끼려고 짧게 — 상세 화면(D4) 영양 카드 아래에 그대로 보인다
+    menu.servingNote = multi ? `전체 ${fmtAmt(weight!)} 제품 · 식약처 1회 섭취참고량 기준 추정` : '포장 중량 정보 없음 · 식약처 1회 섭취참고량 기준 추정';
+  } else if (serving.servingNote) menu.servingNote = serving.servingNote;
+  if (weight) menu._weight = weight.value;
   if (maker) menu.maker = maker;
   if (serving.nutrients.caffeine && serving.nutrients.caffeine > 0) menu.tags = ['카페인 있음'];
-  const ref = cell('refDate');
-  if (ref) menu._refDate = ref;
+  const refDate = cell('refDate');
+  if (refDate) menu._refDate = refDate;
   menu._priority = priority;
   return { menu };
 }
 
-/** 같은 이름+제조사면 기준일자가 최신인 것 하나만 (수입/재보고 중복 정리). id 충돌은 접미사로 피한다 */
+/**
+ * 같은 이름+제조사는 하나만 남긴다 (수입/재보고·묶음 중복 정리). 고르는 순서:
+ * 1) 1개 무게가 확실한 공식 행(단품) — "안성탕면 125g"과 "안성탕면 625g(5개입)"이면 125g
+ * 2) 기준일자 최신  3) 중량이 작은 쪽(단품일 확률)
+ * id 충돌은 접미사로 피한다
+ */
 export function dedupeProducts(products: IngestedProduct[]): (MenuItem & { _priority?: number })[] {
+  const rank = (p: IngestedProduct) => (p.trust === 'official' ? 1 : 0);
+  const better = (a: IngestedProduct, b: IngestedProduct) => {
+    if (rank(a) !== rank(b)) return rank(a) > rank(b);
+    const da = a._refDate ?? '';
+    const db = b._refDate ?? '';
+    if (da !== db) return da > db;
+    return (a._weight ?? Infinity) < (b._weight ?? Infinity);
+  };
   const best = new Map<string, IngestedProduct>();
   for (const p of products) {
     const key = `${normalizeMenuName(p.name)}|${normalizeCompany(p.maker)}`;
     const prev = best.get(key);
-    if (!prev || (p._refDate ?? '') > (prev._refDate ?? '')) best.set(key, p);
+    if (!prev || better(p, prev)) best.set(key, p);
   }
   const ids = new Set<string>();
   const out: (MenuItem & { _priority?: number })[] = [];
   for (const p of best.values()) {
-    const { _refDate, ...rest } = p;
+    const { _refDate, _weight, ...rest } = p;
     void _refDate;
+    void _weight;
     let id = rest.id;
     for (let n = 2; ids.has(id); n++) id = `${rest.id}-${n}`;
     ids.add(id);
