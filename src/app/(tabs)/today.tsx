@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, EmptyState, KcalRing, MenuTile, NutrientBar, RichText, Skeleton, Text, Wordmark, type NutrientKey } from '@/components';
 import { getMenu } from '@/data';
+import { REFERENCE_FOOD_SPECS, foodEquivalent, resolveReferenceFoods } from '@/domain/foodEquivalent';
 import { formatNumber } from '@/domain/summary';
 import { MEAL_LABEL, type DaySummary, type MenuCategory } from '@/domain/types';
 import { useDay } from '@/state/day';
@@ -29,6 +31,11 @@ export default function Today() {
   const loading = !summary && (dayStatus === 'idle' || dayStatus === 'loading' || useProfile.getState().status === 'loading');
   const bars = targets ? (targets.emphasis.filter((k) => k !== 'kcal') as NutrientKey[]).slice(0, 3) : [];
   const logs = summary?.logs ?? [];
+  const over = !!summary && (summary.status === 'over' || summary.remaining.kcal <= 0);
+
+  // 남은 kcal 을 음식으로 번역 — 기준 음식 kcal 은 앱 메뉴 데이터에서만. 못 맞추면 줄을 숨긴다
+  const refFoods = useMemo(() => resolveReferenceFoods(REFERENCE_FOOD_SPECS, getMenu), []);
+  const equivalent = useMemo(() => (summary && !over ? foodEquivalent(summary.remaining.kcal, refFoods) : null), [summary, over, refFoods]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -43,7 +50,14 @@ export default function Today() {
             <Skeleton width="80%" height={24} />
           </View>
         ) : summary ? (
-          <RichText variant="h1" text={headline(summary, nickname)} accessibilityRole="header" />
+          <>
+            <RichText variant="h1" text={headline(summary, nickname)} accessibilityRole="header" />
+            {equivalent ? (
+              <Text variant="caption" color="ink3" style={styles.equivalent}>
+                {equivalent.text}
+              </Text>
+            ) : null}
+          </>
         ) : (
           <Text variant="h1" accessibilityRole="header">
             {nickname}님, 반가워요
@@ -145,6 +159,7 @@ const styles = StyleSheet.create({
   topBar: { height: size.header, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: spacing.page, paddingRight: spacing.sm },
   scroll: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.xl },
   headSkel: { gap: spacing.sm },
+  equivalent: { marginTop: spacing.xs },
   gaugeCard: { marginTop: spacing.xl, padding: spacing.xl },
   gaugeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
   bars: { flex: 1, gap: 14, minWidth: 0 },
