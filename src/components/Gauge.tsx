@@ -80,17 +80,17 @@ export interface RoomBarProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** 여유분 미니카드 (D3) — 틴트 바탕 + "오늘 여유 540 kcal" + 흰 트랙 바 */
+/** 남은 양 미니카드 (D3) — 틴트 바탕 + "오늘 더 먹을 수 있는 양 540 kcal" + 흰 트랙 바 */
 export function RoomBar({ remaining, progress, over, style }: RoomBarProps) {
   return (
-    <View style={[styles.room, style]} accessibilityRole="summary">
+    <View style={[styles.room, style]} accessibilityRole="summary" accessibilityLabel={over ? '오늘은 여기까지, 내일 다시 채워져요' : `오늘 더 먹을 수 있는 양 ${formatNumber(remaining)} kcal`}>
       {over ? (
         <Text variant="caption" color="ink2" style={styles.roomText}>
           오늘은 여기까지, 내일 다시 채워져요
         </Text>
       ) : (
         <Text variant="caption" color="ink2" style={styles.roomText}>
-          오늘 여유{' '}
+          오늘 더 먹을 수 있는 양{' '}
           <Text variant="h3" color="primaryText">
             {formatNumber(remaining)}
           </Text>{' '}
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   ringTarget: { marginTop: spacing.md },
   room: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: 14 },
   roomText: { flexShrink: 1 },
-  roomTrack: { width: 120, height: 6, borderRadius: radius.pill, backgroundColor: colors.surface, overflow: 'hidden', flexShrink: 0 },
+  roomTrack: { width: 88, height: 6, borderRadius: radius.pill, backgroundColor: colors.surface, overflow: 'hidden', flexShrink: 0 },
   roomFill: { height: 6, borderRadius: radius.pill, backgroundColor: colors.primary },
   nb: { gap: 6 },
   nbTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
