@@ -4,13 +4,17 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomSheet, Button, Card, Chip, IconButton, Input, MenuTile, Skeleton, Text, TrustBadge, UnknownBadge, VerdictBadge, showToast } from '@/components';
+import { Button, Card, Chip, IconButton, Input, MenuTile, Skeleton, Text, TrustBadge, UnknownBadge, VerdictBadge, showToast } from '@/components';
 import { QtyStepper } from '@/components/QtyStepper';
+import { RecordSheet } from '@/components/RecordSheet';
 import { getBrand, getMenu, normalizeName, searchMenus } from '@/data';
 import { applyOptions, judgeMenu } from '@/domain/judge';
 import { menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
 import { formatNumber, overToastSuffix, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients, type Profile } from '@/domain/types';
+import { analyzeMeal } from '@/services/ai/mealAnalyze';
+import { matchFood } from '@/services/ai/mealMatch';
+import { hasLLM } from '@/services/env';
 import { newId } from '@/services/id';
 import { findSimilarMenu, getCachedRemoteProduct, searchProductsRemote } from '@/services/products';
 import { judgeContext, useJudgeContext } from '@/state/judgeContext';
@@ -78,10 +82,10 @@ export default function AddLog() {
   const [manual, setManual] = useState(params.name !== undefined);
   const [query, setQuery] = useState('');
   const [history, setHistory] = useState<{ frequent: MealLog[]; recent: MealLog[] } | null>(null);
-  /** + 로 방금 기록한 행 → 기록 id (되돌리기 하면 빠진다) */
+  /** 이 화면에서 방금 기록한 행 → 기록 id (되돌리기 하면 빠진다) */
   const [added, setAdded] = useState<Record<string, string>>({});
 
-  // 수량 조절 시트
+  // 기록 확인 시트 (매장 담기와 같은 RecordSheet: 얼마나 + 끼니)
   const [picked, setPicked] = useState<{ key: string; source: Source } | null>(null);
   const [meal, setMeal] = useState<MealType>(() => defaultMealType());
   const [qty, setQty] = useState(1);
@@ -168,21 +172,7 @@ export default function AddLog() {
     return ok;
   };
 
-  /** 행 오른쪽 + : 끼니 자동 · 1개로 바로 기록하고 이 화면에 남는다(여러 개 연달아 담기) */
-  const quickAdd = async (key: string, source: Source) => {
-    if (added[key]) return;
-    const log = buildLog(source, defaultMealType(), 1, remaining, profile);
-    if (!log) return openManual(sourceName(source));
-    setAdded((a) => ({ ...a, [key]: log.id }));
-    await commit(log, () =>
-      setAdded((a) => {
-        const { [key]: _drop, ...rest } = a;
-        return rest;
-      }),
-    );
-  };
-
-  /** 행 본문: 끼니·양을 고른 뒤 기록 */
+  /** 행의 + · 행 본문: 기록 확인 시트(얼마나 · 끼니)를 연다. 영양 정보가 없으면 직접 입력으로 */
   const pick = (key: string, source: Source) => {
     if (!baseNutrients(source)) return openManual(sourceName(source));
     setMeal(defaultMealType());
@@ -190,15 +180,23 @@ export default function AddLog() {
     setPicked({ key, source });
   };
 
+  /** 시트에서 기록 → 이 화면에 남아 행에 ✓ (여러 개 연달아 담기). 되돌리기 하면 ✓ 도 빠진다 */
   const savePicked = async () => {
     if (!picked || saving) return;
-    const log = buildLog(picked.source, meal, qty, remaining, profile);
+    const { key, source } = picked;
+    const log = buildLog(source, meal, qty, remaining, profile);
     if (!log) return;
     setSaving(true);
-    await commit(log);
+    setAdded((a) => ({ ...a, [key]: log.id }));
+    await commit(log, () =>
+      setAdded((a) => {
+        if (a[key] !== log.id) return a;
+        const { [key]: _drop, ...rest } = a;
+        return rest;
+      }),
+    );
     setSaving(false);
     setPicked(null);
-    close();
   };
 
   const openManual = (name?: string) => {
@@ -209,12 +207,14 @@ export default function AddLog() {
   // ── 직접 입력 ──
   const [manualName, setManualName] = useState(params.name ?? '');
   const [manualMeal, setManualMeal] = useState<MealType>(() => defaultMealType());
+  /** 먹은 양 — 칸의 숫자는 1인분 기준, 저장할 때 곱한다 */
+  const [manualQty, setManualQty] = useState(1);
   const [kcal, setKcal] = useState('');
   const [carbs, setCarbs] = useState('');
   const [protein, setProtein] = useState('');
   const [fat, setFat] = useState('');
-  /** "잘 모르겠어요" 로 채운 기준 메뉴 — 칸을 직접 고치면 해제(내가 입력) */
-  const [estimate, setEstimate] = useState<{ status: 'idle' | 'finding' | 'none' } | { status: 'found'; menu: MenuItem; name: string }>({ status: 'idle' });
+  /** "잘 모르겠어요" 로 채운 근거 한 줄 — 칸을 직접 고치면 해제(내가 입력) */
+  const [estimate, setEstimate] = useState<{ status: 'idle' | 'finding' | 'none' } | { status: 'found'; label: string; name: string }>({ status: 'idle' });
   const setField = (set: (v: string) => void) => (v: string) => {
     set(v);
     if (estimate.status === 'found') setEstimate({ status: 'idle' });
@@ -224,18 +224,23 @@ export default function AddLog() {
     const name = manualName.trim();
     if (!name) return;
     setEstimate({ status: 'finding' });
-    const m = await findSimilarMenu(name);
-    const n = m ? applyOptions(m) : null;
-    if (!m || !n) {
+    // AI 가 있으면 먼저 "무엇인지" 정리 → 앱 데이터의 같은 메뉴 / AI 1인분 어림. 없거나 못 찾으면 비슷한 메뉴
+    let hit = hasLLM() ? await guessByAI(name) : null;
+    if (!hit) {
+      const m = await findSimilarMenu(name).catch(() => undefined);
+      const n = m ? applyOptions(m) : null;
+      if (m && n) hit = { base: n, label: `${estimateLabel(m)} 기준으로 채웠어요` };
+    }
+    if (!hit) {
       setEstimate({ status: 'none' });
       return;
     }
     const f = (v: number | undefined) => (v == null ? '' : String(Math.round(v)));
-    setKcal(f(n.kcal));
-    setCarbs(f(n.carbs));
-    setProtein(f(n.protein));
-    setFat(f(n.fat));
-    setEstimate({ status: 'found', menu: m, name });
+    setKcal(f(hit.base.kcal));
+    setCarbs(f(hit.base.carbs));
+    setProtein(f(hit.base.protein));
+    setFat(f(hit.base.fat));
+    setEstimate({ status: 'found', label: hit.label, name });
   };
 
   const manualOk = manualName.trim().length > 0 && (num(kcal) ?? -1) >= 0;
@@ -246,18 +251,17 @@ export default function AddLog() {
     if (num(carbs) !== undefined) n.carbs = num(carbs);
     if (num(protein) !== undefined) n.protein = num(protein);
     if (num(fat) !== undefined) n.fat = num(fat);
-    const est = estimate.status === 'found' ? estimate.menu : undefined;
     const log: MealLog = {
       id: newId(),
       date: toDateKey(now),
       mealType: manualMeal,
       time: now.toISOString(),
       createdAt: now.toISOString(),
-      qty: 1,
+      qty: manualQty,
       name: manualName.trim(),
       storeName: params.store || undefined,
-      nutrients: n,
-      trust: est ? 'estimated' : 'user',
+      nutrients: scaleNutrients(n, manualQty),
+      trust: estimate.status === 'found' ? 'estimated' : 'user',
     };
     setSaving(true);
     await commit(log);
@@ -266,6 +270,7 @@ export default function AddLog() {
   };
 
   const pickedN = picked ? baseNutrients(picked.source) : null;
+  const manualKcal = num(kcal);
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
@@ -288,7 +293,7 @@ export default function AddLog() {
             <View style={styles.form}>
               <Input label="메뉴 이름" kind="text" value={manualName} onChangeText={setField(setManualName)} placeholder="예: 닭가슴살 샐러드" autoCapitalize="sentences" />
               <View>
-                <Input label="칼로리" value={kcal} onChangeText={setField(setKcal)} unit="kcal" placeholder="0" maxLength={5} />
+                <Input label="칼로리 (1인분)" value={kcal} onChangeText={setField(setKcal)} unit="kcal" placeholder="0" maxLength={5} />
                 <Pressable
                   accessibilityRole="button"
                   disabled={!manualName.trim() || estimate.status === 'finding'}
@@ -305,7 +310,7 @@ export default function AddLog() {
                   <View style={styles.estimate}>
                     <TrustBadge trust="estimated" size="sm" />
                     <Text variant="small" color="ink2" style={styles.flexText}>
-                      {estimateLabel(estimate.menu)} 기준으로 채웠어요
+                      {estimate.label}
                     </Text>
                   </View>
                 ) : estimate.status === 'none' ? (
@@ -322,6 +327,19 @@ export default function AddLog() {
                   <Input label="탄수화물" value={carbs} onChangeText={setField(setCarbs)} unit="g" maxLength={4} style={styles.macro} />
                   <Input label="단백질" value={protein} onChangeText={setField(setProtein)} unit="g" maxLength={4} style={styles.macro} />
                   <Input label="지방" value={fat} onChangeText={setField(setFat)} unit="g" maxLength={4} style={styles.macro} />
+                </View>
+              </View>
+              <View>
+                <Text variant="captionMedium" color="ink2">
+                  얼마나 드셨어요?
+                </Text>
+                <View style={styles.qtyRow}>
+                  <QtyStepper value={manualQty} onChange={setManualQty} unit="인분" />
+                  {manualKcal !== undefined && manualKcal >= 0 ? (
+                    <Text variant="caption" color="ink2">
+                      <Text variant="bodyMedium">{formatNumber(Math.round(scaleNutrients({ kcal: manualKcal }, manualQty).kcal))}</Text> kcal
+                    </Text>
+                  ) : null}
                 </View>
               </View>
               <View>
@@ -399,7 +417,7 @@ export default function AddLog() {
                       {lists.frequent.map((f) => {
                         const source = frequentSource(f);
                         if (!source) return null;
-                        return <Row key={f.key} rowKey={f.key} source={source} favorite={!!f.favorite} added={!!added[f.key]} onPick={pick} onAdd={quickAdd} />;
+                        return <Row key={f.key} rowKey={f.key} source={source} favorite={!!f.favorite} added={!!added[f.key]} onPick={pick} onAdd={pick} />;
                       })}
                     </Section>
                   ) : null}
@@ -407,7 +425,7 @@ export default function AddLog() {
                     <Section title="최근">
                       {lists.recent.map((l) => {
                         const k = logKey(l);
-                        return <Row key={k} rowKey={k} source={{ kind: 'log', log: l }} added={!!added[k]} onPick={pick} onAdd={quickAdd} />;
+                        return <Row key={k} rowKey={k} source={{ kind: 'log', log: l }} added={!!added[k]} onPick={pick} onAdd={pick} />;
                       })}
                     </Section>
                   ) : null}
@@ -451,7 +469,7 @@ export default function AddLog() {
                     badge={judgement && !judgement.unknown ? <VerdictBadge verdict={judgement.verdict} size="sm" /> : !applyOptions(menu) ? <UnknownBadge /> : null}
                     added={!!added[`m:${menu.id}`]}
                     onPick={pick}
-                    onAdd={quickAdd}
+                    onAdd={pick}
                   />
                 ))}
                 {remoteLoading ? <ActivityIndicator color={colors.ink3} style={styles.moreLoading} /> : null}
@@ -484,28 +502,49 @@ export default function AddLog() {
         </>
       )}
 
-      <BottomSheet
+      <RecordSheet
         visible={!!picked}
         onClose={() => setPicked(null)}
-        title={picked ? sourceName(picked.source) : undefined}
-        subtitle={picked && pickedN ? `${qtyLabel(qty, sourceUnit(picked.source))} · ${formatNumber(scaleNutrients(pickedN, qty).kcal)} kcal` : undefined}
-        footer={<Button title="기록하기" loading={saving} onPress={() => void savePicked()} />}
-      >
-        <Text variant="captionMedium" color="ink2">
-          얼마나 먹었나요?
-        </Text>
-        {picked ? <QtyStepper value={qty} onChange={setQty} unit={sourceUnit(picked.source)} size="lg" style={styles.stepper} /> : null}
-        <Text variant="captionMedium" color="ink2" style={styles.sheetLabel}>
-          끼니
-        </Text>
-        <View style={styles.meals}>
-          {MEALS.map((m) => (
-            <Chip key={m} label={MEAL_LABEL[m]} variant="option" selected={meal === m} onPress={() => setMeal(m)} style={styles.mealChip} />
-          ))}
-        </View>
-      </BottomSheet>
+        items={
+          picked && pickedN
+            ? [{ key: picked.key, name: sourceName(picked.source), sub: sourceSub(picked.source), base: pickedN, unit: sourceUnit(picked.source), qty }]
+            : []
+        }
+        onQty={(_key, q) => setQty(q)}
+        meal={meal}
+        onMeal={setMeal}
+        remainingKcal={remaining?.kcal ?? null}
+        saving={saving}
+        onSave={() => void savePicked()}
+      />
     </SafeAreaView>
   );
+}
+
+/** 시트의 한 줄: 매장·브랜드 · 옵션 */
+function sourceSub(s: Source): string | undefined {
+  const store = s.kind === 'menu' ? s.menu.maker ?? getBrand(s.menu.brandId)?.name : s.log.storeName;
+  const options = s.kind === 'log' ? s.log.optionLabels ?? [] : [];
+  return [store, ...options].filter(Boolean).join(' · ') || undefined;
+}
+
+/**
+ * "잘 모르겠어요" + AI: 이름을 밀리가 정리 → 앱 데이터의 같은 메뉴(또는 비슷한 메뉴) / AI 1인분 어림.
+ * AI 없음·실패·못 찾음이면 null (호출 쪽이 비슷한 메뉴로 채운다)
+ */
+async function guessByAI(name: string): Promise<{ base: Nutrients; label: string } | null> {
+  try {
+    const r = await analyzeMeal({ kind: 'text', text: name });
+    const food = r.ok ? r.meal.items[0] : undefined;
+    if (!food) return null;
+    const hit = await matchFood(food);
+    if (!hit.base) return null;
+    if ((hit.kind === 'exact' || hit.kind === 'similar') && hit.menu) return { base: hit.base, label: `${estimateLabel(hit.menu)} 기준으로 채웠어요` };
+    if (hit.kind === 'ai') return { base: hit.base, label: hit.unit === '인분' ? '밀리가 1인분으로 어림했어요' : `밀리가 ${qtyLabel(1, hit.unit)} 기준으로 어림했어요` };
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /** "‘아메리카노’(스타벅스)" */
@@ -578,7 +617,7 @@ function Row({
       {n ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={added ? `${name} 기록했어요` : `${name} 바로 기록`}
+          accessibilityLabel={added ? `${name} 기록했어요` : `${name} 양 정해서 기록`}
           accessibilityState={{ disabled: added }}
           disabled={added}
           hitSlop={4}
@@ -640,7 +679,6 @@ const styles = StyleSheet.create({
   macro: { flex: 1 },
   meals: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   mealChip: { flex: 1 },
-  stepper: { marginTop: spacing.sm },
-  sheetLabel: { marginTop: spacing.xl },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
   footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.lg, borderTopWidth: 1, borderTopColor: colors.line },
 });
