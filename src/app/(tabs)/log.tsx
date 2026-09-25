@@ -9,7 +9,7 @@ import { BackIcon, BottomSheet, Button, Card, ChevronRightIcon, Chip, EmptyState
 import { QtyStepper } from '@/components/QtyStepper';
 import { getMenu } from '@/data';
 import { menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
-import { formatNumber, summarizeDay, toDateKey } from '@/domain/summary';
+import { formatNumber, overKcalText, summarizeDay, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, VERDICT_LABEL, type DaySummary, type MealLog, type MealType, type MenuCategory } from '@/domain/types';
 import { getCachedRemoteProduct } from '@/services/products';
 import { getRepos } from '@/services/repo';
@@ -44,7 +44,8 @@ function progressCopy(s: DaySummary): string {
     case 'almost':
       return '오늘 거의 다 채웠어요';
     case 'over':
-      return '내일 다시 채워져요';
+      // 넘은 양은 숨기지 않고 사실로 (빨강 — 2026-09-25 효님 결정). 지난 날짜도 그날 기준
+      return overKcalText(s.over.kcal ?? 0);
   }
 }
 
@@ -211,7 +212,7 @@ export default function LogScreen() {
           <View style={styles.cardHead}>
             <Text variant="h3">{title} 섭취 현황</Text>
             {summary ? (
-              <Text variant="small" color="ink3" numberOfLines={1} style={styles.cheerText}>
+              <Text variant="small" color={summary.status === 'over' ? 'over' : 'ink3'} numberOfLines={1} style={styles.cheerText}>
                 {progressCopy(summary)}
               </Text>
             ) : null}
@@ -229,6 +230,7 @@ export default function LogScreen() {
             <View style={styles.gaugeRow}>
               <KcalRing
                 value={summary.consumed.kcal}
+                over={summary.over.kcal}
                 caption="kcal 먹었어요"
                 progress={targets.kcal > 0 ? summary.consumed.kcal / targets.kcal : 0}
                 target={targets.kcal}
@@ -238,7 +240,7 @@ export default function LogScreen() {
               />
               <View style={styles.bars}>
                 {bars.map((k) => (
-                  <NutrientBar key={k} nutrient={k} value={Math.round((summary.consumed[k] ?? 0) * 10) / 10} max={targets[k]} />
+                  <NutrientBar key={k} nutrient={k} value={Math.round((summary.consumed[k] ?? 0) * 10) / 10} max={targets[k]} over={k === 'protein' ? undefined : summary.over[k]} />
                 ))}
               </View>
             </View>

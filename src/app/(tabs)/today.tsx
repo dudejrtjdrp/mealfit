@@ -20,9 +20,14 @@ import { colors, fonts, radius, size, spacing } from '@/theme';
 
 const MAX_ROWS = 4;
 
-/** 인사 헤드라인 — 허용의 언어만. 넘겼거나 여유가 0이면 "오늘은 여기까지, 내일 다시 채워져요" */
+/**
+ * 인사 헤드라인 — 넘었으면 넘은 양을 숨기지 않고 사실로(숫자 빨강, 2026-09-25 효님 결정), 딱 0이면 "오늘은 여기까지".
+ * **…** 는 RichText 강조(기본 초록), 넘은 양은 강조색을 over 로 바꿔 그린다
+ */
 function headline(summary: DaySummary, nickname: string): string {
-  if (summary.status === 'over' || summary.remaining.kcal <= 0) return `${nickname}님, 오늘은 여기까지\n**내일** 다시 채워져요`;
+  const over = summary.over.kcal ?? 0;
+  if (over > 0) return `${nickname}님, 오늘 목표보다\n**${formatNumber(over)}kcal** 더 드셨어요`;
+  if (summary.remaining.kcal <= 0) return `${nickname}님, 오늘은 여기까지\n**내일** 다시 채워져요`;
   return `${nickname}님, 오늘\n**${formatNumber(summary.remaining.kcal)}kcal** 더 먹을 수 있어요`;
 }
 
@@ -37,7 +42,9 @@ export default function Today() {
   const loading = !summary && (dayStatus === 'idle' || dayStatus === 'loading' || useProfile.getState().status === 'loading');
   const bars = targets ? (targets.emphasis.filter((k) => k !== 'kcal') as NutrientKey[]).slice(0, 3) : [];
   const logs = summary?.logs ?? [];
+  /** 넘었거나(목표보다 더 먹음) 딱 다 채운 날 — 추천·음식 번역 줄을 숨긴다 */
   const over = !!summary && (summary.status === 'over' || summary.remaining.kcal <= 0);
+  const overKcal = summary?.over.kcal ?? 0;
 
   // 이번 끼니 적정량을 음식으로 번역 ("점심으로는 샌드위치 하나에 라떼 한 잔 정도예요") — 판정과 같은 끼니 기준.
   // 기준 음식 kcal 은 앱 메뉴 데이터에서만. 못 맞추면 줄을 숨긴다
@@ -65,8 +72,12 @@ export default function Today() {
           </View>
         ) : summary ? (
           <>
-            <RichText variant="h1" text={headline(summary, nickname)} accessibilityRole="header" />
-            {equivalent ? (
+            <RichText variant="h1" text={headline(summary, nickname)} emphasisColor={overKcal > 0 ? 'over' : 'primaryText'} accessibilityRole="header" />
+            {overKcal > 0 ? (
+              <Text variant="caption" color="ink3" style={styles.equivalent}>
+                내일 다시 채워져요
+              </Text>
+            ) : equivalent ? (
               <Text variant="caption" color="ink3" style={styles.equivalent}>
                 {equivalent.text}
               </Text>
@@ -84,7 +95,11 @@ export default function Today() {
         <Card
           style={styles.gaugeCard}
           onPress={summary && targets ? () => router.navigate('/(tabs)/log') : undefined}
-          accessibilityLabel={summary ? `오늘 ${formatNumber(Math.max(0, summary.remaining.kcal))}kcal 더 먹을 수 있어요. 누르면 기록으로 가요` : undefined}
+          accessibilityLabel={
+            summary
+              ? `${overKcal > 0 ? `오늘 목표보다 ${formatNumber(overKcal)}kcal 더 드셨어요` : `오늘 ${formatNumber(Math.max(0, summary.remaining.kcal))}kcal 더 먹을 수 있어요`}. 누르면 기록으로 가요`
+              : undefined
+          }
         >
           {loading ? (
             <View style={styles.gaugeRow}>
@@ -97,10 +112,15 @@ export default function Today() {
             </View>
           ) : summary && targets ? (
             <View style={styles.gaugeRow}>
-              <KcalRing value={summary.remaining.kcal} progress={targets.kcal > 0 ? summary.consumed.kcal / targets.kcal : 0} numberSize={summary.remaining.kcal >= 10000 ? 24 : undefined} />
+              <KcalRing
+                value={summary.remaining.kcal}
+                over={overKcal}
+                progress={targets.kcal > 0 ? summary.consumed.kcal / targets.kcal : 0}
+                numberSize={summary.remaining.kcal >= 10000 ? 24 : undefined}
+              />
               <View style={styles.bars}>
                 {bars.map((k) => (
-                  <NutrientBar key={k} nutrient={k} value={Math.round((summary.consumed[k] ?? 0) * 10) / 10} max={targets[k]} />
+                  <NutrientBar key={k} nutrient={k} value={Math.round((summary.consumed[k] ?? 0) * 10) / 10} max={targets[k]} over={k === 'protein' ? undefined : summary.over[k]} />
                 ))}
               </View>
             </View>

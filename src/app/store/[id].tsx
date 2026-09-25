@@ -87,7 +87,6 @@ export default function StoreMenu() {
   const title = store?.name ?? brand?.name ?? '매장';
   const noInfo = !brand || brand.coverage === 'none' || menus.length === 0 || menus.every((m) => m.trust === 'none');
   const trust = summarizeTrust(menus.map((m) => m.trust));
-  const over = summary?.status === 'over' || (summary ? summary.remaining.kcal <= 0 : false);
   /** 메뉴 카드 보조 수치 — 내 목적의 첫 강조 영양소 (없으면 단백질) */
   const sub: NutrientKey = ((targets?.emphasis ?? []).find((k) => k !== 'kcal') as NutrientKey | undefined) ?? 'protein';
 
@@ -113,7 +112,7 @@ export default function StoreMenu() {
         ) : (
           <>
             {summary && targets ? (
-              <RoomBar remaining={summary.remaining.kcal} progress={targets.kcal > 0 ? summary.consumed.kcal / targets.kcal : 0} over={over} />
+              <RoomBar remaining={summary.remaining.kcal} progress={targets.kcal > 0 ? summary.consumed.kcal / targets.kcal : 0} over={summary.over.kcal} />
             ) : (
               <Skeleton height={48} borderRadius={radius.md} />
             )}
