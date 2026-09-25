@@ -28,12 +28,25 @@ export interface MealBudget {
   kcal: number;
   /** 이번 끼니를 포함해 남은 주 끼니 수 (1 이상) */
   slotsLeft: number;
-  /** 이번 끼니 이름 — '아침' · '점심' · '저녁' · '간식'(늦은 시간/세 끼 다 기록) */
+  /** 이번 끼니 이름 — '아침' · '점심' · '저녁' · '야식'(21시 이후) · '간식'(21시 전에 세 끼를 다 기록) */
   label: string;
   mealType: MealType;
-  /** 오늘 마지막 끼니 — 적정량 = 남은 전부 */
+  /** 오늘 마지막 주 끼니 — 적정량 = 남은 전부. 간식·야식 슬롯은 상한이 있어 false */
   isLast: boolean;
+  /** 주 끼니가 남지 않은 간식·야식 슬롯 — 적정량에 SNACK_* 상한이 걸린다 */
+  isSnack: boolean;
 }
+
+/**
+ * 간식·야식 슬롯(21시 이후, 또는 세 끼를 다 기록한 뒤)의 적정량 상한.
+ * 주 끼니가 남지 않았다고 하루 남은 양 전부를 한 번에 먹을 양으로 보면, 밤 9시에 아무것도 기록하지 않은 사람에게
+ * 1,260kcal 우유 1.8L 팩이 '좋음'이 된다. 그래서 min(남은 양, max(SNACK_MIN_KCAL, 남은 양 ÷ SNACK_SHARE_DIVISOR)):
+ * - ÷3: 하루 세 끼 중 한 끼 몫보다 크지 않게 (남은 2,579 → 860)
+ * - 최소 400: 남은 양이 적은 날에도 가벼운 한 끼·간식(삼각김밥+우유 정도)은 알맞게 본다
+ * - 남은 양보다 크게는 잡지 않는다
+ */
+export const SNACK_MIN_KCAL = 400;
+export const SNACK_SHARE_DIVISOR = 3;
 
 /**
  * 이 kcal 이상 기록한 끼니만 "먹은 끼니"로 친다 — 라떼 한 잔(150kcal)만 적어도 점심을 먹은 것으로 보고
@@ -79,11 +92,16 @@ export function mealBudget(remainingKcal: number, now: Date = new Date(), opts: 
   const slotsLeft = forced ?? Math.max(1, upcoming.length);
   const mealType: MealType = upcoming[0] ?? 'snack';
   const rem = Number.isFinite(remainingKcal) ? Math.max(0, remainingKcal) : 0;
+  // slotsLeft 를 직접 준 경우는 호출한 쪽이 끼니 수를 정한 것이라 상한을 걸지 않는다
+  const isSnack = forced === undefined && upcoming.length === 0;
+  const kcal = isSnack ? Math.min(rem, Math.max(SNACK_MIN_KCAL, rem / SNACK_SHARE_DIVISOR)) : rem / slotsLeft;
+  const late = mealTypeAt(now) === 'snack';
   return {
-    kcal: Math.round(rem / slotsLeft),
+    kcal: Math.round(kcal),
     slotsLeft,
-    label: MEAL_LABEL[mealType],
+    label: isSnack && late ? '야식' : MEAL_LABEL[mealType],
     mealType,
-    isLast: slotsLeft === 1,
+    isLast: slotsLeft === 1 && !isSnack,
+    isSnack,
   };
 }

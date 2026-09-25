@@ -256,11 +256,16 @@ export const BUDGET_BIG_PCT = 110;
 /**
  * 근거 숫자 한 줄 — "점심 적정량의 60%예요" · 마지막 끼니면 "오늘 남은 양의 60%예요".
  * 적정량을 넘으면 "…의 150%라 이번 끼니엔 조금 커요". 남은 양이 없으면 undefined.
+ * 간식·야식 슬롯은 퍼센트 대신 말로: "야식으로 알맞아요" · "야식으로는 조금 커요".
  */
 export function budgetReason(kcal: number, budget: MealBudget, remainingKcal: number): string | undefined {
   if (!(remainingKcal > 0) || !(budget.kcal > 0) || !Number.isFinite(kcal)) return undefined;
   const pctOf = (base: number) => Math.round((kcal / base) * 100);
   if (kcal > remainingKcal) return `오늘 남은 양의 ${pctOf(remainingKcal)}%라 조금 커요`;
+  if (budget.isSnack) {
+    // 야식·간식 모두 받침(ㄱ)이 있어 '으로'
+    return pctOf(budget.kcal) > BUDGET_BIG_PCT ? `${budget.label}으로는 조금 커요` : `${budget.label}으로 알맞아요`;
+  }
   const who = budget.isLast ? '오늘 남은 양' : `${budget.label} 적정량`;
   const pct = pctOf(budget.isLast ? remainingKcal : budget.kcal);
   if (pct < 1) return `${who}의 1%도 안 돼요`;

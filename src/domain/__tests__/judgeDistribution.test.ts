@@ -100,6 +100,8 @@ describe('끼니별 분포 — 아침·점심·저녁 모두 좋음/괜찮음/�
     { label: '아침 8시', now: new Date(2026, 8, 15, 8), left: 1 },
     { label: '점심 12시', now: new Date(2026, 8, 15, 12), left: 0.7 },
     { label: '저녁 7시', now: new Date(2026, 8, 15, 19), left: 0.35 },
+    // 밤 9시 반, 저녁을 건너뛰어 하루의 절반이 남음 — 야식 상한(남은 양 ÷ 3) 때문에 대부분 좋음이 되지 않는다
+    { label: '밤 9시 반', now: new Date(2026, 8, 15, 21, 30), left: 0.5 },
   ];
   const scaled = (f: number): DailyTargets => ({
     kcal: Math.round(targets.kcal * f),

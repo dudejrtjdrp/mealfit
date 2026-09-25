@@ -277,6 +277,21 @@ describe('끼니 기준 판정 (이번 끼니 적정량 = 남은 kcal ÷ 남은 
     expect(judgeMenu(big, full, { ...ctx, now: at(19) }).verdict).toBe('good');
   });
 
+  it('21시 이후엔 하루 남은 양 전부가 아니라 야식 한 번 몫으로 본다 (1,260 kcal 우유 팩은 좋음이 아니다)', () => {
+    const late = { ...ctx, now: at(21, 25) };
+    const rem = { ...REMAINING, kcal: 2579, carbs: 330, protein: 100, fat: 70, sugar: 50, sodium: 2000 };
+    const milk = menu({ id: 'milk', name: '순백목장우유', nutrients: { kcal: 1260, carbs: 90, protein: 54, fat: 72, sugar: 90 } });
+    const j = judgeMenu(milk, rem, late);
+    expect(j.verdict).toBe('pass');
+    expect(j.reasons[0]).toBe('야식으로는 조금 커요');
+    const snack = judgeMenu(menu({ id: 'kimbap', category: 'meal', nutrients: { kcal: 300, carbs: 45, protein: 8, fat: 7 } }), rem, late);
+    expect(snack.verdict).toBe('good');
+    expect(snack.reasons[0]).toBe('야식으로 알맞아요');
+    // 세 끼를 다 기록한 저녁 8시는 '간식'
+    const after = judgeMenu(salad, { ...REMAINING, kcal: 700 }, { ...ctx, now: at(20), eatenMeals: ['breakfast', 'lunch', 'dinner'] });
+    expect(after.reasons[0]).toBe('간식으로는 조금 커요');
+  });
+
   it('mealSlotsLeft 를 주면 시각보다 우선', () => {
     const j = judgeMenu(salad, { ...REMAINING, kcal: 700 }, { ...ctx, now: at(19), mealSlotsLeft: 2 });
     expect(j.reasons[0]).toBe('저녁 적정량의 129%라 이번 끼니엔 조금 커요');
