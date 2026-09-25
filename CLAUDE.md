@@ -14,7 +14,7 @@ Expo 57은 이전 버전과 다르다 — API가 불확실하면 https://docs.ex
 
 ## 폴더
 ```
-src/app/                 라우트 (A2 login, (onboarding)/step1~7, (tabs)/today|nearby|log|my, store/[id], menu/[id], log/add, log/ai ...)
+src/app/                 라우트 (A2 login, (onboarding)/step1~7, (tabs)/today|nearby|log|milly|my, store/[id], menu/[id], log/add, log/ai ...)
 src/components/          공통 컴포넌트 (Badge, Gauge, StoreCard, MenuCard, OptionChip, EmptyState, Button, ProgressSteps, BottomSheet ...)
 src/domain/              순수 로직 (타입, 목표량 계산, 판정 엔진, 성향 분류) — React 의존 금지, 전부 jest 테스트
 src/data/                시드 데이터 (brands.json, menus.json, options) + 로더
@@ -39,7 +39,7 @@ docs/                    IA, 시안, 결정 기록
 7. **포지셔닝은 "건강관리"**: 브랜드 문구에 다이어트·감량이라는 단어를 앞세우지 않는다. 목적 목록에서는 써도 된다.
 
 ## 화면 규칙
-- 기준 해상도 390×844. 하단 탭 4개: 오늘(today) · 주변(nearby) · 기록(log) · 마이(my). 시안의 "탐색"은 "주변"과 같은 것.
+- 기준 해상도 390×844. 하단 탭 5개: 오늘(today) · 주변(nearby) · 기록(log) · 밀리(milly) · 마이(my) — 밀리 탭은 2026-09-25 효님 요청으로 추가. 시안의 "탐색"은 "주변"과 같은 것.
 - 카드 radius 20, 페이지 좌우 20, 카드 안쪽 18~20, 배지 pill. 그림자는 theme.shadow.card.
 - 모든 화면은 상태를 다 그린다: 로딩(스켈레톤) · 빈 상태 · 오류 · 정보 없음.
 - 텍스트는 전부 한국어, 존댓말 "~해요"체.
