@@ -4,26 +4,26 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card, Chip, IconButton, Input, MenuTile, Skeleton, Text, TrustBadge, UnknownBadge, VerdictBadge, showToast } from '@/components';
+import { Button, Card, IconButton, Input, MenuTile, Skeleton, Text, TrustBadge, UnknownBadge, VerdictBadge } from '@/components';
 import { QtyStepper } from '@/components/QtyStepper';
-import { RecordSheet } from '@/components/RecordSheet';
+import { DateChips, MealChips, RecordSheet } from '@/components/RecordSheet';
 import { getBrand, getMenu, normalizeName, searchMenus } from '@/data';
 import { applyOptions, judgeMenu } from '@/domain/judge';
+import { clampLogDate, dateLabel } from '@/domain/logDate';
 import { menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
-import { formatNumber, overToastSuffix, toDateKey } from '@/domain/summary';
-import { MEAL_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients, type Profile } from '@/domain/types';
+import { formatNumber, toDateKey } from '@/domain/summary';
+import type { MealLog, MealType, MenuItem, Nutrients } from '@/domain/types';
 import { analyzeMeal } from '@/services/ai/mealAnalyze';
 import { matchFood } from '@/services/ai/mealMatch';
 import { hasLLM } from '@/services/env';
-import { newId } from '@/services/id';
 import { findSimilarMenu, getCachedRemoteProduct, searchProductsRemote } from '@/services/products';
-import { judgeContext, useJudgeContext } from '@/state/judgeContext';
+import { useJudgeContext } from '@/state/judgeContext';
 import { defaultMealType, useDay } from '@/state/day';
 import { ensureFavoritesLoaded, logKey, rankFrequent, useFavorites, type FrequentItem } from '@/state/favorites';
 import { useProfile } from '@/state/profile';
+import { recordItems, type RecordItem } from '@/state/recordItems';
 import { colors, radius, size, spacing, type } from '@/theme';
 
-const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 /** "자주 먹어요"는 최근 30일, "최근"은 14일 */
 const FREQUENT_DAYS = 30;
 const RECENT_DAYS = 14;
@@ -46,35 +46,23 @@ function baseNutrients(s: Source): Nutrients | null {
   return scaleNutrients(s.log.nutrients, 1 / prev);
 }
 
-function buildLog(s: Source, mealType: MealType, qty: number, remaining: DailyTargets | null, profile: Profile | null): MealLog | null {
-  const now = new Date();
-  const base = { id: newId(), date: toDateKey(now), mealType, time: now.toISOString(), createdAt: now.toISOString(), qty };
-  const n = baseNutrients(s);
-  if (!n) return null;
-  if (s.kind === 'menu') {
-    const j = remaining ? judgeMenu(s.menu, remaining, judgeContext(profile, useDay.getState().summary?.logs)) : null;
-    return {
-      ...base,
-      name: s.menu.name,
-      brandId: s.menu.brandId,
-      storeName: s.menu.maker ?? getBrand(s.menu.brandId)?.name,
-      menuId: s.menu.id,
-      nutrients: scaleNutrients(n, qty),
-      trust: s.menu.trust,
-      verdict: j && !j.unknown ? j.verdict : undefined,
-    };
-  }
-  const { id: _id, date: _d, mealType: _m, time: _t, createdAt: _c, qty: _q, ...rest } = s.log;
-  return { ...rest, ...base, nutrients: scaleNutrients(n, qty) };
+/** 다시 기록할 원본 → 기록 항목. 전에 남긴 기록은 옵션·매장·영양을 그대로, 판정은 먹은 양 기준으로 다시 (없던 판정은 붙이지 않는다) */
+function toRecordItem(s: Source, qty: number): RecordItem | null {
+  const base = baseNutrients(s);
+  if (!base) return null;
+  if (s.kind === 'menu') return { name: s.menu.name, base, qty, trust: s.menu.trust, menu: s.menu };
+  const l = s.log;
+  return { name: l.name, base, qty, trust: l.trust, menu: findMenu(l.menuId), storeName: l.storeName, optionLabels: l.optionLabels, menuId: l.menuId, brandId: l.brandId, noVerdict: !l.verdict };
 }
 
-/** E2 기록 추가 — 검색창 하나 · 자주 먹어요/최근(+ 한 번에 기록) · 검색 결과(판정 배지) · 맨 아래 직접 입력 · 하단 AI 입력줄(사진·글·말 → E4) */
+/**
+ * E2 기록 추가 — 검색창 하나 · 자주 먹어요/최근(+ 한 번에 기록) · 검색 결과(판정 배지) · 맨 아래 직접 입력 · 하단 AI 입력줄(사진·글·말 → E4).
+ * params.date 가 있으면 그날로 기록한다 (기록 탭에서 고른 지난 날). 시트에서 날짜를 바꿀 수 있다.
+ */
 export default function AddLog() {
-  const params = useLocalSearchParams<{ name?: string; store?: string; tab?: string }>();
-  const profile = useProfile((s) => s.profile);
+  const params = useLocalSearchParams<{ name?: string; store?: string; tab?: string; date?: string }>();
   const summary = useDay((s) => s.summary);
   const targets = useProfile((s) => s.targets);
-  const addLog = useDay((s) => s.addLog);
   const favorites = useFavorites((s) => s.items);
   const remaining = summary?.remaining ?? targets;
 
@@ -90,6 +78,10 @@ export default function AddLog() {
   const [meal, setMeal] = useState<MealType>(() => defaultMealType());
   const [qty, setQty] = useState(1);
   const [saving, setSaving] = useState(false);
+  /** 기록할 날짜 — 시트·직접 입력이 같이 쓴다 */
+  const [date, setDate] = useState(() => clampLogDate(params.date));
+  const isToday = date === toDateKey();
+  const aiParams = (mode: 'photo' | 'voice' | 'text', extra?: { text: string }) => ({ mode, ...(isToday ? {} : { date }), ...extra });
 
   useEffect(ensureFavoritesLoaded, []);
 
@@ -155,23 +147,6 @@ export default function AddLog() {
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)/log'));
 
-  /** 기록 + 되돌리기 토스트 */
-  const commit = async (log: MealLog, onUndo?: () => void) => {
-    const ok = await addLog(log);
-    const text = `${MEAL_LABEL[log.mealType]}으로 기록했어요`;
-    // 이 기록으로 하루 목표를 넘은 상태면 넘은 양도 함께 ("… · 오늘 목표보다 120kcal 넘었어요")
-    const day = useDay.getState();
-    const suffix = log.date === day.date ? overToastSuffix(day.summary) : '';
-    showToast(ok ? text + suffix : `${text} · 저장은 다음에 다시 시도할게요`, ok ? 'success' : 'info', {
-      label: '되돌리기',
-      onPress: () => {
-        void useDay.getState().removeLog(log.id);
-        onUndo?.();
-      },
-    });
-    return ok;
-  };
-
   /** 행의 + · 행 본문: 기록 확인 시트(얼마나 · 끼니)를 연다. 영양 정보가 없으면 직접 입력으로 */
   const pick = (key: string, source: Source) => {
     if (!baseNutrients(source)) return openManual(sourceName(source));
@@ -184,19 +159,24 @@ export default function AddLog() {
   const savePicked = async () => {
     if (!picked || saving) return;
     const { key, source } = picked;
-    const log = buildLog(source, meal, qty, remaining, profile);
-    if (!log) return;
+    const item = toRecordItem(source, qty);
+    if (!item) return;
     setSaving(true);
-    setAdded((a) => ({ ...a, [key]: log.id }));
-    await commit(log, () =>
-      setAdded((a) => {
-        if (a[key] !== log.id) return a;
-        const { [key]: _drop, ...rest } = a;
-        return rest;
-      }),
-    );
-    setSaving(false);
-    setPicked(null);
+    try {
+      const [log] = await recordItems([item], meal, {
+        date,
+        onUndo: () =>
+          setAdded((a) => {
+            if (a[key] !== log?.id) return a;
+            const { [key]: _drop, ...rest } = a;
+            return rest;
+          }),
+      });
+      if (log) setAdded((a) => ({ ...a, [key]: log.id }));
+      setPicked(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openManual = (name?: string) => {
@@ -246,26 +226,20 @@ export default function AddLog() {
   const manualOk = manualName.trim().length > 0 && (num(kcal) ?? -1) >= 0;
   const saveManual = async () => {
     if (!manualOk || saving) return;
-    const now = new Date();
     const n: Nutrients = { kcal: num(kcal)! };
     if (num(carbs) !== undefined) n.carbs = num(carbs);
     if (num(protein) !== undefined) n.protein = num(protein);
     if (num(fat) !== undefined) n.fat = num(fat);
-    const log: MealLog = {
-      id: newId(),
-      date: toDateKey(now),
-      mealType: manualMeal,
-      time: now.toISOString(),
-      createdAt: now.toISOString(),
-      qty: manualQty,
-      name: manualName.trim(),
-      storeName: params.store || undefined,
-      nutrients: scaleNutrients(n, manualQty),
-      trust: estimate.status === 'found' ? 'estimated' : 'user',
-    };
     setSaving(true);
-    await commit(log);
-    setSaving(false);
+    try {
+      await recordItems(
+        [{ name: manualName.trim(), base: n, qty: manualQty, trust: estimate.status === 'found' ? 'estimated' : 'user', storeName: params.store || undefined }],
+        manualMeal,
+        { date },
+      );
+    } finally {
+      setSaving(false);
+    }
     close();
   };
 
@@ -281,9 +255,16 @@ export default function AddLog() {
             <Ionicons name="chevron-back" size={22} color={colors.ink} />
           </Pressable>
         ) : null}
-        <Text variant="h2" accessibilityRole="header" style={styles.headTitle}>
-          {manual ? '직접 입력' : '기록 추가'}
-        </Text>
+        <View style={styles.headTitle}>
+          <Text variant="h2" accessibilityRole="header">
+            {manual ? '직접 입력' : '기록 추가'}
+          </Text>
+          {isToday ? null : (
+            <Text variant="caption" color="primaryText">
+              {dateLabel(date)} 기록으로 남겨요
+            </Text>
+          )}
+        </View>
         <IconButton name="close" label="닫기" color={colors.ink} onPress={close} />
       </View>
 
@@ -342,16 +323,8 @@ export default function AddLog() {
                   ) : null}
                 </View>
               </View>
-              <View>
-                <Text variant="captionMedium" color="ink2">
-                  끼니
-                </Text>
-                <View style={styles.meals}>
-                  {MEALS.map((m) => (
-                    <Chip key={m} label={MEAL_LABEL[m]} variant="option" selected={manualMeal === m} onPress={() => setManualMeal(m)} style={styles.mealChip} />
-                  ))}
-                </View>
-              </View>
+              <DateChips value={date} onChange={setDate} extra={params.date} />
+              <MealChips value={manualMeal} onChange={setManualMeal} />
             </View>
           </ScrollView>
           <View style={styles.footer}>
@@ -449,7 +422,7 @@ export default function AddLog() {
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'text', text: query.trim() } })}
+                    onPress={() => router.push({ pathname: '/log/ai', params: aiParams('text', { text: query.trim() }) })}
                     style={({ pressed }) => [styles.askMilly, pressed && styles.pressed]}
                   >
                     <Ionicons name="sparkles-outline" size={16} color={colors.primaryText} />
@@ -487,15 +460,15 @@ export default function AddLog() {
 
           {/* E4 AI로 기록 — 사진·말·글로 한 번에 */}
           <View style={styles.aiBar}>
-            <Pressable accessibilityRole="button" accessibilityLabel="사진으로 기록" hitSlop={4} onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'photo' } })} style={({ pressed }) => [styles.aiIcon, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="사진으로 기록" hitSlop={4} onPress={() => router.push({ pathname: '/log/ai', params: aiParams('photo') })} style={({ pressed }) => [styles.aiIcon, pressed && styles.pressed]}>
               <Ionicons name="camera-outline" size={22} color={colors.ink} />
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="글로 여러 개 한 번에 기록" onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'text' } })} style={({ pressed }) => [styles.aiField, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="글로 여러 개 한 번에 기록" onPress={() => router.push({ pathname: '/log/ai', params: aiParams('text') })} style={({ pressed }) => [styles.aiField, pressed && styles.pressed]}>
               <Text variant="body" color="ink3" numberOfLines={1}>
                 김치찌개랑 밥 반 공기처럼 한 번에
               </Text>
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="말로 기록" hitSlop={4} onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'voice' } })} style={({ pressed }) => [styles.aiMic, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="말로 기록" hitSlop={4} onPress={() => router.push({ pathname: '/log/ai', params: aiParams('voice') })} style={({ pressed }) => [styles.aiMic, pressed && styles.pressed]}>
               <Ionicons name="mic" size={20} color={colors.inkOnPrimary} />
             </Pressable>
           </View>
@@ -513,7 +486,10 @@ export default function AddLog() {
         onQty={(_key, q) => setQty(q)}
         meal={meal}
         onMeal={setMeal}
-        remainingKcal={remaining?.kcal ?? null}
+        date={date}
+        onDate={setDate}
+        dateExtra={params.date}
+        remainingKcal={summary ? summary.remaining.kcal - (summary.over.kcal ?? 0) : remaining?.kcal ?? null}
         saving={saving}
         onSave={() => void savePicked()}
       />
@@ -599,7 +575,7 @@ function Row({
 
   return (
     <View style={[styles.row, !n && styles.dim]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${name}, 양 정해서 기록`} onPress={() => onPick(rowKey, source)} style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${name}, 양·끼니 정해서 기록`} onPress={() => onPick(rowKey, source)} style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}>
         <MenuTile menu={menu ?? { name, category: 'meal' }} size={44} />
         <View style={styles.rowBody}>
           <View style={styles.rowTitle}>
@@ -617,7 +593,7 @@ function Row({
       {n ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={added ? `${name} 기록했어요` : `${name} 양 정해서 기록`}
+          accessibilityLabel={added ? `${name} 기록했어요` : `${name} 양·끼니 정해서 기록`}
           accessibilityState={{ disabled: added }}
           disabled={added}
           hitSlop={4}
@@ -677,8 +653,6 @@ const styles = StyleSheet.create({
   estimateNone: { marginTop: spacing.xs },
   macros: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   macro: { flex: 1 },
-  meals: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  mealChip: { flex: 1 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
   footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.lg, borderTopWidth: 1, borderTopColor: colors.line },
 });

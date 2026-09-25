@@ -80,8 +80,13 @@ export function useSpeechInput({ onText, onEnd }: { onText: (t: string) => void;
 }
 
 export const SPEECH_ERROR_TEXT: Record<SpeechError, string> = {
-  denied: '마이크·음성 인식 권한을 켜 주시면 말로 기록할 수 있어요.',
+  denied: '설정에서 마이크·음성 인식 권한을 켜 주시면 말로 기록할 수 있어요.',
   unavailable: '이 기기에서는 음성 인식을 쓸 수 없어요. 글로 적어 주세요.',
   'no-speech': '잘 못 들었어요. 한 번 더 말해 주세요.',
   failed: '음성 인식이 잠깐 안 됐어요. 다시 해 보거나 글로 적어 주세요.',
 };
+
+/** 권한을 거절한 경우 — 안내 옆에 "설정 열기"(Linking.openSettings)를 함께 보여준다 */
+export function speechErrorNeedsSettings(e: SpeechError | null | undefined): boolean {
+  return e === 'denied';
+}

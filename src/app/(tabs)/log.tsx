@@ -1,26 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BackIcon, BottomSheet, Button, Card, ChevronRightIcon, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, Skeleton, Text, VerdictBadge, showToast, type NutrientKey } from '@/components';
-import { QtyStepper } from '@/components/QtyStepper';
+import { BackIcon, Card, ChevronRightIcon, EmptyState, KcalRing, MenuTile, NutrientBar, Skeleton, Text, VerdictBadge, type NutrientKey } from '@/components';
+import { AIQuickRow } from '@/components/AIQuickRow';
+import { LogEditSheet } from '@/components/LogEditSheet';
 import { getMenu } from '@/data';
-import { menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
+import { clampLogDate, parseDateKey } from '@/domain/logDate';
+import { menuQtyUnit, qtyLabel } from '@/domain/qty';
 import { formatNumber, overKcalText, summarizeDay, toDateKey } from '@/domain/summary';
-import { MEAL_LABEL, VERDICT_LABEL, type DaySummary, type MealLog, type MealType, type MenuCategory } from '@/domain/types';
-import { getCachedRemoteProduct } from '@/services/products';
+import { MEAL_LABEL, VERDICT_LABEL, type DaySummary, type MealLog, type MenuCategory } from '@/domain/types';
 import { getRepos } from '@/services/repo';
 import { dominantVerdict, useDay, weekTally } from '@/state/day';
 import { useProfile } from '@/state/profile';
+import { logMenu, removeLogWithUndo } from '@/state/recordItems';
 import { colors, fonts, radius, size, spacing } from '@/theme';
 
 const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
-const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 /** 기록의 제공 단위(개·잔·인분…) — 서버 제품은 세션 캐시에 있을 때만 알 수 있다 */
-const logUnit = (log: MealLog) => menuQtyUnit(log.menuId ? getMenu(log.menuId) ?? getCachedRemoteProduct(log.menuId) : undefined);
+const logUnit = (log: MealLog) => menuQtyUnit(logMenu(log));
 
 function mondayOf(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -49,17 +50,24 @@ function progressCopy(s: DaySummary): string {
   }
 }
 
-/** E1 기록 목록 — 주간 캘린더 스트립 · 하루 요약(링·미니바) · 끼니별 기록 */
+/**
+ * E1 기록 목록 — 주간 캘린더 스트립 · 하루 요약(링·미니바) · 끼니별 기록.
+ * params: date(그날을 보여준다 — 오늘 탭에서 오면 오늘) · at(같은 날짜로 다시 와도 반영되게 하는 값)
+ */
 export default function LogScreen() {
+  const params = useLocalSearchParams<{ date?: string; at?: string }>();
   const today = toDateKey();
   const targets = useProfile((s) => s.targets);
   const todaySummary = useDay((s) => s.summary);
   const todayStatus = useDay((s) => s.status);
-  const { addLog, updateLog, removeLog, logsInRange } = useDay();
+  const todayLogs = useDay((s) => s.logs);
+  const rev = useDay((s) => s.rev);
+  const logsInRange = useDay((s) => s.logsInRange);
 
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [selected, setSelected] = useState(today);
-  const [other, setOther] = useState<{ date: string; logs: MealLog[] } | null>(null);
+  const [other, setOther] = useState<{ date: string; logs: MealLog[]; error?: boolean } | null>(null);
+  const [retry, setRetry] = useState(0);
   /** 보고 있는 주의 날짜별 기록 (판정 점·주간 요약) — 한 주를 한 번에 읽는다 */
   const [week, setWeek] = useState<{ from: string; byDate: Record<string, MealLog[]> } | null>(null);
   const [editing, setEditing] = useState<MealLog | null>(null);
@@ -76,8 +84,16 @@ export default function LogScreen() {
     };
   }, [logsInRange, from, to]);
 
-  useEffect(refreshWeek, [refreshWeek, todaySummary]);
+  useEffect(refreshWeek, [refreshWeek, todaySummary, rev]);
   useFocusEffect(refreshWeek);
+
+  // 다른 화면(오늘 탭 등)에서 날짜를 주고 오면 그날로 — 주도 같이 옮긴다
+  useEffect(() => {
+    if (!params.date && !params.at) return;
+    const key = clampLogDate(params.date);
+    setSelected(key);
+    setWeekStart(mondayOf(parseDateKey(key) ?? new Date()));
+  }, [params.date, params.at]);
 
   const weekByDate = week?.from === from ? week.byDate : null;
   // 주간 요약: 이번 주면 일요일에, 지난 주를 넘겨 보면 언제나
@@ -86,24 +102,31 @@ export default function LogScreen() {
   const showWeekly = !!weekByDate && (isPastWeek || (from === thisMonday && new Date().getDay() === 0));
   const tally = weekByDate ? weekTally(weekByDate) : null;
 
-  // 오늘이 아닌 날을 고르면 저장소에서 따로 읽는다
+  // 오늘이 아닌 날을 고르면 저장소에서 따로 읽는다 (기록이 추가·수정·삭제되면 rev 로 다시)
   useEffect(() => {
     if (selected === today) return;
     let alive = true;
     getRepos()
       .logs.listByDate(selected)
-      .then((logs) => alive && setOther({ date: selected, logs }))
-      .catch(() => alive && setOther({ date: selected, logs: [] }));
+      .then((logs) => alive && setOther({ date: selected, logs: [...logs].sort((a, b) => a.time.localeCompare(b.time)) }))
+      .catch(() => alive && setOther({ date: selected, logs: [], error: true }));
     return () => {
       alive = false;
     };
-  }, [selected, today, todaySummary]);
+  }, [selected, today, rev, retry]);
 
   const isToday = selected === today;
-  const summary: DaySummary | null = isToday ? todaySummary : other && other.date === selected && targets ? summarizeDay(selected, other.logs, targets) : null;
-  const loading = !summary && (isToday ? todayStatus !== 'ready' && todayStatus !== 'error' : true);
+  const otherHere = other && other.date === selected ? other : null;
+  /** 그날 기록을 못 읽었다 — 빈 날처럼 보이지 않게 오류 + 다시 시도 */
+  const loadError = isToday ? todayStatus === 'error' : !!otherHere?.error;
+  const summary: DaySummary | null = loadError ? null : isToday ? todaySummary : otherHere && targets ? summarizeDay(selected, otherHere.logs, targets) : null;
+  /** 그날 기록 — 목표량이 없어도(요약이 없어도) 목록은 보여준다. null 이면 아직 읽는 중 */
+  const dayLogs: MealLog[] | null = loadError ? null : isToday ? (todayStatus === 'ready' ? todayLogs : todaySummary?.logs ?? null) : otherHere?.logs ?? null;
+  const loading = !loadError && !dayLogs;
+  const retryLoad = () => (isToday ? void useDay.getState().load(today) : setRetry((n) => n + 1));
 
-  const moveWeek = (n: number) => setWeekStart((w) => addDays(w, n * 7));
+  const thisWeek = from >= thisMonday;
+  const moveWeek = (n: number) => setWeekStart((w) => (n > 0 && toDateKey(w) >= thisMonday ? w : addDays(w, n * 7)));
   const swipeRef = useRef(moveWeek);
   swipeRef.current = moveWeek;
   const pan = useMemo(
@@ -121,35 +144,14 @@ export default function LogScreen() {
   const bars = targets ? (targets.emphasis.filter((k) => k !== 'kcal') as NutrientKey[]).slice(0, 3) : [];
   const title = isToday ? '오늘' : `${Number(selected.slice(5, 7))}월 ${Number(selected.slice(8, 10))}일`;
 
-  const applyEdit = async (patch: Partial<Pick<MealLog, 'mealType' | 'qty'>>) => {
-    if (!editing) return;
-    const base = editing.qty > 0 ? editing.qty : 1;
-    const qty = patch.qty ?? editing.qty;
-    const factor = qty / base;
-    const scaled = scaleNutrients(editing.nutrients, factor);
-    const next: MealLog = { ...editing, ...patch, qty, nutrients: scaled };
-    setEditing(next);
-    // 오늘이 아닌 기록도 스토어를 거친다 — 저장소 반영 + 주간 캐시 비우기
-    await updateLog(next);
-    if (next.date !== today) setOther((o) => (o ? { ...o, logs: o.logs.map((l) => (l.id === next.id ? next : l)) } : o));
-  };
-
-  /** 지우기 — 확인창 대신 토스트의 되돌리기(지운 기록을 그대로 다시 추가) */
-  const remove = async (log: MealLog) => {
+  /** 지우기 — 확인창 대신 토스트의 되돌리기. 목록·주간 점은 스토어의 rev 로 다시 읽는다 */
+  const remove = (log: MealLog) => {
     if (editing?.id === log.id) setEditing(null);
-    await removeLog(log.id);
-    if (log.date !== today) setOther((o) => (o && o.date === log.date ? { ...o, logs: o.logs.filter((l) => l.id !== log.id) } : o));
-    refreshWeek();
-    showToast('기록을 지웠어요', 'info', {
-      label: '되돌리기',
-      onPress: () => {
-        void addLog(log).then(() => {
-          if (log.date !== today) setOther((o) => (o && o.date === log.date ? { ...o, logs: [...o.logs.filter((l) => l.id !== log.id), log].sort((a, b) => a.time.localeCompare(b.time)) } : o));
-          refreshWeek();
-        });
-      },
-    });
+    void removeLogWithUndo(log);
   };
+  /** 이 날로 기록 추가 (오늘이면 날짜 없이) */
+  const addParams = isToday ? undefined : { date: selected };
+  const openAdd = () => router.push({ pathname: '/log/add', params: addParams });
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -163,7 +165,7 @@ export default function LogScreen() {
               오늘도 건강한 습관을 이어가요.
             </Text>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="기록 추가" onPress={() => router.push('/log/add')} style={styles.addBtn}>
+          <Pressable accessibilityRole="button" accessibilityLabel={isToday ? '기록 추가' : `${title} 기록 추가`} onPress={openAdd} style={styles.addBtn}>
             <Text variant="bodyMedium" color="primaryText" style={styles.addText}>
               추가
             </Text>
@@ -194,7 +196,15 @@ export default function LogScreen() {
               </Pressable>
             );
           })}
-          <Pressable accessibilityRole="button" accessibilityLabel="다음 주" hitSlop={8} onPress={() => moveWeek(1)} style={styles.weekNav}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="다음 주"
+            accessibilityState={{ disabled: thisWeek }}
+            disabled={thisWeek}
+            hitSlop={8}
+            onPress={() => moveWeek(1)}
+            style={[styles.weekNav, thisWeek && styles.weekNavOff]}
+          >
             <ChevronRightIcon size={16} color={colors.ink3} />
           </Pressable>
         </View>
@@ -217,7 +227,9 @@ export default function LogScreen() {
               </Text>
             ) : null}
           </View>
-          {loading ? (
+          {loadError ? (
+            <EmptyState pose="sorry" title="기록을 불러오지 못했어요" description="잠시 뒤 다시 시도해 주세요." actionLabel="다시 시도" onAction={retryLoad} style={styles.emptyInner} />
+          ) : loading ? (
             <View style={styles.gaugeRow}>
               <Skeleton width={120} height={120} borderRadius={60} />
               <View style={styles.bars}>
@@ -245,23 +257,33 @@ export default function LogScreen() {
               </View>
             </View>
           ) : (
-            <EmptyState pose="sorry" title="목표량을 아직 계산하지 못했어요" description="마이 탭에서 신체 정보를 확인해 주세요." style={styles.emptyInner} />
+            <EmptyState
+              pose="sorry"
+              title="목표량을 아직 계산하지 못했어요"
+              description="마이 탭에서 신체 정보를 확인해 주세요."
+              actionLabel="신체 정보 보기"
+              onAction={() => router.push('/my/body')}
+              style={styles.emptyInner}
+            />
           )}
         </Card>
 
         <Card padding={0} style={[styles.card, styles.logCard]}>
           <View style={styles.cardHead}>
             <Text variant="h3">{title} 식사 기록</Text>
-            {summary && summary.logs.length > 0 ? (
+            {dayLogs && dayLogs.length > 0 ? (
               <Text variant="small" color="ink3">
-                {summary.logs.length}끼 · {formatNumber(summary.consumed.kcal)} kcal
+                {dayLogs.length}끼 · {formatNumber(Math.round(dayLogs.reduce((s, l) => s + l.nutrients.kcal, 0)))} kcal
               </Text>
             ) : null}
           </View>
-          {summary && summary.logs.length > 0 ? (
+          {loadError ? null : <AIQuickRow date={isToday ? undefined : selected} style={styles.aiRow} />}
+          {loadError ? (
+            <EmptyState pose="sorry" title="기록을 불러오지 못했어요" actionLabel="다시 시도" onAction={retryLoad} style={styles.emptyInner} />
+          ) : dayLogs && dayLogs.length > 0 ? (
             <View style={styles.rows}>
-              {summary.logs.map((l, i) => (
-                <LogRow key={l.id} log={l} first={i === 0} onPress={() => setEditing(l)} onDelete={() => void remove(l)} />
+              {dayLogs.map((l, i) => (
+                <LogRow key={l.id} log={l} first={i === 0} onPress={() => setEditing(l)} onDelete={() => remove(l)} />
               ))}
             </View>
           ) : loading ? (
@@ -272,40 +294,16 @@ export default function LogScreen() {
             <EmptyState
               pose={isToday ? 'base' : 'sleep'}
               title={isToday ? '아직 기록이 없어요' : '이 날은 기록이 없어요'}
-              description={isToday ? '먹은 메뉴를 가볍게 남겨 보세요.' : undefined}
-              actionLabel={isToday ? '기록 추가' : undefined}
-              onAction={isToday ? () => router.push('/log/add') : undefined}
+              description={isToday ? '먹은 메뉴를 가볍게 남겨 보세요.' : '이 날 먹은 걸 지금 남겨도 돼요.'}
+              actionLabel={isToday ? '기록 추가' : '이 날 기록 추가'}
+              onAction={openAdd}
               style={styles.emptyInner}
             />
           )}
         </Card>
       </ScrollView>
 
-      <BottomSheet
-        visible={!!editing}
-        onClose={() => setEditing(null)}
-        title={editing?.name}
-        subtitle={editing ? `${formatNumber(editing.nutrients.kcal)} kcal${editing.storeName ? ` · ${editing.storeName}` : ''}` : undefined}
-        footer={
-          <View style={styles.sheetFooter}>
-            <Button title="지우기" variant="ghost" onPress={() => editing && void remove(editing)} style={styles.sheetBtn} />
-            <Button title="완료" onPress={() => setEditing(null)} style={styles.sheetBtn} />
-          </View>
-        }
-      >
-        <Text variant="captionMedium" color="ink2">
-          끼니
-        </Text>
-        <View style={styles.sheetChips}>
-          {MEALS.map((m) => (
-            <Chip key={m} label={MEAL_LABEL[m]} variant="option" selected={editing?.mealType === m} onPress={() => void applyEdit({ mealType: m })} />
-          ))}
-        </View>
-        <Text variant="captionMedium" color="ink2" style={styles.sheetLabel}>
-          수량
-        </Text>
-        {editing ? <QtyStepper value={editing.qty} onChange={(q) => void applyEdit({ qty: q })} unit={logUnit(editing)} size="lg" style={styles.stepper} /> : null}
-      </BottomSheet>
+      <LogEditSheet log={editing} onClose={() => setEditing(null)} />
     </SafeAreaView>
   );
 }
@@ -388,6 +386,8 @@ const styles = StyleSheet.create({
   addText: { fontSize: 14, fontFamily: fonts.semibold },
   week: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, marginHorizontal: -spacing.md },
   weekNav: { width: 20, alignItems: 'center' },
+  weekNavOff: { opacity: 0.3 },
+  aiRow: { marginTop: spacing.md, marginBottom: 0 },
   day: { flex: 1, alignItems: 'center' },
   todayLabel: { fontFamily: fonts.semibold },
   dayCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
@@ -406,14 +406,9 @@ const styles = StyleSheet.create({
   swipeAction: { width: 84, alignItems: 'center', justifyContent: 'center', gap: 2, backgroundColor: colors.ink2, borderRadius: radius.md, marginVertical: spacing.xs, marginLeft: spacing.sm },
   weekly: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', marginTop: spacing.md, backgroundColor: colors.primaryTint, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 6 },
   weeklyText: { fontFamily: fonts.medium },
-  stepper: { marginTop: spacing.sm },
   rowLine: { borderTopWidth: 1, borderTopColor: colors.line },
   rowBody: { flex: 1, minWidth: 0 },
   rowName: { fontSize: 14 },
   rowRight: { alignItems: 'flex-end', gap: 4 },
   bold: { fontFamily: fonts.bold },
-  sheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  sheetLabel: { marginTop: spacing.xl },
-  sheetFooter: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  sheetBtn: { flex: 1 },
 });

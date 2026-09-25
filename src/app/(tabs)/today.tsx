@@ -1,16 +1,17 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, RichText, Skeleton, Text, Wordmark, type NutrientKey } from '@/components';
+import { AIQuickRow } from '@/components/AIQuickRow';
+import { LogEditSheet } from '@/components/LogEditSheet';
 import { RecommendCard, RecommendCardSkeleton } from '@/components/RecommendCard';
 import { getMenu, getMenusByBrand } from '@/data';
 import { REFERENCE_FOOD_SPECS, foodEquivalent, resolveReferenceFoods } from '@/domain/foodEquivalent';
 import { eatenMealsFromLogs, mealBudget } from '@/domain/mealBudget';
-import { formatNumber } from '@/domain/summary';
-import { MEAL_LABEL, type DailyTargets, type DaySummary, type MenuCategory, type Profile } from '@/domain/types';
+import { formatNumber, toDateKey } from '@/domain/summary';
+import { MEAL_LABEL, type DailyTargets, type DaySummary, type MealLog, type MenuCategory, type Profile } from '@/domain/types';
 import * as location from '@/services/location';
 import { useJudgeContext, useMealSlot } from '@/state/judgeContext';
 import { useDay } from '@/state/day';
@@ -20,6 +21,9 @@ import { RECOMMEND_MODES, collectCandidates, modeSubLabel, pickRecommendations, 
 import { colors, fonts, radius, size, spacing } from '@/theme';
 
 const MAX_ROWS = 4;
+
+/** 기록 탭으로 — 기록 탭이 지난 날을 보고 있었어도 오늘로 (at: 같은 날짜로 다시 와도 반영되게) */
+const openLogTab = () => router.navigate({ pathname: '/(tabs)/log', params: { date: toDateKey(), at: String(Date.now()) } });
 
 /**
  * 인사 헤드라인 — 넘었으면 넘은 양을 숨기지 않고 사실로(숫자 빨강, 2026-09-25 효님 결정), 딱 0이면 "오늘은 여기까지".
@@ -38,11 +42,16 @@ export default function Today() {
   const targets = useProfile((s) => s.targets);
   const summary = useDay((s) => s.summary);
   const dayStatus = useDay((s) => s.status);
+  const dayLogs = useDay((s) => s.logs);
+  const [editing, setEditing] = useState<MealLog | null>(null);
+  /** 오늘 기록을 읽지 못했다 — 0 kcal 로 보이지 않게 오류 + 다시 시도 */
+  const loadError = dayStatus === 'error';
+  const retry = () => void useDay.getState().load(toDateKey());
 
   const nickname = profile?.nickname ?? '회원';
   const loading = !summary && (dayStatus === 'idle' || dayStatus === 'loading' || useProfile.getState().status === 'loading');
   const bars = targets ? (targets.emphasis.filter((k) => k !== 'kcal') as NutrientKey[]).slice(0, 3) : [];
-  const logs = summary?.logs ?? [];
+  const logs = summary?.logs ?? dayLogs;
   /** 넘었거나(목표보다 더 먹음) 딱 다 채운 날 — 추천·음식 번역 줄을 숨긴다 */
   const over = !!summary && (summary.status === 'over' || summary.remaining.kcal <= 0);
   const overKcal = summary?.over.kcal ?? 0;
@@ -71,7 +80,7 @@ export default function Today() {
             <Skeleton width="60%" height={24} />
             <Skeleton width="80%" height={24} />
           </View>
-        ) : summary ? (
+        ) : summary && !loadError ? (
           <>
             <RichText variant="h1" text={headline(summary, nickname)} emphasisColor={overKcal > 0 ? 'over' : 'primaryText'} accessibilityRole="header" />
             {overKcal > 0 ? (
@@ -95,14 +104,16 @@ export default function Today() {
 
         <Card
           style={styles.gaugeCard}
-          onPress={summary && targets ? () => router.navigate('/(tabs)/log') : undefined}
+          onPress={summary && targets && !loadError ? openLogTab : undefined}
           accessibilityLabel={
-            summary
+            summary && !loadError
               ? `${overKcal > 0 ? `오늘 목표보다 ${formatNumber(overKcal)}kcal 더 드셨어요` : `오늘 ${formatNumber(Math.max(0, summary.remaining.kcal))}kcal 더 먹을 수 있어요`}. 누르면 기록으로 가요`
               : undefined
           }
         >
-          {loading ? (
+          {loadError ? (
+            <EmptyState pose="sorry" title="오늘 기록을 불러오지 못했어요" description="잠시 뒤 다시 시도해 주세요." actionLabel="다시 시도" onAction={retry} style={styles.emptyInner} />
+          ) : loading ? (
             <View style={styles.gaugeRow}>
               <Skeleton width={130} height={130} borderRadius={65} />
               <View style={styles.bars}>
@@ -147,14 +158,25 @@ export default function Today() {
             </Pressable>
           </View>
           <AIQuickRow />
-          {loading ? (
+          {loadError ? (
+            <Text variant="caption" color="ink3" style={styles.emptyLog}>
+              기록을 불러오면 여기에 보여 드릴게요.
+            </Text>
+          ) : loading ? (
             <View style={styles.rows}>
               <Skeleton height={44} borderRadius={radius.pill} />
             </View>
           ) : logs.length > 0 ? (
             <View style={styles.rows}>
               {logs.slice(0, MAX_ROWS).map((l) => (
-                <Pressable key={l.id} accessibilityRole="button" onPress={() => router.navigate('/(tabs)/log')} style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}>
+                <Pressable
+                  key={l.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${l.name}, ${MEAL_LABEL[l.mealType]}, ${formatNumber(l.nutrients.kcal)}kcal`}
+                  accessibilityHint="양·끼니를 고치거나 지울 수 있어요"
+                  onPress={() => setEditing(l)}
+                  style={({ pressed }) => [styles.logRow, pressed && { opacity: 0.7 }]}
+                >
                   <MenuTile menu={(l.menuId && getMenu(l.menuId)) || { name: l.name, category: 'meal' as MenuCategory }} size={44} />
                   <Text variant="body" numberOfLines={1} style={styles.logName}>
                     {l.name}
@@ -171,7 +193,7 @@ export default function Today() {
                 </Pressable>
               ))}
               {logs.length > MAX_ROWS ? (
-                <Pressable accessibilityRole="button" onPress={() => router.navigate('/(tabs)/log')} style={styles.more}>
+                <Pressable accessibilityRole="button" onPress={openLogTab} style={styles.more}>
                   <Text variant="caption" color="ink3">
                     기록 {logs.length - MAX_ROWS}개 더 보기
                   </Text>
@@ -189,34 +211,9 @@ export default function Today() {
       <View style={styles.footer}>
         <Button title="주변 메뉴 더 보기" onPress={() => router.navigate('/(tabs)/nearby')} />
       </View>
-    </SafeAreaView>
-  );
-}
 
-/** 먹은 걸 바로 알려주기 — 사진·말·글 (E4 AI로 기록) */
-function AIQuickRow() {
-  const items = [
-    { mode: 'photo', icon: 'camera-outline', label: '사진으로' },
-    { mode: 'voice', icon: 'mic-outline', label: '말로' },
-    { mode: 'text', icon: 'create-outline', label: '글로' },
-  ] as const;
-  return (
-    <View style={styles.aiRow}>
-      {items.map((it) => (
-        <Pressable
-          key={it.mode}
-          accessibilityRole="button"
-          accessibilityLabel={`${it.label} 기록하기`}
-          onPress={() => router.push({ pathname: '/log/ai', params: { mode: it.mode } })}
-          style={({ pressed }) => [styles.aiBtn, pressed && { opacity: 0.7 }]}
-        >
-          <Ionicons name={it.icon} size={18} color={colors.primaryText} />
-          <Text variant="captionMedium" color="primaryText">
-            {it.label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
+      <LogEditSheet log={editing} onClose={() => setEditing(null)} />
+    </SafeAreaView>
   );
 }
 
@@ -356,8 +353,6 @@ const styles = StyleSheet.create({
   addBtn: { minHeight: size.touch, minWidth: size.touch, paddingLeft: spacing.md, alignItems: 'flex-end', justifyContent: 'center' },
   addText: { fontSize: 14, fontFamily: fonts.semibold },
   rows: { gap: 4 },
-  aiRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.sm },
-  aiBtn: { flex: 1, minHeight: size.touch, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.pill, backgroundColor: colors.primaryTint },
   logRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   logName: { flex: 1, fontSize: 14 },
   bold: { fontFamily: fonts.bold },

@@ -2,50 +2,53 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Linking, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomSheet, Button, Card, Chip, IconButton, MenuTile, MillyAvatar, Skeleton, Text, TrustBadge, showToast, type MillyPose } from '@/components';
 import { QtyStepper } from '@/components/QtyStepper';
+import { DateChips, MealChips } from '@/components/RecordSheet';
 import { getBrand, normalizeName, searchMenus } from '@/data';
 import { AI_MEAL_DAILY_LIMIT } from '@/domain/aiMeal';
-import { applyOptions, judgeMenu } from '@/domain/judge';
+import { applyOptions } from '@/domain/judge';
+import { clampLogDate, dateLabel } from '@/domain/logDate';
 import { scaleNutrients } from '@/domain/qty';
-import { formatNumber, overToastSuffix, toDateKey } from '@/domain/summary';
-import { MEAL_LABEL, type MealLog, type MealType, type MenuItem } from '@/domain/types';
+import { formatNumber, toDateKey } from '@/domain/summary';
+import type { MealType, MenuItem } from '@/domain/types';
 import { aiMealQuotaLeft, analyzeMeal } from '@/services/ai/mealAnalyze';
 import { matchFoods, matchLabel, withMenu, type MatchedFood } from '@/services/ai/mealMatch';
 import { hasLLM } from '@/services/env';
-import { newId } from '@/services/id';
 import { pickMealPhoto } from '@/services/mealPhoto';
 import { searchProductsRemote } from '@/services/products';
-import { SPEECH_ERROR_TEXT, useSpeechInput } from '@/services/speech';
+import { SPEECH_ERROR_TEXT, speechErrorNeedsSettings, useSpeechInput } from '@/services/speech';
 import { defaultMealType, useDay } from '@/state/day';
-import { judgeContext } from '@/state/judgeContext';
 import { useProfile } from '@/state/profile';
+import { recordItems } from '@/state/recordItems';
 import { colors, radius, size, spacing, type } from '@/theme';
 
 /**
  * E4 AI로 기록 — 사진·말·글로 먹은 걸 알려주면 밀리가 "무엇을, 대략 얼마나"로 정리하고,
  * 칼로리는 앱 데이터(식약처·브랜드)에서 찾아 확인 카드로 보여준다. 확인 → 한 번에 기록.
- * 진입: 오늘 탭 [사진·말로·글로] 버튼, 기록 추가(E2) 아래 입력줄. params.mode 로 시작 동작을 고른다.
+ * 진입: 오늘·기록 탭 [사진·말로·글로] 버튼, 기록 추가(E2) 아래 입력줄. params.mode 로 시작 동작을 고른다.
+ * params.date 가 있으면 그날로 기록한다 (기록 탭에서 고른 지난 날). 확인 화면에서 날짜·끼니를 바꿀 수 있다.
  */
 
-const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 /** 사진에 덧붙이는 먹은 양 (선택) */
 const EATEN = ['다 먹었어요', '반쯤 먹었어요', '조금 남겼어요', '조금만 먹었어요'] as const;
 
 type Stage = 'input' | 'analyzing' | 'confirm';
 type Photo = { uri: string; base64: string };
-type Notice = { pose: MillyPose; text: string } | null;
+/** settings: 권한을 거절해 설정에서 켜야 할 때 "설정 열기" 버튼을 함께 */
+type Notice = { pose: MillyPose; text: string; settings?: boolean } | null;
+
+const openSettings = () => Linking.openSettings().catch(() => showToast('기기 설정에서 권한을 켜 주세요', 'info'));
 
 export default function AILog() {
-  const params = useLocalSearchParams<{ mode?: 'photo' | 'voice' | 'text'; text?: string }>();
-  const profile = useProfile((s) => s.profile);
+  const params = useLocalSearchParams<{ mode?: 'photo' | 'voice' | 'text'; text?: string; date?: string }>();
   const targets = useProfile((s) => s.targets);
   const summary = useDay((s) => s.summary);
-  const addLog = useDay((s) => s.addLog);
-  const remaining = summary?.remaining ?? targets;
+  /** 기록 전 오늘 더 먹을 수 있는 kcal (넘었으면 음수) */
+  const roomKcal = summary ? summary.remaining.kcal - (summary.over.kcal ?? 0) : targets?.kcal ?? null;
   const aiOn = hasLLM();
 
   const [stage, setStage] = useState<Stage>('input');
@@ -59,6 +62,7 @@ export default function AILog() {
   const [items, setItems] = useState<MatchedFood[]>([]);
   const [source, setSource] = useState<'ai' | 'cache' | 'rules'>('ai');
   const [meal, setMeal] = useState<MealType>(() => defaultMealType());
+  const [date, setDate] = useState(() => clampLogDate(params.date));
   const [saving, setSaving] = useState(false);
   /** 메뉴 바꾸기·추가 시트: key 가 있으면 그 줄 바꾸기, null 이면 새로 추가 */
   const [swap, setSwap] = useState<{ key: string | null; query: string } | null>(null);
@@ -101,7 +105,7 @@ export default function AILog() {
       setPhoto({ uri: r.uri, base64: r.base64 });
       setNotice(null);
     } else if (r.reason === 'denied') {
-      setNotice({ pose: 'sorry', text: '카메라 권한을 켜 주시면 사진으로 기록할 수 있어요. 앨범에서 골라도 돼요.' });
+      setNotice({ pose: 'sorry', text: '설정에서 카메라 권한을 켜 주시면 사진으로 기록할 수 있어요. 앨범에서 골라도 돼요.', settings: true });
     } else if (r.reason === 'failed') {
       setNotice({ pose: 'sorry', text: '사진을 불러오지 못했어요. 다시 한 번 해 주세요.' });
     }
@@ -164,44 +168,28 @@ export default function AILog() {
 
   const countable = items.filter((x) => x.base);
   const total = countable.reduce((s, x) => s + scaleNutrients(x.base!, x.qty).kcal, 0);
-  const after = remaining ? remaining.kcal - total : null;
+  const after = roomKcal != null && date === toDateKey() ? roomKcal - total : null;
 
+  /** 기록 — 매장 담기·기록 추가와 같은 recordItems (날짜·끼니·되돌리기 토스트). 판정은 같은 이름 메뉴를 찾은 것만 */
   async function save() {
     if (!countable.length || saving) return;
     setSaving(true);
-    const now = new Date();
-    const ctx = judgeContext(profile, useDay.getState().summary?.logs);
-    const logs: MealLog[] = countable.map((x, i) => {
-      const at = new Date(now.getTime() + i).toISOString();
-      const j = x.menu && x.kind === 'exact' && remaining ? judgeMenu(x.menu, remaining, ctx) : null;
-      return {
-        id: newId(),
-        date: toDateKey(now),
-        mealType: meal,
-        time: at,
-        createdAt: at,
-        qty: x.qty,
-        name: x.name,
-        ...(x.menu ? { brandId: x.menu.brandId, storeName: x.menu.maker ?? getBrand(x.menu.brandId)?.name, menuId: x.menu.id } : {}),
-        nutrients: scaleNutrients(x.base!, x.qty),
-        trust: x.trust,
-        verdict: j && !j.unknown ? j.verdict : undefined,
-      };
-    });
-    let ok = true;
-    for (const l of logs) ok = (await addLog(l)) && ok;
-    setSaving(false);
-    const day = useDay.getState();
-    const suffix = overToastSuffix(day.summary);
-    const head = `${MEAL_LABEL[meal]}으로 ${logs.length === 1 ? '' : `${logs.length}개 `}기록했어요`;
-    showToast(ok ? head + suffix : `${head} · 저장은 다음에 다시 시도할게요`, ok ? 'success' : 'info', {
-      label: '되돌리기',
-      onPress: () => logs.forEach((l) => void useDay.getState().removeLog(l.id)),
-    });
+    try {
+      await recordItems(
+        countable.map((x) => ({ name: x.name, base: x.base!, qty: x.qty, trust: x.trust, menu: x.menu, noVerdict: x.kind !== 'exact' })),
+        meal,
+        { date },
+      );
+    } catch {
+      showToast('기록을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요', 'info');
+      return;
+    } finally {
+      setSaving(false);
+    }
     close();
   }
 
-  const shownNotice: Notice = notice ?? (speech.error ? { pose: 'sorry', text: SPEECH_ERROR_TEXT[speech.error] } : null);
+  const shownNotice: Notice = notice ?? (speech.error ? { pose: 'sorry', text: SPEECH_ERROR_TEXT[speech.error], settings: speechErrorNeedsSettings(speech.error) } : null);
 
   const quotaText =
     !aiOn ? '지금은 글과 말로 알려 주시면 간단히 나눠 드려요' : left == null ? '' : left > 0 ? `오늘 밀리 정리 ${left}번 남았어요` : `오늘 밀리 정리 ${AI_MEAL_DAILY_LIMIT}번을 다 썼어요 · 글은 간단히 나눠 드려요`;
@@ -242,7 +230,11 @@ export default function AILog() {
       ) : stage === 'input' ? (
         <>
           <ScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            <Bubble pose={shownNotice?.pose ?? 'base'} text={shownNotice?.text ?? (photo ? '얼마나 드셨는지 알려 주시면 더 정확해요.' : '뭐 드셨어요? 사진을 찍거나 말로 알려 주시면 제가 정리할게요.')} />
+            <Bubble
+              pose={shownNotice?.pose ?? 'base'}
+              text={shownNotice?.text ?? (photo ? '얼마나 드셨는지 알려 주시면 더 정확해요.' : `뭐 드셨어요? 사진을 찍거나 말로 알려 주시면 제가 정리할게요.${date === toDateKey() ? '' : `\n${dateLabel(date)} 기록으로 남겨요.`}`)}
+              action={shownNotice?.settings ? { label: '설정 열기', onPress: openSettings } : undefined}
+            />
 
             {photo ? (
               <View style={styles.photoWrap}>
@@ -332,14 +324,8 @@ export default function AILog() {
               </Text>
             </Pressable>
 
-            <Text variant="captionMedium" color="ink2" style={styles.mealLabel}>
-              끼니
-            </Text>
-            <View style={styles.meals}>
-              {MEALS.map((m) => (
-                <Chip key={m} label={MEAL_LABEL[m]} variant="option" selected={meal === m} onPress={() => setMeal(m)} style={styles.mealChip} />
-              ))}
-            </View>
+            <DateChips value={date} onChange={setDate} extra={params.date} />
+            <MealChips value={meal} onChange={setMeal} />
           </ScrollView>
           <View style={styles.footer}>
             <View style={styles.totalRow}>
@@ -364,12 +350,19 @@ export default function AILog() {
   );
 }
 
-function Bubble({ pose, text }: { pose: MillyPose; text: string }) {
+function Bubble({ pose, text, action }: { pose: MillyPose; text: string; action?: { label: string; onPress: () => void } }) {
   return (
     <View style={styles.bubbleRow}>
       <MillyAvatar pose={pose} size={40} />
       <View style={styles.bubble}>
         <Text variant="body">{text}</Text>
+        {action ? (
+          <Pressable accessibilityRole="button" onPress={action.onPress} hitSlop={6} style={({ pressed }) => [styles.bubbleAction, pressed && styles.pressed]}>
+            <Text variant="label" color="primaryText">
+              {action.label}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -530,9 +523,7 @@ const styles = StyleSheet.create({
   itemBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 40 + spacing.md },
   emptyItems: { paddingVertical: spacing.xl },
   addMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, minHeight: 48, borderRadius: radius.button, borderWidth: 1, borderColor: colors.line },
-  mealLabel: { marginTop: spacing.xs },
-  meals: { flexDirection: 'row', gap: spacing.sm, marginTop: -spacing.sm },
-  mealChip: { flex: 1 },
+  bubbleAction: { alignSelf: 'flex-start', minHeight: 32, marginTop: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
   totalRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm, flexWrap: 'wrap' },
   search: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: radius.button, backgroundColor: colors.section, paddingHorizontal: spacing.lg, gap: spacing.sm, marginTop: spacing.md },
   searchInput: { flex: 1, height: '100%', ...type.body, color: colors.ink, outlineStyle: 'none' } as never,

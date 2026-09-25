@@ -5,7 +5,6 @@ import { Animated, LayoutAnimation, Pressable, ScrollView, Share, StyleSheet, Vi
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  BottomSheet,
   Button,
   Card,
   Chip,
@@ -24,22 +23,21 @@ import {
   showToast,
   type NutrientKey,
 } from '@/components';
-import { QtyStepper } from '@/components/QtyStepper';
+import { RecordSheet } from '@/components/RecordSheet';
 import { getBrand, getMenu, getMenusByBrand } from '@/data';
 import { STORE_CATEGORY_LABEL, formatPrice } from '@/data/labels';
 import { applyOptions, judgeMenu, suggestAlternatives } from '@/domain/judge';
-import { menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
-import { afterEating, formatNumber, overToastSuffix, toDateKey } from '@/domain/summary';
-import { MEAL_LABEL, VERDICT_LABEL, type DailyTargets, type DaySummary, type MealLog, type MealType, type MenuItem, type Nutrients, type OptionGroup } from '@/domain/types';
-import { newId } from '@/services/id';
+import { clampLogDate } from '@/domain/logDate';
+import { menuQtyUnit } from '@/domain/qty';
+import { afterEating, formatNumber } from '@/domain/summary';
+import { VERDICT_LABEL, type DailyTargets, type DaySummary, type MealType, type MenuItem, type Nutrients, type OptionGroup } from '@/domain/types';
 import { getCachedRemoteProduct } from '@/services/products';
 import { useJudgeContext } from '@/state/judgeContext';
 import { defaultMealType, useDay } from '@/state/day';
 import { ensureFavoritesLoaded, useFavorites, useIsFavorite } from '@/state/favorites';
 import { useProfile } from '@/state/profile';
+import { recordItems } from '@/state/recordItems';
 import { colors, fonts, radius, spacing } from '@/theme';
-
-const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 function defaultSelection(menu?: MenuItem): Record<string, string> {
   const out: Record<string, string> = {};
@@ -62,9 +60,9 @@ function choiceLabel(menu: MenuItem, g: OptionGroup, label: string, selected: Re
   return parts.join(' · ');
 }
 
-/** D4 메뉴 상세·구매 가이드 — 판정 배지 + 이유 한 줄 · "먹으면 N kcal 남아요" · 옵션(kcal 변화) · 대안 · 원탭 기록 */
+/** D4 메뉴 상세·구매 가이드 — 판정 배지 + 이유 한 줄 · "먹으면 N kcal 남아요" · 옵션(kcal 변화) · 대안 · 기록(양·날짜·끼니 시트) */
 export default function MenuDetail() {
-  const params = useLocalSearchParams<{ id: string; store?: string }>();
+  const params = useLocalSearchParams<{ id: string; store?: string; date?: string }>();
   // 서버 검색(E2)에서 고른 시판 제품은 로컬 카탈로그에 없을 수 있다 → 세션 캐시에서 찾는다
   // 즐겨찾기에 담아 둔 서버 제품은 다음 실행에도 열 수 있게 스냅샷으로 찾는다
   const favSnapshot = useFavorites((s) => s.items.find((x) => x.menuId === params.id)?.menu);
@@ -75,11 +73,11 @@ export default function MenuDetail() {
 
   const targets = useProfile((s) => s.targets);
   const summary = useDay((s) => s.summary);
-  const addLog = useDay((s) => s.addLog);
 
   const [selected, setSelected] = useState<Record<string, string>>(() => defaultSelection(menu));
   const [sheet, setSheet] = useState(false);
   const [meal, setMeal] = useState<MealType>(() => defaultMealType());
+  const [date, setDate] = useState(() => clampLogDate(params.date));
   const [qty, setQty] = useState(1);
   const [saving, setSaving] = useState(false);
   const [detail, setDetail] = useState(false);
@@ -138,48 +136,33 @@ export default function MenuDetail() {
     Share.share({ message: `${menu.name} — ${verdict}` }).catch(() => {});
   };
 
-  /** 기록 — 원탭(끼니 자동·1개)과 시트(끼니·양 선택) 공통. 되돌리기 토스트 후 이전 화면으로 */
-  const record = async (mealType: MealType, q: number) => {
+  /** 기본값이 아닌 옵션 라벨 ("시럽 빼기") — 기록·시트에 함께 */
+  const optionLabels = (menu.options ?? [])
+    .map((g) => {
+      const label = selected[g.id];
+      const def = g.choices.find((c) => c.isDefault)?.label;
+      return label && label !== def ? label : undefined;
+    })
+    .filter((x): x is string => !!x);
+
+  /** 기록 — 매장 담기·기록 추가와 같은 시트(양·날짜·끼니)에서. 고른 옵션을 반영한 영양으로 저장, 되돌리기 토스트 후 이전 화면으로 */
+  const record = async () => {
     if (!nutrients || saving) return;
     setSaving(true);
-    const now = new Date();
-    const optionLabels = (menu.options ?? [])
-      .map((g) => {
-        const label = selected[g.id];
-        const def = g.choices.find((c) => c.isDefault)?.label;
-        return label && label !== def ? label : undefined;
-      })
-      .filter((x): x is string => !!x);
-    const log: MealLog = {
-      id: newId(),
-      date: toDateKey(now),
-      mealType,
-      time: now.toISOString(),
-      name: menu.name,
-      brandId: menu.brandId,
-      storeName,
-      menuId: menu.id,
-      optionLabels: optionLabels.length ? optionLabels : undefined,
-      nutrients: scaleNutrients(nutrients, q),
-      trust: menu.trust,
-      qty: q,
-      verdict: judgement && !judgement.unknown ? judgement.verdict : undefined,
-      createdAt: now.toISOString(),
-    };
-    const ok = await addLog(log);
-    setSaving(false);
-    setSheet(false);
-    const text = `${MEAL_LABEL[mealType]}으로 기록했어요`;
-    // 이 기록으로 하루 목표를 넘은 상태면 넘은 양도 함께 ("… · 오늘 목표보다 120kcal 넘었어요")
-    showToast(ok ? text + overToastSuffix(useDay.getState().summary) : `${text} · 저장은 다음에 다시 시도할게요`, ok ? 'success' : 'info', {
-      label: '되돌리기',
-      onPress: () => void useDay.getState().removeLog(log.id),
-    });
-    if (router.canGoBack()) router.back();
+    try {
+      await recordItems([{ name: menu.name, base: nutrients, qty, trust: menu.trust, menu, storeName, optionLabels }], meal, { date });
+      setSheet(false);
+      if (router.canGoBack()) router.back();
+    } catch {
+      showToast('기록을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요', 'info');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openSheet = () => {
     setMeal(defaultMealType());
+    setDate(clampLogDate(params.date));
     setQty(1);
     setSheet(true);
   };
@@ -373,35 +356,27 @@ export default function MenuDetail() {
         )}
       </ScrollView>
 
-      {/* 6. 하단 CTA — 한 번에 기록(끼니 자동·1개). 끼니·양을 고르고 싶으면 위 글자 버튼 */}
+      {/* 6. 하단 CTA — 양·날짜·끼니를 고르는 기록 시트 (매장 담기·기록 추가와 같은 모양) */}
       {!unknown ? (
         <View style={styles.footer}>
-          <Pressable accessibilityRole="button" onPress={openSheet} hitSlop={6} style={({ pressed }) => [styles.subCta, pressed && styles.pressed]}>
-            <Text variant="captionMedium" color="ink2">
-              끼니·양 정해서 기록
-            </Text>
-          </Pressable>
-          <Button title="이걸로 기록" loading={saving && !sheet} onPress={() => void record(defaultMealType(), 1)} accessibilityLabel={`${MEAL_LABEL[defaultMealType()]}으로 1${unit} 기록`} />
+          <Button title="기록하기" onPress={openSheet} accessibilityLabel={`${menu.name} 양·끼니 정해서 기록`} />
         </View>
       ) : null}
 
-      <BottomSheet
-        visible={sheet}
+      <RecordSheet
+        visible={sheet && !!nutrients}
         onClose={() => setSheet(false)}
-        title="어느 끼니로 기록할까요?"
-        subtitle={nutrients ? `${menu.name} · ${qtyLabel(qty, unit)} ${formatNumber(scaleNutrients(nutrients, qty).kcal)} kcal` : menu.name}
-        footer={<Button title="기록하기" loading={saving} onPress={() => void record(meal, qty)} />}
-      >
-        <View style={styles.meals}>
-          {MEALS.map((m) => (
-            <Chip key={m} label={MEAL_LABEL[m]} variant="option" size="lg" selected={meal === m} onPress={() => setMeal(m)} style={styles.mealChip} />
-          ))}
-        </View>
-        <Text variant="captionMedium" color="ink2" style={styles.qtyLabel}>
-          얼마나 먹었나요?
-        </Text>
-        <QtyStepper value={qty} onChange={setQty} unit={unit} size="lg" style={styles.stepper} />
-      </BottomSheet>
+        items={nutrients ? [{ key: menu.id, name: menu.name, sub: [storeName, ...optionLabels].filter(Boolean).join(' · ') || undefined, base: nutrients, unit, qty }] : []}
+        onQty={(_k, q) => setQty(q)}
+        meal={meal}
+        onMeal={setMeal}
+        date={date}
+        onDate={setDate}
+        dateExtra={params.date}
+        remainingKcal={summary ? summary.remaining.kcal - (summary.over.kcal ?? 0) : targets?.kcal ?? null}
+        saving={saving}
+        onSave={() => void record()}
+      />
     </SafeAreaView>
   );
 }
@@ -603,10 +578,5 @@ const styles = StyleSheet.create({
   alts: { marginTop: spacing.xs },
   alt: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   altBody: { flex: 1, minWidth: 0 },
-  footer: { paddingHorizontal: spacing.page, paddingTop: spacing.xs, paddingBottom: spacing.lg, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
-  subCta: { alignSelf: 'center', minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, marginBottom: spacing.xs },
-  meals: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  mealChip: { flexGrow: 1, flexBasis: '45%' },
-  qtyLabel: { marginTop: spacing.lg },
-  stepper: { marginTop: spacing.sm },
+  footer: { paddingHorizontal: spacing.page, paddingTop: spacing.md, paddingBottom: spacing.lg, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
 });

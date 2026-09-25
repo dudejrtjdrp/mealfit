@@ -19,6 +19,8 @@ interface DayState {
   logs: MealLog[];
   summary: DaySummary | null;
   status: 'idle' | 'loading' | 'ready' | 'error';
+  /** 기록이 추가·수정·삭제될 때마다 +1 — 오늘이 아닌 날을 보는 화면(기록 탭)이 다시 읽는 신호 */
+  rev: number;
   load: (date?: string) => Promise<void>;
   addLog: (log: MealLog) => Promise<boolean>;
   updateLog: (log: MealLog) => Promise<boolean>;
@@ -81,6 +83,7 @@ export const useDay = create<DayState>((set, get) => ({
   logs: [],
   summary: null,
   status: 'idle',
+  rev: 0,
 
   load: async (date = toDateKey()) => {
     set({ date, status: 'loading', summary: summarize(date, get().date === date ? get().logs : []) });
@@ -100,10 +103,12 @@ export const useDay = create<DayState>((set, get) => ({
       const next = sortLogs([...logs.filter((l) => l.id !== log.id), log]);
       set({ logs: next, summary: summarize(date, next) });
     }
+    set((st) => ({ rev: st.rev + 1 }));
     rangeCache.clear();
     try {
       await getRepos().logs.add(log);
       rangeCache.clear();
+      set((st) => ({ rev: st.rev + 1 }));
       return true;
     } catch (e) {
       console.warn('[day] add 실패', e);
@@ -113,12 +118,15 @@ export const useDay = create<DayState>((set, get) => ({
 
   updateLog: async (log) => {
     const { date, logs } = get();
-    const next = sortLogs(log.date === date ? logs.map((l) => (l.id === log.id ? log : l)) : logs.filter((l) => l.id !== log.id));
-    set({ logs: next, summary: summarize(date, next) });
+    // 다른 날에서 이 날로 옮겨 온 기록도 들어오게 (바꾸기 = 빼고 넣기)
+    const others = logs.filter((l) => l.id !== log.id);
+    const next = sortLogs(log.date === date ? [...others, log] : others);
+    set((st) => ({ logs: next, summary: summarize(date, next), rev: st.rev + 1 }));
     rangeCache.clear();
     try {
       await getRepos().logs.update(log);
       rangeCache.clear();
+      set((st) => ({ rev: st.rev + 1 }));
       return true;
     } catch (e) {
       console.warn('[day] update 실패', e);
@@ -129,11 +137,12 @@ export const useDay = create<DayState>((set, get) => ({
   removeLog: async (id) => {
     const { date, logs } = get();
     const next = logs.filter((l) => l.id !== id);
-    set({ logs: next, summary: summarize(date, next) });
+    set((st) => ({ logs: next, summary: summarize(date, next), rev: st.rev + 1 }));
     rangeCache.clear();
     try {
       await getRepos().logs.remove(id);
       rangeCache.clear();
+      set((st) => ({ rev: st.rev + 1 }));
       return true;
     } catch (e) {
       console.warn('[day] remove 실패', e);
