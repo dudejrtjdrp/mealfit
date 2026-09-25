@@ -1,6 +1,20 @@
 import { haversineM } from '../../domain/geo';
 import { judgeMenu } from '../../domain/judge';
-import { getBrand, getBrands, getMenu, getMenus, getMenusByBrand, getMockStores, getSeedPolicy, matchBrand, searchMenus } from '../index';
+import { drinkKey, mergeSeedOptionsIntoOfficial } from '../dedupe';
+import {
+  getBrand,
+  getBrands,
+  getMenu,
+  getMenus,
+  getMenusByBrand,
+  getMergedSeedCounts,
+  getMockStores,
+  getSeedPolicy,
+  matchBrand,
+  normalizeName,
+  searchMenus,
+} from '../index';
+import type { MenuItem } from '../../domain/types';
 
 const CENTER = { lat: 37.5006, lng: 127.0366 };
 
@@ -86,12 +100,130 @@ describe('시드 정리 정책 (로더)', () => {
     }
   });
 
-  it('스타벅스 D3 목록에 옵션 있는 시드(아이스 카페 라떼 등)가 옵션째 보인다', () => {
-    const latte = getMenusByBrand('starbucks').find((m) => m.id === 'starbucks-iced-latte');
-    expect(latte?.trust).toBe('estimated');
-    expect(latte?.options?.map((g) => g.label)).toEqual(['사이즈', '우유 변경']);
-    expect(getMenusByBrand('starbucks').filter((m) => m.options?.some((g) => g.id === 'syrup')).length).toBeGreaterThan(0);
+  it('스타벅스 D3 목록: 공식판과 겹치는 시드 옵션판은 빠지고, 우유·시럽 옵션은 공식판에서 고를 수 있다', () => {
+    const sb = getMenusByBrand('starbucks');
+    // 시드 "아이스 카페 라떼"(사이즈·우유) → 공식 "카페 라떼 아이스(ICED) (Tall)" 에 우유 옵션만 옮긴다(사이즈는 공식판이 따로 있다)
+    expect(sb.some((m) => m.id === 'starbucks-iced-latte')).toBe(false);
+    const iced = sb.filter((m) => m.trust === 'official' && drinkKey(m.name).base === '카페라떼' && drinkKey(m.name).temp === 'ice');
+    expect(iced.length).toBeGreaterThanOrEqual(1);
+    for (const m of iced) expect(m.options?.map((g) => g.label)).toEqual(['우유 변경']);
+    expect(sb.filter((m) => m.options?.some((g) => g.id === 'syrup')).length).toBeGreaterThan(0);
     expect(getSeedPolicy().keptWithOptionsByBrand.starbucks).toBeGreaterThan(0);
+  });
+});
+
+describe('같은 음료 중복 병합 (시드 옵션판 ↔ 공식 사이즈판)', () => {
+  it('어느 브랜드 목록에도 같은 음료(이름·온도 정규화 후)가 시드 옵션판과 공식판으로 함께 있지 않다', () => {
+    for (const b of getBrands()) {
+      const ms = getMenusByBrand(b.id);
+      const official = new Set(ms.filter((m) => m.trust === 'official').map((m) => JSON.stringify(drinkKey(m.name))));
+      const officialBase = new Set(ms.filter((m) => m.trust === 'official').map((m) => drinkKey(m.name).base));
+      for (const s of ms.filter((m) => m.trust === 'estimated' && m.options?.length)) {
+        const k = drinkKey(s.name);
+        expect(official.has(JSON.stringify(k)) || (k.temp === null && officialBase.has(k.base))).toBe(false);
+      }
+    }
+    expect(getMergedSeedCounts().starbucks).toBeGreaterThanOrEqual(10);
+  });
+
+  it('뺀 시드판도 id 로는 그대로 찾힌다 (예전 기록의 menuId)', () => {
+    for (const id of ['starbucks-iced-latte', 'starbucks-iced-americano', 'starbucks-caramel-macchiato']) {
+      const m = getMenu(id);
+      expect(m?.trust).toBe('estimated');
+      expect(m?.options?.length).toBeGreaterThan(0);
+      expect(getMenusByBrand('starbucks').some((x) => x.id === id)).toBe(false);
+    }
+  });
+
+  it('시드판의 시럽·우유 옵션이 사라지지 않는다 — 공식판으로 옮겨지거나 시드판이 남는다', () => {
+    const seeds = (require('../menus.json') as MenuItem[]).filter((m) => m.trust === 'estimated' && m.options?.some((g) => g.id !== 'size'));
+    for (const s of seeds) {
+      const listed = getMenusByBrand(s.brandId);
+      if (listed.some((m) => m.id === s.id)) continue;
+      const k = drinkKey(s.name);
+      const carriers = listed.filter((m) => m.trust === 'official' && drinkKey(m.name).base === k.base);
+      if (!carriers.length) continue; // 다른 정책(mergeMenus)으로 빠진 시드
+      for (const g of s.options!.filter((x) => x.id !== 'size')) {
+        expect(carriers.some((m) => m.options?.some((x) => x.id === g.id))).toBe(true);
+      }
+    }
+  });
+
+  it('옮긴 옵션도 판정 구매 가이드에 쓰인다 (공식 카라멜 마키아또 "시럽 빼면")', () => {
+    const macchiato = getMenusByBrand('starbucks').find(
+      (m) => m.trust === 'official' && drinkKey(m.name).base === '카라멜마키아또' && m.options?.some((g) => g.id === 'syrup'),
+    );
+    expect(macchiato).toBeDefined();
+    const remaining = { kcal: 300, carbs: 128, protein: 44, fat: 42, sugar: 30, sodium: 1200, emphasis: ['carbs', 'protein', 'fat'] as ('carbs' | 'protein' | 'fat')[] };
+    const profile = { primaryGoal: 'maintain' as const, secondaryGoals: [], diet: { type: 'balanced' as const, evidence: [], source: 'rule' as const } };
+    const guides = [8, 12, 19].map((h) => judgeMenu(macchiato!, remaining, { profile, now: new Date(2026, 8, 15, h) }).guide);
+    expect(guides.some((g) => g?.startsWith('시럽 빼면'))).toBe(true);
+  });
+});
+
+describe('drinkKey · mergeSeedOptionsIntoOfficial (순수 함수)', () => {
+  it('사이즈·온도 표기와 공백을 빼고 온도를 따로 본다', () => {
+    expect(drinkKey('카페 라떼 아이스(ICED) (Tall)')).toEqual({ base: '카페라떼', temp: 'ice' });
+    expect(drinkKey('아이스 카페 라떼')).toEqual({ base: '카페라떼', temp: 'ice' });
+    expect(drinkKey('카페라떼')).toEqual({ base: '카페라떼', temp: null });
+    expect(drinkKey('카페 라떼 핫(HOT) (EX)')).toEqual({ base: '카페라떼', temp: 'hot' });
+    expect(drinkKey('HOT 흑임자 크림 라떼')).toEqual({ base: '흑임자크림라떼', temp: 'hot' });
+    expect(drinkKey('콜드 브루 (Tall)')).toEqual({ base: '콜드브루', temp: null });
+    expect(drinkKey('카페 라떼 Grande')).toEqual({ base: '카페라떼', temp: null });
+    // 이름의 일부인 아이스는 그대로
+    expect(drinkKey('아이스크림 카페 라떼').base).toBe('아이스크림카페라떼');
+    expect(drinkKey('복숭아 아이스티').base).toBe('복숭아아이스티');
+    expect(normalizeName('카페 라떼')).toBe(drinkKey('카페 라떼 (Venti)').base);
+  });
+
+  const off = (id: string, name: string, kcal: number, brandId = 'cafe'): MenuItem => ({
+    id,
+    brandId,
+    name,
+    category: 'drink',
+    serving: '1잔',
+    nutrients: { kcal },
+    trust: 'official',
+    sourceUrl: 'https://example.com',
+  });
+  const seed: MenuItem = {
+    id: 'cafe-iced-latte',
+    brandId: 'cafe',
+    name: '아이스 카페 라떼',
+    category: 'drink',
+    serving: 'Tall',
+    nutrients: { kcal: 110 },
+    trust: 'estimated',
+    blurb: '부드러운 라떼예요.',
+    options: [
+      { id: 'size', label: '사이즈', choices: [{ label: 'Tall', delta: {}, isDefault: true }, { label: 'Venti', delta: { kcal: 70 } }] },
+      { id: 'milk', label: '우유 변경', choices: [{ label: '일반', delta: {}, isDefault: true }, { label: '오트밀크', delta: { kcal: -10 } }] },
+    ],
+  };
+
+  it('같은 브랜드·이름·온도의 공식판이 있으면 시드를 숨기고 사이즈 외 옵션·소개를 공식판마다 옮긴다', () => {
+    const input = [seed, off('o-ice-t', '카페 라떼 아이스(ICED) (Tall)', 110), off('o-ice-v', '카페 라떼 아이스(ICED) (Venti)', 180), off('o-hot', '카페 라떼 핫(HOT) (Tall)', 180), off('x', '카페 라떼 아이스(ICED)', 1, 'other')];
+    const r = mergeSeedOptionsIntoOfficial(input);
+    expect(r.menus.map((m) => m.id)).toEqual(['o-ice-t', 'o-ice-v', 'o-hot', 'x']);
+    expect(r.hidden.map((m) => m.id)).toEqual(['cafe-iced-latte']);
+    expect(r.mergedByBrand).toEqual({ cafe: 1 });
+    for (const id of ['o-ice-t', 'o-ice-v']) {
+      const m = r.menus.find((x) => x.id === id)!;
+      expect(m.options?.map((g) => g.id)).toEqual(['milk']);
+      expect(m.blurb).toBe('부드러운 라떼예요.');
+      expect(m.trust).toBe('official');
+    }
+    // 온도가 다른 공식판·다른 브랜드는 건드리지 않는다
+    expect(r.menus.find((x) => x.id === 'o-hot')?.options).toBeUndefined();
+    expect(r.menus.find((x) => x.id === 'x')?.options).toBeUndefined();
+    // 입력은 바꾸지 않는다
+    expect(input[1].options).toBeUndefined();
+  });
+
+  it('짝이 없으면 시드 옵션판을 그대로 둔다', () => {
+    const r = mergeSeedOptionsIntoOfficial([seed, off('o-hot', '카페 라떼 핫(HOT) (Tall)', 180), off('o2', '바닐라 라떼 아이스(ICED)', 200)]);
+    expect(r.hidden).toEqual([]);
+    expect(r.menus[0]).toBe(seed);
   });
 });
 

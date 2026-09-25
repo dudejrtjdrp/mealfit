@@ -1,5 +1,6 @@
 import type { Brand, MenuItem, Store } from '../domain/types';
 import brandsJson from './brands.json';
+import { mergeSeedOptionsIntoOfficial } from './dedupe';
 import { DATASETS, PACKAGED_BRAND_ID, mergeBrands, mergeMenus } from './ingest/nutrition';
 import { getMockStores as buildMockStores } from './mockStores';
 
@@ -27,6 +28,8 @@ interface Catalog {
   menusByBrand: Map<string, MenuItem[]>;
   keywordIndex: { key: string; brand: Brand }[];
   seedPolicy: ReturnType<typeof mergeMenus>['seedPolicy'];
+  /** 공식 사이즈판과 겹쳐 목록에서 뺀(옵션은 공식판으로 옮긴) 시드 옵션판 수, 브랜드별 */
+  mergedSeedsByBrand: Record<string, number>;
 }
 
 /**
@@ -44,7 +47,9 @@ function buildCatalog(): Catalog {
   // 손으로 만든 시드 + 공공데이터 (정책은 mergeMenus 참고):
   // 공공데이터 official 20개 이상 브랜드는 옵션 없는 시드 estimated 를 목록에서 빼고(옵션 시드는 D4 옵션 칩·구매 가이드용으로 유지), 같은 브랜드·메뉴명의 추정치는 공식값으로 교체, 나머지는 추가
   const merged = mergeMenus(menusJson, mfds.menus);
-  const menus = merged.menus;
+  // 같은 음료가 시드 옵션판 + 공식 사이즈판으로 두 번 보이지 않게: 공식판을 남기고 시드의 사이즈 외 옵션(시럽·우유 등)을 옮긴다
+  const deduped = mergeSeedOptionsIntoOfficial(merged.menus);
+  const menus = deduped.menus;
   const brands = [...mergeBrands(brandsJson as Brand[], mfds.brands, menus), PACKAGED_BRAND];
 
   const menusByBrand = new Map<string, MenuItem[]>();
@@ -58,7 +63,7 @@ function buildCatalog(): Catalog {
     menus,
     brandById: new Map(brands.map((b) => [b.id, b])),
     // 목록에서 뺀 시드 메뉴도 id 로는 찾을 수 있게 둔다 — 예전 기록(menuId)·딥링크가 "정보 없음"으로 바뀌지 않게
-    menuById: new Map([...merged.hidden, ...menus].map((m) => [m.id, m])),
+    menuById: new Map([...merged.hidden, ...deduped.hidden, ...menus].map((m) => [m.id, m])),
     menusByBrand,
     // 긴 키워드부터 비교해 "CU" 같은 짧은 키워드가 먼저 잡히지 않게 한다
     keywordIndex: brands
@@ -66,6 +71,7 @@ function buildCatalog(): Catalog {
       .filter((x) => x.key.length > 0)
       .sort((a, b) => b.key.length - a.key.length),
     seedPolicy: merged.seedPolicy,
+    mergedSeedsByBrand: deduped.mergedByBrand,
   };
 }
 
@@ -162,6 +168,10 @@ export function getProductCount(): number {
 /** 시드 정리 정책 결과 (목록에서 뺀/남긴 시드 메뉴 수) — 검증·디버그용 */
 export function getSeedPolicy() {
   return data().seedPolicy;
+}
+/** 공식 사이즈판과 합쳐 목록에서 뺀 시드 옵션판 수 (브랜드별) — 검증·디버그용 */
+export function getMergedSeedCounts(): Record<string, number> {
+  return data().mergedSeedsByBrand;
 }
 
 // 기록 추가(E2) 검색용: 정규화 이름을 한 번만 계산해 두고(3만여 개), 키 입력마다 정규식을 다시 돌리지 않는다
