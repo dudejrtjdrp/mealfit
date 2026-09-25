@@ -13,7 +13,7 @@ import { VERDICT_LABEL, type Store, type StoreCategory } from '@/domain/types';
 import { judgeProfile } from '@/state/bootstrap';
 import { useDay } from '@/state/day';
 import type { Radius } from '@/services/kakao';
-import { filterStores, shortAreaName, summarizeRanked, useNearby, type CategoryFilter, type StorePick } from '@/state/nearby';
+import { filterStores, shortAreaName, splitByInfo, summarizeRanked, useNearby, type CategoryFilter, type StorePick } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
 import { colors, fonts, radius, size, spacing } from '@/theme';
 
@@ -62,6 +62,10 @@ export default function Nearby() {
     return p;
   };
   const busy = status === 'locating' || status === 'loading';
+  // 정보 없는 매장은 목록 맨 아래 "정보 준비 중 N곳" 한 줄로 접는다
+  const { known, noInfo } = useMemo(() => splitByInfo(visible), [visible]);
+  const [showNoInfo, setShowNoInfo] = useState(false);
+  const openStore = (s: Store) => router.push({ pathname: '/store/[id]', params: { id: s.id, brandId: s.brandId ?? '' } });
 
   let body: ReactNode;
   if (status === 'denied') {
@@ -102,9 +106,27 @@ export default function Nearby() {
   } else {
     body = (
       <View style={styles.list}>
-        {visible.map((s) => (
-          <StoreCard key={s.id} store={s} pick={pickFor(s)} onPress={() => router.push({ pathname: '/store/[id]', params: { id: s.id, brandId: s.brandId ?? '' } })} />
+        {known.map((s) => (
+          <StoreCard key={s.id} store={s} pick={pickFor(s)} onPress={() => openStore(s)} />
         ))}
+        {noInfo.length > 0 && known.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showNoInfo }}
+            accessibilityLabel={`정보 준비 중인 매장 ${noInfo.length}곳, ${showNoInfo ? '접기' : '펼치기'}`}
+            onPress={() => setShowNoInfo((v) => !v)}
+            style={({ pressed }) => [styles.foldRow, pressed && styles.pressed]}
+          >
+            <Ionicons name="time-outline" size={16} color={colors.ink3} />
+            <Text variant="captionMedium" color="ink2" style={styles.foldText}>
+              정보 준비 중 {noInfo.length}곳
+            </Text>
+            <View style={showNoInfo ? styles.flip : undefined}>
+              <ChevronDownIcon size={18} color={colors.ink3} />
+            </View>
+          </Pressable>
+        ) : null}
+        {showNoInfo || known.length === 0 ? noInfo.map((s) => <StoreCard key={s.id} store={s} pick={null} onPress={() => openStore(s)} />) : null}
         {source === 'mock' ? (
           <Text variant="caption" color="ink3" align="center" style={styles.sourceNote}>
             예시 매장 목록이에요
@@ -264,6 +286,9 @@ const styles = StyleSheet.create({
   pick: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   pickLead: { fontFamily: fonts.semibold },
   pickName: { flexShrink: 1 },
+  foldRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.section },
+  foldText: { flex: 1 },
+  flip: { transform: [{ rotate: '180deg' }] },
   skelBody: { flex: 1, gap: spacing.sm },
   sourceNote: { marginTop: spacing.sm },
 });
