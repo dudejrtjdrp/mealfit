@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BrandTile, ChevronRightIcon, Chip, CoverageBadge, EmptyState, PinIcon, Skeleton, Text, showToast } from '@/components';
+import { BottomSheet, BrandTile, ChevronDownIcon, ChevronRightIcon, Chip, CoverageBadge, EmptyState, PinIcon, Skeleton, Text, showToast } from '@/components';
 import { getBrand, getMenusByBrand } from '@/data';
 import { STORE_CATEGORY_LABEL, formatDistance } from '@/data/labels';
 import { applyOptions, rankMenus } from '@/domain/judge';
@@ -12,9 +12,16 @@ import { formatNumber } from '@/domain/summary';
 import { VERDICT_LABEL, type Store, type StoreCategory } from '@/domain/types';
 import { judgeProfile } from '@/state/bootstrap';
 import { useDay } from '@/state/day';
-import { filterStores, summarizeRanked, useNearby, type CategoryFilter, type StorePick } from '@/state/nearby';
+import type { Radius } from '@/services/kakao';
+import { filterStores, shortAreaName, summarizeRanked, useNearby, type CategoryFilter, type StorePick } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
 import { colors, fonts, radius, size, spacing } from '@/theme';
+
+const RADII: { value: Radius; label: string; hint: string }[] = [
+  { value: 500, label: '500m', hint: '걸어서 7분 안팎' },
+  { value: 1000, label: '1km', hint: '걸어서 15분 안팎' },
+];
+const radiusLabel = (r: Radius) => (r === 500 ? '500m' : '1km');
 
 const CATS: { id: CategoryFilter; label: string }[] = [
   { id: 'all', label: '전체' },
@@ -25,9 +32,10 @@ const CATS: { id: CategoryFilter; label: string }[] = [
   { id: 'bakery', label: '베이커리' },
 ];
 
-/** D1 주변 매장 목록 — 위치 헤더(탭 → 위치 설정) · 반경/카테고리 칩 · 매장 카드(커버리지 아웃라인 배지) */
+/** D1 주변 매장 목록 — 위치 헤더("역삼동 · 500m ▾": 동네 탭 → 위치 설정, 반경 탭 → 시트) · 카테고리 칩 · 매장 카드(판정 요약) */
 export default function Nearby() {
   const { areaName, pinned, radiusM, category, stores, status, source, setRadius, setCategory, refresh } = useNearby();
+  const [radiusOpen, setRadiusOpen] = useState(false);
 
   // 처음 들어오거나 5분이 지났으면 새로 찾는다
   useFocusEffect(
@@ -117,26 +125,38 @@ export default function Nearby() {
           <Text variant="h1" accessibilityRole="header">
             주변
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`검색 위치 설정, 지금 ${areaName || '현재 위치'}`}
-            accessibilityHint="지도에서 검색 기준 위치를 바꿀 수 있어요"
-            onPress={() => router.push('/nearby/location')}
-            style={styles.area}
-          >
-            <PinIcon size={18} color={pinned ? colors.primary : colors.ink2} />
-            <Text variant="caption" color={pinned ? 'primaryText' : 'ink2'} numberOfLines={1} style={styles.areaText}>
-              {areaName || (status === 'locating' ? '위치 찾는 중' : '현재 위치')}
+          <View style={styles.locRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`검색 위치 설정, 지금 ${areaName || '현재 위치'}`}
+              accessibilityHint="지도에서 검색 기준 위치를 바꿀 수 있어요"
+              onPress={() => router.push('/nearby/location')}
+              style={({ pressed }) => [styles.area, pressed && styles.pressed]}
+            >
+              <PinIcon size={18} color={pinned ? colors.primary : colors.ink2} />
+              <Text variant="captionMedium" color={pinned ? 'primaryText' : 'ink'} numberOfLines={1} style={styles.areaText}>
+                {areaName ? shortAreaName(areaName) : status === 'locating' ? '위치 찾는 중' : '현재 위치'}
+              </Text>
+            </Pressable>
+            <Text variant="caption" color="ink3">
+              ·
             </Text>
-            <ChevronRightIcon size={16} color={colors.ink3} />
-          </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`검색 반경 ${radiusLabel(radiusM)}, 바꾸기`}
+              hitSlop={6}
+              onPress={() => setRadiusOpen(true)}
+              style={({ pressed }) => [styles.radiusBtn, pressed && styles.pressed]}
+            >
+              <Text variant="captionMedium" color="ink">
+                {radiusLabel(radiusM)}
+              </Text>
+              <ChevronDownIcon size={16} color={colors.ink3} />
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipsWrap}>
-          {([500, 1000] as const).map((r) => (
-            <Chip key={r} label={r === 500 ? '500m' : '1km'} variant="option" selected={radiusM === r} onPress={() => setRadius(r)} />
-          ))}
-          <View style={styles.chipDivider} />
           {CATS.map((c) => (
             <Chip key={c.id} label={c.label} selected={category === c.id} onPress={() => setCategory(c.id)} />
           ))}
@@ -144,6 +164,35 @@ export default function Nearby() {
 
         {body}
       </ScrollView>
+
+      <BottomSheet visible={radiusOpen} onClose={() => setRadiusOpen(false)} title="얼마나 멀리까지 찾을까요?">
+        {RADII.map((r, i) => {
+          const selected = r.value === radiusM;
+          return (
+            <Pressable
+              key={r.value}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${r.label}, ${r.hint}`}
+              onPress={() => {
+                setRadiusOpen(false);
+                setRadius(r.value);
+              }}
+              style={({ pressed }) => [styles.radiusRow, i > 0 && styles.radiusRowSep, pressed && styles.pressed]}
+            >
+              <View style={styles.radiusBody}>
+                <Text variant="h3" color={selected ? 'primaryText' : 'ink'}>
+                  {r.label}
+                </Text>
+                <Text variant="caption" color="ink3">
+                  {r.hint}
+                </Text>
+              </View>
+              {selected ? <Ionicons name="checkmark" size={22} color={colors.primary} /> : null}
+            </Pressable>
+          );
+        })}
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -198,11 +247,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingBottom: spacing.xxxl },
   header: { paddingHorizontal: spacing.page, paddingTop: spacing.lg, minHeight: size.header },
-  area: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, minHeight: 32, alignSelf: 'flex-start' },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  area: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, flexShrink: 1 },
   areaText: { flexShrink: 1 },
+  radiusBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 36 },
+  radiusRow: { flexDirection: 'row', alignItems: 'center', minHeight: 64, paddingVertical: spacing.md },
+  radiusRowSep: { borderTopWidth: 1, borderTopColor: colors.line },
+  radiusBody: { flex: 1, gap: 2 },
   chipsWrap: { marginTop: spacing.md, flexGrow: 0 },
   chips: { paddingHorizontal: spacing.page, gap: spacing.sm, alignItems: 'center' },
-  chipDivider: { width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: spacing.xs },
   list: { paddingHorizontal: spacing.page, marginTop: spacing.lg, gap: 10 },
   card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: spacing.lg },
   pressed: { opacity: 0.8 },

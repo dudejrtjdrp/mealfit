@@ -204,3 +204,15 @@ export function summarizeRanked(ranked: RankedMenu[]): StorePick {
   }
   return { good, ok, known, top };
 }
+
+/**
+ * 헤더용 짧은 동네 이름 — "서울 강남구 역삼동" → "역삼동", "경기 성남시 분당구 정자동" → "정자동".
+ * 주소 꼴이 아니면(지도에서 고른 장소 이름 등) 그대로 둔다.
+ */
+export function shortAreaName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return name.trim();
+  const last = parts[parts.length - 1];
+  const isAddress = /(시|도|특별시|광역시)$/.test(parts[0]) || /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/.test(parts[0]);
+  return isAddress && /(동|가|읍|면|리)$/.test(last) ? last : name.trim();
+}

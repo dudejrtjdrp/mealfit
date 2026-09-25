@@ -9,7 +9,7 @@ import { YEOKSAM_CENTER } from '../../data/mockStores';
 import { clearNearbyCache } from '../../services/kakao';
 import * as location from '../../services/location';
 import { getBrands } from '../../data';
-import { filterStores, groupByVerdict, nearestOfBrand, searchBrands, splitByInfo, summarizeRanked, useNearby } from '../nearby';
+import { filterStores, groupByVerdict, nearestOfBrand, searchBrands, shortAreaName, splitByInfo, summarizeRanked, useNearby } from '../nearby';
 
 const loc = location as jest.Mocked<typeof location>;
 
@@ -198,5 +198,17 @@ describe('주변 목록 도우미', () => {
     expect(pick).toMatchObject({ good: 2, ok: 1, known: 4 });
     expect(pick.top?.menu.id).toBe('o1');
     expect(summarizeRanked([{ menu: m('p'), judgement: j('pass') }]).top).toBeNull();
+  });
+});
+
+describe('shortAreaName', () => {
+  it('주소 꼴이면 동 이름만, 아니면 그대로', () => {
+    expect(shortAreaName('서울 강남구 역삼동')).toBe('역삼동');
+    expect(shortAreaName('서울 영등포구 여의도동')).toBe('여의도동');
+    expect(shortAreaName('경기 성남시 분당구 정자동')).toBe('정자동');
+    expect(shortAreaName('서울 중구 을지로3가')).toBe('을지로3가');
+    expect(shortAreaName('스타벅스 여의도점')).toBe('스타벅스 여의도점');
+    expect(shortAreaName('지정한 위치')).toBe('지정한 위치');
+    expect(shortAreaName('역삼동')).toBe('역삼동');
   });
 });
