@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Animated, LayoutAnimation, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -24,12 +24,13 @@ import {
   showToast,
   type NutrientKey,
 } from '@/components';
+import { QtyStepper } from '@/components/QtyStepper';
 import { getBrand, getMenu, getMenusByBrand } from '@/data';
 import { STORE_CATEGORY_LABEL, formatPrice } from '@/data/labels';
 import { applyOptions, judgeMenu, suggestAlternatives } from '@/domain/judge';
-import { QTY_OPTIONS, menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
-import { formatNumber } from '@/domain/summary';
-import { MEAL_LABEL, VERDICT_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients } from '@/domain/types';
+import { menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
+import { formatNumber, toDateKey } from '@/domain/summary';
+import { MEAL_LABEL, VERDICT_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients, type OptionGroup } from '@/domain/types';
 import { newId } from '@/services/id';
 import { getCachedRemoteProduct } from '@/services/products';
 import { judgeProfile } from '@/state/bootstrap';
@@ -49,7 +50,19 @@ function defaultSelection(menu?: MenuItem): Record<string, string> {
   return out;
 }
 
-/** D4 메뉴 상세·구매 가이드 — 판정 배지 대형 · 영양 vs 여유 비교 바 · 판정 이유 · 옵션 칩 즉시 갱신 · 대안 · CTA "이걸로 기록" */
+/** 옵션 칩 라벨: 기본값 대비 kcal 변화(0이면 생략) + 추가 금액 — "시럽 빼기 −60kcal" */
+function choiceLabel(menu: MenuItem, g: OptionGroup, label: string, selected: Record<string, string>, priceDelta?: number): string {
+  const def = (g.choices.find((c) => c.isDefault) ?? g.choices[0])?.label;
+  const withChoice = applyOptions(menu, { ...selected, [g.id]: label })?.kcal;
+  const withDefault = def != null ? applyOptions(menu, { ...selected, [g.id]: def })?.kcal : undefined;
+  const d = withChoice != null && withDefault != null ? Math.round(withChoice - withDefault) : 0;
+  const parts = [label];
+  if (d !== 0) parts[0] += ` ${d > 0 ? '+' : '−'}${formatNumber(Math.abs(d))}kcal`;
+  if (priceDelta && g.id !== 'size' && g.id !== 'bread') parts.push(`+${formatNumber(priceDelta)}원`);
+  return parts.join(' · ');
+}
+
+/** D4 메뉴 상세·구매 가이드 — 판정 배지 + 이유 한 줄 · "먹으면 N kcal 남아요" · 옵션(kcal 변화) · 대안 · 원탭 기록 */
 export default function MenuDetail() {
   const params = useLocalSearchParams<{ id: string; store?: string }>();
   // 서버 검색(E2)에서 고른 시판 제품은 로컬 카탈로그에 없을 수 있다 → 세션 캐시에서 찾는다
@@ -70,6 +83,7 @@ export default function MenuDetail() {
   const [meal, setMeal] = useState<MealType>(() => defaultMealType());
   const [qty, setQty] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [detail, setDetail] = useState(false);
 
   useEffect(() => {
     setSelected(defaultSelection(menu));
@@ -109,6 +123,7 @@ export default function MenuDetail() {
   const price = menu.price != null ? menu.price + (menu.options ?? []).reduce((s, g) => s + (g.choices.find((c) => c.label === selected[g.id])?.priceDelta ?? 0), 0) : undefined;
   const categoryLabel = brand ? STORE_CATEGORY_LABEL[brand.category] : '';
   const storeName = params.store || menu.maker || brand?.name;
+  const unit = menuQtyUnit(menu);
 
   const toggleFavorite = async () => {
     // 앱 번들에 없는 메뉴(서버 검색 제품)는 다음 실행에 다시 찾을 수 있게 통째로 적어 둔다
@@ -122,8 +137,9 @@ export default function MenuDetail() {
     Share.share({ message: `${menu.name} — ${verdict}` }).catch(() => {});
   };
 
-  const save = async () => {
-    if (!nutrients) return;
+  /** 기록 — 원탭(끼니 자동·1개)과 시트(끼니·양 선택) 공통. 되돌리기 토스트 후 이전 화면으로 */
+  const record = async (mealType: MealType, q: number) => {
+    if (!nutrients || saving) return;
     setSaving(true);
     const now = new Date();
     const optionLabels = (menu.options ?? [])
@@ -135,25 +151,40 @@ export default function MenuDetail() {
       .filter((x): x is string => !!x);
     const log: MealLog = {
       id: newId(),
-      date: useDay.getState().date,
-      mealType: meal,
+      date: toDateKey(now),
+      mealType,
       time: now.toISOString(),
       name: menu.name,
       brandId: menu.brandId,
       storeName,
       menuId: menu.id,
       optionLabels: optionLabels.length ? optionLabels : undefined,
-      nutrients: scaleNutrients(nutrients, qty),
+      nutrients: scaleNutrients(nutrients, q),
       trust: menu.trust,
-      qty,
+      qty: q,
       verdict: judgement && !judgement.unknown ? judgement.verdict : undefined,
       createdAt: now.toISOString(),
     };
     const ok = await addLog(log);
     setSaving(false);
     setSheet(false);
-    showToast(ok ? '기록했어요' : '기록했어요 · 저장은 다음에 다시 시도할게요', ok ? 'success' : 'info');
+    const text = `${MEAL_LABEL[mealType]}으로 기록했어요`;
+    showToast(ok ? text : `${text} · 저장은 다음에 다시 시도할게요`, ok ? 'success' : 'info', {
+      label: '되돌리기',
+      onPress: () => void useDay.getState().removeLog(log.id),
+    });
     if (router.canGoBack()) router.back();
+  };
+
+  const openSheet = () => {
+    setMeal(defaultMealType());
+    setQty(1);
+    setSheet(true);
+  };
+
+  const toggleDetail = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDetail((d) => !d);
   };
 
   const rows: NutrientKey[] = ['kcal', ...((targets?.emphasis ?? ['carbs', 'protein', 'fat']).filter((k) => k !== 'kcal') as NutrientKey[])];
@@ -176,6 +207,7 @@ export default function MenuDetail() {
         />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* 1. 메뉴명·가격 */}
         <View style={styles.top}>
           <MenuTile menu={menu} size={64} />
           <Text variant="caption" color="ink3" style={styles.category}>
@@ -187,6 +219,8 @@ export default function MenuDetail() {
               {formatPrice(price)}
             </Text>
           ) : null}
+
+          {/* 2. 판정 배지 + 이유 한 줄 */}
           <View style={styles.badges}>
             {!unknown && judgement ? (
               <Animated.View style={{ transform: [{ scale: pop }] }}>
@@ -197,6 +231,21 @@ export default function MenuDetail() {
             )}
             <TrustBadge trust={menu.trust} />
           </View>
+          {!unknown && judgement?.reasons[0] ? (
+            <View style={styles.reason}>
+              <SproutIcon size={16} color={colors.primaryText} />
+              <View style={styles.reasonText}>
+                <Text variant="bodyMedium" color="ink">
+                  {judgement.reasons[0]}
+                </Text>
+                {judgement.reasons[1] ? (
+                  <Text variant="caption" color="ink3" style={styles.reasonSub}>
+                    {judgement.reasons[1]}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
           {menu.blurb ? (
             <Text variant="caption" color="ink2" style={styles.blurb}>
               {menu.blurb}
@@ -211,40 +260,42 @@ export default function MenuDetail() {
           />
         ) : (
           <>
+            {/* 3. 먹으면 얼마 남는지 — 막대 하나 + 영양 자세히(접힘) */}
             <Card style={styles.card}>
               <View style={styles.cardHead}>
-                <Text variant="h3">영양 vs 오늘 여유</Text>
+                <Text variant="h3">이 메뉴를 먹으면</Text>
                 <Text variant="small" color="ink3">
                   {servingLabel(menu, selected)}
                 </Text>
               </View>
-              {remaining && targets && nutrients
-                ? rows.map((k) => <CompareRow key={k} nutrient={k} nutrients={nutrients} remaining={remaining} targets={targets} />)
-                : null}
+              {remaining && targets && nutrients ? <AfterBar menuKcal={nutrients.kcal} remaining={remaining.kcal} target={targets.kcal} /> : null}
               {menu.servingNote ? (
                 <Text variant="small" color="ink3" style={styles.servingNote}>
                   {menu.servingNote}
                 </Text>
               ) : null}
-              {judgement ? (
-                <View style={styles.reason}>
-                  <View style={styles.reasonIcon}>
-                    <SproutIcon size={18} color={colors.primaryText} />
-                  </View>
-                  <View style={styles.reasonText}>
-                    <Text variant="captionMedium" color="ink">
-                      {judgement.reasons[0]}
-                    </Text>
-                    {judgement.reasons[1] ? (
-                      <Text variant="small" color="ink2" style={styles.reasonSub}>
-                        {judgement.reasons[1]}
-                      </Text>
-                    ) : null}
-                  </View>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: detail }}
+                onPress={toggleDetail}
+                style={({ pressed }) => [styles.detailToggle, pressed && styles.pressed]}
+              >
+                <Text variant="captionMedium" color="ink2">
+                  영양 정보 자세히
+                </Text>
+                <Ionicons name={detail ? 'chevron-up' : 'chevron-down'} size={16} color={colors.ink3} />
+              </Pressable>
+              {detail && remaining && nutrients ? (
+                <View>
+                  {rows.map((k) => (
+                    <CompareRow key={k} nutrient={k} nutrients={nutrients} remaining={remaining} />
+                  ))}
                 </View>
               ) : null}
             </Card>
 
+            {/* 4. 옵션 — 칩마다 kcal 변화 */}
             {menu.options?.length ? (
               <Card style={styles.card}>
                 <Text variant="h3">옵션 선택</Text>
@@ -267,7 +318,7 @@ export default function MenuDetail() {
                           key={c.label}
                           variant="option"
                           size="sm"
-                          label={c.priceDelta && g.id !== 'size' && g.id !== 'bread' ? `${c.label} (+${formatNumber(c.priceDelta)}원)` : c.label}
+                          label={choiceLabel(menu, g, c.label, selected, c.priceDelta)}
                           selected={selected[g.id] === c.label}
                           onPress={() => setSelected((s) => ({ ...s, [g.id]: c.label }))}
                         />
@@ -278,6 +329,7 @@ export default function MenuDetail() {
               </Card>
             ) : null}
 
+            {/* 5. 대안 */}
             {alternatives.length > 0 ? (
               <Card style={styles.card}>
                 <View style={styles.cardHead}>
@@ -296,7 +348,7 @@ export default function MenuDetail() {
                         key={alt.id}
                         accessibilityRole="button"
                         onPress={() => router.replace({ pathname: '/menu/[id]', params: { id: alt.id, store: params.store ?? '' } })}
-                        style={({ pressed }) => [styles.alt, pressed && { opacity: 0.8 }]}
+                        style={({ pressed }) => [styles.alt, pressed && styles.pressed]}
                       >
                         <MenuTile menu={alt} size={40} />
                         <View style={styles.altBody}>
@@ -318,9 +370,15 @@ export default function MenuDetail() {
         )}
       </ScrollView>
 
+      {/* 6. 하단 CTA — 한 번에 기록(끼니 자동·1개). 끼니·양을 고르고 싶으면 위 글자 버튼 */}
       {!unknown ? (
         <View style={styles.footer}>
-          <Button title="이걸로 기록" onPress={() => setSheet(true)} />
+          <Pressable accessibilityRole="button" onPress={openSheet} hitSlop={6} style={({ pressed }) => [styles.subCta, pressed && styles.pressed]}>
+            <Text variant="captionMedium" color="ink2">
+              끼니·양 정해서 기록
+            </Text>
+          </Pressable>
+          <Button title="이걸로 기록" loading={saving && !sheet} onPress={() => void record(defaultMealType(), 1)} accessibilityLabel={`${MEAL_LABEL[defaultMealType()]}으로 1${unit} 기록`} />
         </View>
       ) : null}
 
@@ -328,8 +386,8 @@ export default function MenuDetail() {
         visible={sheet}
         onClose={() => setSheet(false)}
         title="어느 끼니로 기록할까요?"
-        subtitle={nutrients ? `${menu.name} · ${qtyLabel(qty, menuQtyUnit(menu))} ${formatNumber(scaleNutrients(nutrients, qty).kcal)} kcal` : menu.name}
-        footer={<Button title="기록하기" loading={saving} onPress={save} />}
+        subtitle={nutrients ? `${menu.name} · ${qtyLabel(qty, unit)} ${formatNumber(scaleNutrients(nutrients, qty).kcal)} kcal` : menu.name}
+        footer={<Button title="기록하기" loading={saving} onPress={() => void record(meal, qty)} />}
       >
         <View style={styles.meals}>
           {MEALS.map((m) => (
@@ -339,11 +397,7 @@ export default function MenuDetail() {
         <Text variant="captionMedium" color="ink2" style={styles.qtyLabel}>
           얼마나 먹었나요?
         </Text>
-        <View style={styles.qtys}>
-          {QTY_OPTIONS.map((q) => (
-            <Chip key={q} label={qtyLabel(q, menuQtyUnit(menu))} variant="option" selected={qty === q} onPress={() => setQty(q)} />
-          ))}
-        </View>
+        <QtyStepper value={qty} onChange={setQty} unit={unit} size="lg" style={styles.stepper} />
       </BottomSheet>
     </SafeAreaView>
   );
@@ -357,23 +411,67 @@ function servingLabel(menu: MenuItem, selected: Record<string, string>): string 
   return cur && cur !== def ? `${cur} 사이즈` : menu.serving;
 }
 
-function rowCaption(k: NutrientKey, value: number, left: number): string {
-  if (k === 'protein') return value >= left ? '오늘 필요한 만큼 채워요' : '조금씩 채워보세요';
-  if (value <= left * 0.5) return '지금도 여유가 있어요';
-  if (value <= left) return '여유 안에 들어가요';
-  return '오늘 여유보다 조금 커요';
+/** "먹으면 358kcal 남아요" + 하루 막대(먹은 양 · 이 메뉴 · 남는 양) */
+function AfterBar({ menuKcal, remaining, target }: { menuKcal: number; remaining: number; target: number }) {
+  const eaten = Math.max(0, target - remaining);
+  const after = Math.round(remaining - menuKcal);
+  const total = Math.max(target, eaten + menuKcal, 1);
+  const eatenW = eaten / total;
+  const menuW = menuKcal / total;
+  const anim = useRef(new Animated.Value(menuW)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: menuW, duration: 260, useNativeDriver: false }).start();
+  }, [menuW, anim]);
+
+  return (
+    <View style={styles.after} accessibilityLabel={after >= 0 ? `먹으면 ${formatNumber(after)}kcal 남아요` : '오늘 더 먹을 수 있는 양보다 조금 커요'}>
+      {after >= 0 ? (
+        <Text style={styles.afterTitle}>
+          먹으면 <Text style={[styles.afterTitle, styles.afterNum]}>{formatNumber(after)}kcal</Text> 남아요
+        </Text>
+      ) : (
+        <Text style={styles.afterTitle}>오늘 더 먹을 수 있는 양보다 조금 커요</Text>
+      )}
+      <View style={styles.afterTrack}>
+        <View style={[styles.afterEaten, { width: `${eatenW * 100}%` }]} />
+        <Animated.View style={[styles.afterMenu, { width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
+      </View>
+      <View style={styles.afterLegend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+          <Text variant="small" color="ink2">
+            이 메뉴 {formatNumber(menuKcal)}kcal
+          </Text>
+        </View>
+        {eaten > 0 ? (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
+            <Text variant="small" color="ink3">
+              먹은 양 {formatNumber(eaten)}kcal
+            </Text>
+          </View>
+        ) : null}
+        <Text variant="small" color="ink3" style={styles.legendRight}>
+          하루 {formatNumber(target)}kcal
+        </Text>
+      </View>
+    </View>
+  );
 }
 
-/** 한 줄: 라벨 · 이 메뉴 값(Bold) · 그린 바(오늘 여유 대비) · "여유 / 목표" */
-function CompareRow({ nutrient, nutrients, remaining, targets }: { nutrient: NutrientKey; nutrients: Nutrients; remaining: DailyTargets; targets: DailyTargets }) {
+/** 영양소 한 줄: 라벨 · 이 메뉴 값 · 바(남은 양 대비) · "먹으면 N 남아요" */
+function afterCopy(k: NutrientKey, value: number, left: number): string {
+  const unit = NUTRIENT_META[k].unit;
+  if (k === 'protein') return value >= left ? '오늘 필요한 만큼 채워요' : `먹고 나서 ${formatNutrient(k, left - value)}${unit} 더 채우면 돼요`;
+  if (value <= left) return `먹으면 ${formatNutrient(k, left - value)}${unit} 남아요`;
+  return '더 먹을 수 있는 양보다 조금 커요';
+}
+
+function CompareRow({ nutrient, nutrients, remaining }: { nutrient: NutrientKey; nutrients: Nutrients; remaining: DailyTargets }) {
   const meta = NUTRIENT_META[nutrient];
   const value = nutrients[nutrient];
-  const left = remaining[nutrient];
+  const left = Math.max(0, remaining[nutrient]);
   const share = typeof value === 'number' ? (left > 0 ? Math.min(1, value / left) : value > 0 ? 1 : 0) : 0;
-  const anim = useRef(new Animated.Value(share)).current;
-  useEffect(() => {
-    Animated.timing(anim, { toValue: share, duration: 260, useNativeDriver: false }).start();
-  }, [share, anim]);
 
   return (
     <View style={styles.cmpRow}>
@@ -390,19 +488,13 @@ function CompareRow({ nutrient, nutrients, remaining, targets }: { nutrient: Nut
             정보 없음
           </Text>
         )}
-        <Text variant="small" color="ink3">
-          여유 {formatNutrient(nutrient, left)} / {formatNutrient(nutrient, targets[nutrient])}
-          {meta.unit}
-        </Text>
+        {typeof value === 'number' ? (
+          <Text variant="small" color="ink3" numberOfLines={1} style={styles.cmpRight}>
+            {afterCopy(nutrient, value, left)}
+          </Text>
+        ) : null}
       </View>
-      <View style={styles.cmpTrack}>
-        {typeof value === 'number' ? <Animated.View style={[styles.cmpFill, { width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} /> : null}
-      </View>
-      {typeof value === 'number' ? (
-        <Text variant="small" color="ink3" numberOfLines={1}>
-          {rowCaption(nutrient, value, left)}
-        </Text>
-      ) : null}
+      <View style={styles.cmpTrack}>{typeof value === 'number' ? <View style={[styles.cmpFill, { width: `${share * 100}%` }]} /> : null}</View>
     </View>
   );
 }
@@ -412,25 +504,37 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: spacing.page },
   scroll: { paddingHorizontal: spacing.page, paddingBottom: spacing.xxl },
+  pressed: { opacity: 0.7 },
   top: { alignItems: 'flex-start', paddingTop: spacing.sm },
   category: { marginTop: spacing.lg },
   name: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 30, letterSpacing: -0.4, color: colors.ink, marginTop: 2 },
   price: { marginTop: 2 },
   badges: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  reason: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.sm },
+  reasonText: { flex: 1 },
+  reasonSub: { marginTop: 2 },
   blurb: { marginTop: spacing.md },
   card: { marginTop: spacing.lg },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
-  cmpRow: { paddingVertical: spacing.sm + 2, gap: 6 },
-  cmpTop: { flexDirection: 'row', alignItems: 'baseline' },
-  cmpLabel: { width: 56 },
-  cmpValueWrap: { flex: 1 },
+  after: { marginTop: spacing.sm, gap: spacing.sm },
+  afterTitle: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 28, letterSpacing: -0.4, color: colors.ink },
+  afterNum: { color: colors.primaryText },
+  afterTrack: { flexDirection: 'row', height: 10, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
+  afterEaten: { height: 10, backgroundColor: colors.border },
+  afterMenu: { height: 10, backgroundColor: colors.primary },
+  afterLegend: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.md },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendRight: { marginLeft: 'auto' },
+  detailToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, marginTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.line },
+  cmpRow: { paddingVertical: spacing.sm, gap: 6 },
+  cmpTop: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+  cmpLabel: { width: 52 },
+  cmpValueWrap: { flexShrink: 0, minWidth: 64 },
   cmpValue: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 22, color: colors.ink },
+  cmpRight: { flex: 1, textAlign: 'right' },
   cmpTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
   cmpFill: { height: 6, borderRadius: radius.pill, backgroundColor: colors.primary },
-  reason: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md, backgroundColor: colors.section, borderRadius: radius.md, padding: 14 },
-  reasonIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
-  reasonText: { flex: 1, marginLeft: spacing.md },
-  reasonSub: { marginTop: 2 },
   guide: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5 },
   guideText: { fontFamily: fonts.semibold },
   optRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
@@ -440,9 +544,10 @@ const styles = StyleSheet.create({
   alts: { marginTop: spacing.xs },
   alt: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   altBody: { flex: 1, minWidth: 0 },
-  footer: { paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.lg, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
+  footer: { paddingHorizontal: spacing.page, paddingTop: spacing.xs, paddingBottom: spacing.lg, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
+  subCta: { alignSelf: 'center', minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, marginBottom: spacing.xs },
   meals: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   mealChip: { flexGrow: 1, flexBasis: '45%' },
   qtyLabel: { marginTop: spacing.lg },
-  qtys: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  stepper: { marginTop: spacing.sm },
 });
