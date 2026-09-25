@@ -1,13 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { APP_NAME, BottomSheet, Button, Card, ListRow, Screen, StackHeader, TRUST_EXPLAIN, Text, TrustBadge, showToast } from '@/components';
 import type { Trust } from '@/domain/types';
 import { getRepos } from '@/services/repo';
 import { getPermissionStatus, requestPermission, type PermissionStatus } from '@/services/location';
+import { MEAL_SLOTS, SLOT_LABEL, formatClock, type MealReminderSettings, type MealSlot } from '@/services/mealReminder';
+import {
+  applyMealReminders,
+  clearMealReminders,
+  getReminderPermission,
+  loadReminderSettings,
+  remindersSupported,
+  requestReminderPermission,
+  saveReminderSettings,
+  type ReminderPermission,
+} from '@/services/notifications';
 import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
 import { useSession } from '@/state/session';
@@ -22,12 +33,32 @@ type Kind = 'logout' | 'withdraw' | 'wipe';
 const TITLE: Record<Kind, string> = { logout: '로그아웃할까요?', withdraw: '탈퇴할까요?', wipe: '이 기기 데이터를 지울까요?' };
 const ACTION: Record<Kind, string> = { logout: '로그아웃', withdraw: '탈퇴', wipe: '지우기' };
 
-/** F4 설정 — 위치 권한 · 내 기록(어디에 저장되는지) · 영양 정보 출처 안내 · 로그아웃/탈퇴 (게스트는 로그인 · 이 기기 데이터 지우기) */
+const SLOT_ICON: Record<MealSlot, 'sunny-outline' | 'moon-outline'> = { lunch: 'sunny-outline', dinner: 'moon-outline' };
+
+/** 켜진 끼니 시간 한 줄: "점심 오전 11:40 · 저녁 오후 5:40" */
+const slotSummary = (r: MealReminderSettings) =>
+  MEAL_SLOTS.filter((k) => r[k].on)
+    .map((k) => `${SLOT_LABEL[k]} ${formatClock(r[k].hour, r[k].minute)}`)
+    .join(' · ');
+
+/** F4 설정 — 위치 권한 · 내 기록(어디에 저장되는지) · 식사 시간 알림 · 영양 정보 출처 안내 · 로그아웃/탈퇴 (게스트는 로그인 · 이 기기 데이터 지우기) */
 export default function Settings() {
   const signOut = useProfile((s) => s.signOut);
   const [perm, setPerm] = useState<PermissionStatus>('undetermined');
   const [trustOpen, setTrustOpen] = useState(false);
   const [confirm, setConfirm] = useState<Kind | null>(null);
+  // 식사 시간 알림 (웹은 섹션 자체를 그리지 않는다)
+  const [rem, setRem] = useState<MealReminderSettings | null>(null);
+  const [notifPerm, setNotifPerm] = useState<ReminderPermission>('undetermined');
+  // 켜려다 권한이 없어 못 켰음 → 기기 설정에서 허용하고 돌아오면 바로 켜 준다
+  const wantOnRef = useRef(false);
+  const [wantOn, setWantOnState] = useState(false);
+  // 스위치를 처리하는 동안(권한 창이 떠서 앱이 잠깐 비활성 → 활성) 다시 읽기가 끼어들어 스위치를 되돌리지 않게
+  const busyRef = useRef(false);
+  const setWantOn = useCallback((v: boolean) => {
+    wantOnRef.current = v;
+    setWantOnState(v);
+  }, []);
   const cloud = getRepos().backend === 'supabase';
   const guest = useSession((s) => !s.session);
   const cloudAvailable = useSession((s) => s.mode === 'supabase');
@@ -41,11 +72,90 @@ export default function Settings() {
           : '기록은 계정에 남아 있어요. 다시 로그인하면 이어서 쓸 수 있어요.'
         : '이 기기에 저장된 프로필과 세션이 지워져요.';
 
+  const enableReminders = useCallback(async (base: MealReminderSettings) => {
+    // 끼니가 다 꺼져 있었으면 둘 다 켠다 — 켰는데 아무 알림도 없는 상태를 만들지 않게
+    const none = MEAL_SLOTS.every((k) => !base[k].on);
+    const next: MealReminderSettings = {
+      ...base,
+      enabled: true,
+      lunch: { ...base.lunch, on: none || base.lunch.on },
+      dinner: { ...base.dinner, on: none || base.dinner.on },
+    };
+    setWantOn(false);
+    setRem(next);
+    await saveReminderSettings(next);
+    showToast(`${slotSummary(next)}에 알려드릴게요`, 'success');
+  }, [setWantOn]);
+
+  /** 권한 상태를 다시 읽는다 (화면 복귀·기기 설정에서 돌아왔을 때) */
+  const refreshReminders = useCallback(async () => {
+    if (!remindersSupported || busyRef.current) return;
+    const [r, p] = await Promise.all([loadReminderSettings(), getReminderPermission()]);
+    setNotifPerm(p);
+    if (p === 'granted' && wantOnRef.current && !r.enabled) return enableReminders(r);
+    setRem(r);
+    // 기기 설정에서 알림을 다시 허용했을 수 있으니 켜져 있으면 예약을 다시 건다 (같은 id 라 중복 없음)
+    if (p === 'granted' && r.enabled) void applyMealReminders(r);
+  }, [enableReminders]);
+
   useFocusEffect(
     useCallback(() => {
       void getPermissionStatus().then(setPerm);
-    }, []),
+      void refreshReminders();
+    }, [refreshReminders]),
   );
+
+  useEffect(() => {
+    if (!remindersSupported) return;
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') void refreshReminders();
+    });
+    return () => sub.remove();
+  }, [refreshReminders]);
+
+  const openDeviceSettings = () => Linking.openSettings().catch(() => showToast('기기 설정에서 알림을 켜 주세요', 'info'));
+
+  const onToggleReminders = async (on: boolean) => {
+    if (!rem || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await toggleReminders(rem, on);
+    } finally {
+      busyRef.current = false;
+    }
+  };
+
+  const toggleReminders = async (cur: MealReminderSettings, on: boolean) => {
+    if (!on) {
+      setWantOn(false);
+      const next = { ...cur, enabled: false };
+      setRem(next);
+      await saveReminderSettings(next);
+      return showToast('식사 시간 알림을 껐어요', 'info');
+    }
+    const p = await requestReminderPermission();
+    setNotifPerm(p);
+    if (p !== 'granted') {
+      setWantOn(true);
+      return showToast('기기 설정에서 알림을 켜 주세요', 'info', { label: '설정 열기', onPress: openDeviceSettings });
+    }
+    await enableReminders(cur);
+  };
+
+  const onToggleSlot = async (slot: MealSlot, on: boolean) => {
+    if (!rem) return;
+    const next: MealReminderSettings = { ...rem, [slot]: { ...rem[slot], on } };
+    // 두 끼 다 끄면 전체도 끈다 — 켜져 있는데 아무것도 안 오는 상태를 남기지 않게
+    if (MEAL_SLOTS.every((k) => !next[k].on)) next.enabled = false;
+    setRem(next);
+    await saveReminderSettings(next);
+    showToast(
+      on ? `${SLOT_LABEL[slot]} ${formatClock(rem[slot].hour, rem[slot].minute)}에 알려드릴게요` : next.enabled ? `${SLOT_LABEL[slot]} 알림을 껐어요` : '식사 시간 알림을 껐어요',
+      on ? 'success' : 'info',
+    );
+  };
+
+  const remindersBlocked = notifPerm === 'denied' && (wantOn || !!rem?.enabled);
 
   const onPerm = async () => {
     if (perm === 'granted') return showToast('이미 허용했어요', 'info');
@@ -56,6 +166,10 @@ export default function Settings() {
   const doSignOut = async (kind: Kind | null = confirm) => {
     setConfirm(null);
     const k = kind ?? 'logout';
+    // 다음에 이 기기를 쓰는 사람에게 알림이 가지 않게 예약을 모두 취소하고 스위치도 끈다
+    await clearMealReminders();
+    setWantOn(false);
+    setRem(null);
     // 게스트의 "이 기기 데이터 지우기"는 로컬 저장소 탈퇴와 같다 (프로필·기록 삭제)
     await signOut(k === 'logout' ? 'logout' : 'withdraw');
     showToast(k === 'wipe' ? '이 기기의 데이터를 지웠어요' : k === 'withdraw' ? (cloud ? '탈퇴했어요 · 저장된 정보를 지웠어요' : '탈퇴했어요 · 이 기기의 정보를 지웠어요') : '로그아웃했어요', 'info');
@@ -105,6 +219,65 @@ export default function Settings() {
           </>
         ) : null}
       </Card>
+
+      {remindersSupported ? (
+        <Card padding={spacing.xs} style={styles.card}>
+          <ListRow
+            title="식사 시간 알림"
+            subtitle={rem?.enabled ? '먹기 전에 한 번씩 알려드려요.' : '점심·저녁 먹기 전에 지금 먹기 좋은 메뉴를 알려드려요.'}
+            icon={<Ionicons name="notifications-outline" size={20} color={colors.ink2} />}
+            chevron={false}
+            right={
+              <Switch
+                accessibilityLabel="식사 시간 알림"
+                value={!!rem?.enabled}
+                disabled={!rem}
+                onValueChange={(v) => void onToggleReminders(v)}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.surface}
+                ios_backgroundColor={colors.border}
+              />
+            }
+            style={styles.row}
+          />
+          {remindersBlocked ? (
+            <>
+              <View style={styles.sep} />
+              <ListRow
+                title="기기 설정에서 알림을 켜 주세요"
+                subtitle="설정 열기 · 허용하고 돌아오면 바로 켜져요."
+                icon={<Ionicons name="settings-outline" size={20} color={colors.ink2} />}
+                onPress={openDeviceSettings}
+                style={styles.row}
+              />
+            </>
+          ) : null}
+          {rem?.enabled
+            ? MEAL_SLOTS.map((slot) => (
+                <View key={slot}>
+                  <View style={styles.sep} />
+                  <ListRow
+                    title={SLOT_LABEL[slot]}
+                    subtitle={`매일 ${formatClock(rem[slot].hour, rem[slot].minute)}`}
+                    icon={<Ionicons name={SLOT_ICON[slot]} size={20} color={colors.ink2} />}
+                    chevron={false}
+                    right={
+                      <Switch
+                        accessibilityLabel={`${SLOT_LABEL[slot]} 알림`}
+                        value={rem[slot].on}
+                        onValueChange={(v) => void onToggleSlot(slot, v)}
+                        trackColor={{ false: colors.border, true: colors.primary }}
+                        thumbColor={colors.surface}
+                        ios_backgroundColor={colors.border}
+                      />
+                    }
+                    style={styles.row}
+                  />
+                </View>
+              ))
+            : null}
+        </Card>
+      ) : null}
 
       <Card style={styles.card}>
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: trustOpen }} onPress={() => setTrustOpen((v) => !v)} style={styles.foldHead}>
