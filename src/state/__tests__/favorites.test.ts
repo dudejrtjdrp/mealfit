@@ -26,6 +26,22 @@ describe('즐겨찾기 저장', () => {
     expect(JSON.parse((await AsyncStorage.getItem(FAVORITES_KEY))!)).toHaveLength(1);
   });
 
+  it('restore 는 뺀 항목을 담았던 순서 자리로 되돌리고, 기기에도 남긴다', async () => {
+    const items: FavoriteEntry[] = [
+      { menuId: 'c', name: 'C', addedAt: '2026-09-03' },
+      { menuId: 'b', name: 'B', addedAt: '2026-09-02' },
+      { menuId: 'a', name: 'A', addedAt: '2026-09-01' },
+    ];
+    useFavorites.setState({ items, status: 'ready' });
+    await useFavorites.getState().remove('b');
+    expect(useFavorites.getState().items.map((x) => x.menuId)).toEqual(['c', 'a']);
+    await useFavorites.getState().restore(items[1]);
+    expect(useFavorites.getState().items.map((x) => x.menuId)).toEqual(['c', 'b', 'a']);
+    await useFavorites.getState().restore(items[1]);
+    expect(useFavorites.getState().items).toHaveLength(3);
+    expect(JSON.parse((await AsyncStorage.getItem(FAVORITES_KEY))!)).toHaveLength(3);
+  });
+
   it('깨진 저장값이면 빈 목록', async () => {
     await AsyncStorage.setItem(FAVORITES_KEY, '{oops');
     await useFavorites.getState().load();
@@ -55,8 +71,24 @@ describe('자주 먹어요 순위', () => {
     expect(out[3].lastLog?.id).toBe('7');
   });
 
-  it('limit 만큼만', () => {
-    expect(rankFrequent([], [fav('a', '1'), fav('b', '2'), fav('c', '3')], 2)).toHaveLength(2);
+  const twice = (menuId: string, day: number) => [
+    log({ id: `${menuId}-1`, menuId, name: menuId, time: `2026-09-${String(day).padStart(2, '0')}T08:00:00Z` }),
+    log({ id: `${menuId}-2`, menuId, name: menuId, time: `2026-09-${String(day).padStart(2, '0')}T12:00:00Z` }),
+  ];
+
+  it('즐겨찾기는 limit 를 넘어도 전부 — 9번째 즐겨찾기도 빠지지 않는다', () => {
+    const favs = Array.from({ length: 10 }, (_, i) => fav(`f${i}`, `2026-09-${String(i + 1).padStart(2, '0')}`));
+    const out = rankFrequent([...twice('x', 3), ...twice('y', 4)], favs, 8);
+    expect(out).toHaveLength(10);
+    expect(out.every((x) => x.favorite)).toBe(true);
+    expect(out[0].menuId).toBe('f9');
+  });
+
+  it('빈도 항목은 즐겨찾기 뒤 남은 자리(limit 까지)만 채운다', () => {
+    const logs = [...twice('x', 3), ...twice('y', 4), ...twice('z', 5)];
+    expect(rankFrequent(logs, [fav('a', '1')], 3).map((x) => x.key)).toEqual(['m:a', 'm:z', 'm:y']);
+    expect(rankFrequent(logs, [], 2).map((x) => x.key)).toEqual(['m:z', 'm:y']);
+    expect(rankFrequent(logs, [fav('a', '1'), fav('b', '2')], 2).map((x) => x.key)).toEqual(['m:b', 'm:a']);
   });
 });
 

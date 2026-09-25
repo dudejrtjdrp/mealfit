@@ -22,6 +22,7 @@ import {
   summarizeTrust,
   type NutrientKey,
 } from '@/components';
+import { FavoriteButton } from '@/components/FavoriteButton';
 import { RecordSheet, type RecordSheetItem } from '@/components/RecordSheet';
 import { Segmented } from '@/components/Segmented';
 import { StoreCartBar } from '@/components/StoreCartBar';
@@ -31,7 +32,7 @@ import { YEOKSAM_CENTER } from '@/data/mockStores';
 import { cartKcal, cartQty, cartRemove, cartSetQty, cartStep, type Cart } from '@/domain/cart';
 import { applyOptions, rankMenus } from '@/domain/judge';
 import { menuQtyUnit, qtyLabel } from '@/domain/qty';
-import { formatNumber } from '@/domain/summary';
+import { formatNumber, toDateKey } from '@/domain/summary';
 import type { Judgement, MealType, MenuCategory, MenuItem, Store, Verdict } from '@/domain/types';
 import { useJudgeContext } from '@/state/judgeContext';
 import { defaultMealType, useDay } from '@/state/day';
@@ -83,6 +84,7 @@ export default function StoreMenu() {
   const [cart, setCart] = useState<Cart>([]);
   const [sheet, setSheet] = useState(false);
   const [meal, setMeal] = useState<MealType>(() => defaultMealType());
+  const [date, setDate] = useState(() => toDateKey());
   const [saving, setSaving] = useState(false);
 
   const menus = useMemo(() => (brandId ? getMenusByBrand(brandId) : []), [brandId]);
@@ -130,6 +132,7 @@ export default function StoreMenu() {
   });
   const openSheet = () => {
     setMeal(defaultMealType());
+    setDate(toDateKey());
     setSheet(true);
   };
   const removeFromCart = (id: string) => {
@@ -146,7 +149,7 @@ export default function StoreMenu() {
     if (!items.length || saving) return;
     setSaving(true);
     try {
-      await recordItems(items, meal);
+      await recordItems(items, meal, { date });
       setCart([]);
       setSheet(false);
     } catch {
@@ -243,6 +246,7 @@ export default function StoreMenu() {
                             judgement={judgement}
                             rank={sec === 'good' && sort === 'rank' ? i + 1 : undefined}
                             sub={sub}
+                            storeName={title}
                             qty={cartQty(cart, menu.id)}
                             onStep={(dir) => stepCart(menu, dir)}
                             onPress={() => router.push({ pathname: '/menu/[id]', params: { id: menu.id, store: title } })}
@@ -281,6 +285,8 @@ export default function StoreMenu() {
         onRemove={removeFromCart}
         meal={meal}
         onMeal={setMeal}
+        date={date}
+        onDate={setDate}
         remainingKcal={summary ? summary.remaining.kcal - (summary.over.kcal ?? 0) : null}
         saving={saving}
         onSave={() => void save()}
@@ -332,6 +338,7 @@ function MenuRow({
   judgement,
   rank,
   sub,
+  storeName,
   qty,
   onStep,
   onPress,
@@ -340,6 +347,8 @@ function MenuRow({
   judgement: Judgement;
   rank?: number;
   sub: NutrientKey;
+  /** 자주 먹는 메뉴에 같이 적어 둘 매장 이름 */
+  storeName: string;
   /** 담은 수량 (0 = 안 담음) */
   qty: number;
   onStep: (dir: 1 | -1) => void;
@@ -366,6 +375,7 @@ function MenuRow({
           </Text>
         </View>
       </Pressable>
+      <FavoriteButton menu={menu} storeName={storeName} iconSize={20} box={36} />
       <View style={styles.menuSide}>
         {unknown ? <UnknownBadge /> : <VerdictBadge verdict={judgement.verdict} />}
         {unknown ? null : <CartControl name={menu.name} unit={menuQtyUnit(menu)} qty={qty} onStep={onStep} />}

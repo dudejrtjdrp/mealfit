@@ -1,25 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useDeferredValue, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackIcon, BrandTile, Chip, EmptyState, IconButton, MenuTile, Text, UnknownBadge, VerdictBadge } from '@/components';
-import { getBrand, getBrands, getMenus } from '@/data';
+import { FavoriteButton } from '@/components/FavoriteButton';
+import { getBrand, getBrands, normalizeName, searchMenus } from '@/data';
 import { STORE_CATEGORY_LABEL, formatDistance } from '@/data/labels';
 import { applyOptions, judgeMenu } from '@/domain/judge';
 import { formatNumber } from '@/domain/summary';
 import type { Brand, DailyTargets, MenuItem } from '@/domain/types';
 import { useJudgeContext } from '@/state/judgeContext';
 import { useDay } from '@/state/day';
-import { nearestOfBrand, searchBrands, searchStoreMenus, useNearby } from '@/state/nearby';
+import { searchProductsRemote } from '@/services/products';
+import { nearestOfBrand, searchBrands, useNearby } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
 import { colors, radius, size, spacing, type } from '@/theme';
 
 const BRAND_LIMIT = 6;
-const MENU_LIMIT = 30;
+const MENU_LIMIT = 40;
+const REMOTE_LIMIT = 20;
 
-/** D2 매장·메뉴 검색 — 브랜드를 고르면 가장 가까운 그 매장(없으면 브랜드 메뉴), 메뉴를 고르면 메뉴 상세 */
+/**
+ * D2 매장·메뉴 검색 — 브랜드를 고르면 가장 가까운 그 매장(없으면 브랜드 메뉴), 메뉴를 고르면 메뉴 상세.
+ * 메뉴는 기록 추가(E2)와 같은 순위(searchMenus: 매장 메뉴 + 시판 제품) + 서버 제품 검색을 뒤에 합친다.
+ */
 export default function NearbySearch() {
   const [query, setQuery] = useState('');
   const q = useDeferredValue(query.trim());
@@ -32,7 +38,33 @@ export default function NearbySearch() {
 
   const nearbyBrandIds = useMemo(() => new Set(stores.flatMap((s) => (s.brandId && s.coverage !== 'none' ? [s.brandId] : []))), [stores]);
   const brands = useMemo(() => (q ? searchBrands(getBrands(), q).slice(0, BRAND_LIMIT) : []), [q]);
-  const menus = useMemo(() => (q ? searchStoreMenus(getMenus(), q, { limit: MENU_LIMIT, preferBrandIds: nearbyBrandIds }) : []), [q, nearbyBrandIds]);
+
+  // 서버 제품 검색 — 로컬 결과를 먼저 보여주고, 서버 결과가 오면 뒤에 합친다 (E2 와 같은 흐름)
+  const [remote, setRemote] = useState<{ q: string; items: MenuItem[] } | null>(null);
+  useEffect(() => {
+    if (normalizeName(q) === '') {
+      setRemote(null);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(async () => {
+      const items = await searchProductsRemote(q, REMOTE_LIMIT).catch(() => null);
+      if (alive) setRemote({ q, items: items ?? [] });
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [q]);
+  const remoteLoading = normalizeName(q) !== '' && remote?.q !== q;
+
+  const menus = useMemo(() => {
+    if (!q) return [];
+    const local = searchMenus(q, MENU_LIMIT);
+    const seen = new Set(local.map((m) => m.id));
+    const extra = remote?.q === q ? remote.items.filter((m) => !seen.has(m.id)) : [];
+    return [...local, ...extra].slice(0, MENU_LIMIT + REMOTE_LIMIT);
+  }, [q, remote]);
 
   /** 빈 검색창 아래 — 지금 주변에 있는 브랜드를 바로 누를 수 있게 */
   const nearbyBrands = useMemo(() => [...nearbyBrandIds].map((id) => getBrand(id)).filter((b): b is Brand => !!b), [nearbyBrandIds]);
@@ -44,7 +76,7 @@ export default function NearbySearch() {
   };
   const openMenu = (m: MenuItem) => {
     const s = nearestOfBrand(stores, m.brandId);
-    router.push({ pathname: '/menu/[id]', params: { id: m.id, store: s?.name ?? getBrand(m.brandId)?.name ?? '' } });
+    router.push({ pathname: '/menu/[id]', params: { id: m.id, store: storeNameOf(m, s?.name) } });
   };
 
   let body;
@@ -66,8 +98,40 @@ export default function NearbySearch() {
         ) : null}
       </View>
     );
+  } else if (brands.length === 0 && menus.length === 0 && remoteLoading) {
+    body = (
+      <View style={styles.loading} accessibilityLiveRegion="polite">
+        <ActivityIndicator color={colors.ink3} />
+        <Text variant="caption" color="ink3">
+          찾고 있어요
+        </Text>
+      </View>
+    );
   } else if (brands.length === 0 && menus.length === 0) {
-    body = <EmptyState pose="sleep" title={`'${q}'와 맞는 매장·메뉴가 없어요`} description="다른 이름이나 더 짧게 찾아보세요." style={styles.empty} />;
+    // E2 와 같은 다음 행동: 직접 입력으로 기록 · 밀리한테 정리 부탁
+    body = (
+      <View>
+        <EmptyState
+          pose="sleep"
+          title={`‘${q}’에 맞는 매장·메뉴가 없어요`}
+          description="이름을 조금 다르게 적어 보거나, 먹은 걸 바로 기록해 보세요."
+          actionLabel="직접 입력으로 기록"
+          onAction={() => router.push({ pathname: '/log/add', params: { name: q } })}
+          style={styles.empty}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${q} 밀리한테 정리 부탁하기`}
+          onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'text', text: q } })}
+          style={({ pressed }) => [styles.askMilly, pressed && styles.pressed]}
+        >
+          <Ionicons name="sparkles-outline" size={16} color={colors.primaryText} />
+          <Text variant="captionMedium" color="primaryText">
+            ‘{q}’ 밀리한테 정리 부탁하기
+          </Text>
+        </Pressable>
+      </View>
+    );
   } else {
     body = (
       <>
@@ -109,8 +173,24 @@ export default function NearbySearch() {
               메뉴
             </Text>
             {menus.map((m) => (
-              <MenuResult key={m.id} menu={m} remaining={remaining} profile={profile} nearby={nearbyBrandIds.has(m.brandId)} onPress={() => openMenu(m)} />
+              <MenuResult
+                key={m.id}
+                menu={m}
+                remaining={remaining}
+                profile={profile}
+                nearby={nearbyBrandIds.has(m.brandId)}
+                storeName={storeNameOf(m, nearestOfBrand(stores, m.brandId)?.name)}
+                onPress={() => openMenu(m)}
+              />
             ))}
+            {remoteLoading ? (
+              <View style={styles.moreLoading}>
+                <ActivityIndicator size="small" color={colors.ink3} />
+                <Text variant="small" color="ink3">
+                  시판 제품도 찾고 있어요
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </>
@@ -143,38 +223,49 @@ export default function NearbySearch() {
   );
 }
 
+/** 메뉴 상세·즐겨찾기에 같이 넘길 매장 이름 — 가까운 매장 > 시판 제품 제조사 > 브랜드 */
+function storeNameOf(m: MenuItem, nearestName?: string): string {
+  return nearestName ?? m.maker ?? getBrand(m.brandId)?.name ?? '';
+}
+
 function MenuResult({
   menu,
   remaining,
   profile,
   nearby,
+  storeName,
   onPress,
 }: {
   menu: MenuItem;
   remaining: DailyTargets | null | undefined;
   profile: ReturnType<typeof useProfile.getState>['profile'];
   nearby: boolean;
+  storeName: string;
   onPress: () => void;
 }) {
   const jctx = useJudgeContext();
   const judgement = useMemo(() => (remaining ? judgeMenu(menu, remaining, jctx) : null), [menu, remaining, jctx]);
   const kcal = applyOptions(menu)?.kcal;
   const brand = getBrand(menu.brandId);
-  const meta = `${brand?.name ?? ''}${nearby ? ' · 주변에 있어요' : ''}${kcal != null ? ` · ${formatNumber(kcal)}kcal` : ''}`;
+  const meta = `${menu.maker ?? brand?.name ?? ''}${nearby ? ' · 주변에 있어요' : ''}${kcal != null ? ` · ${formatNumber(kcal)}kcal` : ''}`;
   const unknown = !judgement || judgement.unknown || kcal == null;
+  // 행 본문(누르면 메뉴 상세)과 하트를 형제로 — 겹치면 스크린리더가 안쪽 버튼을 못 찾는다
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${menu.name}, ${meta}`} onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-      <MenuTile menu={menu} size={40} />
-      <View style={styles.rowBody}>
-        <Text variant="h3" numberOfLines={1}>
-          {menu.name}
-        </Text>
-        <Text variant="small" color="ink3" numberOfLines={1}>
-          {meta}
-        </Text>
-      </View>
-      {judgement && !unknown ? <VerdictBadge verdict={judgement.verdict} size="sm" /> : menu.nutrients ? null : <UnknownBadge />}
-    </Pressable>
+    <View style={styles.row}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${menu.name}, ${meta}`} onPress={onPress} style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}>
+        <MenuTile menu={menu} size={40} />
+        <View style={styles.rowBody}>
+          <Text variant="h3" numberOfLines={1}>
+            {menu.name}
+          </Text>
+          <Text variant="small" color="ink3" numberOfLines={1}>
+            {meta}
+          </Text>
+        </View>
+        {judgement && !unknown ? <VerdictBadge verdict={judgement.verdict} size="sm" /> : menu.nutrients ? null : <UnknownBadge />}
+      </Pressable>
+      <FavoriteButton menu={menu} storeName={storeName} iconSize={20} box={36} />
+    </View>
   );
 }
 
@@ -191,6 +282,10 @@ const styles = StyleSheet.create({
   section: { marginTop: spacing.lg },
   sectionTitle: { marginBottom: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
+  rowMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, alignSelf: 'stretch' },
   rowBody: { flex: 1, minWidth: 0, gap: 2 },
+  loading: { marginTop: spacing.xxxl, alignItems: 'center', gap: spacing.sm },
+  moreLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md },
+  askMilly: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, alignSelf: 'center', minHeight: size.touch, paddingHorizontal: spacing.lg, marginTop: -spacing.xl },
   pressed: { opacity: 0.7 },
 });

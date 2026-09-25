@@ -50,7 +50,7 @@ describe('plannedReminders', () => {
     expect(plannedReminders(DEFAULT_REMINDER_SETTINGS)).toEqual([]);
   });
 
-  it('켜면 점심·저녁 두 개, 누르면 오늘 탭', () => {
+  it('켜면 점심·저녁 두 개, 누르면 밀리 탭', () => {
     const list = plannedReminders(on());
     expect(list.map((r) => [r.id, r.hour, r.minute])).toEqual([
       [REMINDER_ID.lunch, 11, 40],
@@ -58,7 +58,8 @@ describe('plannedReminders', () => {
     ]);
     for (const r of list) expect(routeForNotificationData(r.data)).toBe(REMINDER_ROUTE);
     expect(list[0].title).toBe('점심 뭐 드실지 고민되면');
-    expect(list[0].body).toBe('근처에서 지금 먹기 좋은 메뉴를 골라뒀어요');
+    expect(list[0].body).toBe('밀리가 근처에서 지금 먹기 좋은 점심 메뉴를 골라 뒀어요');
+    expect(list[0].data.url).toBe('/(tabs)/milly');
   });
 
   it('끼니별로 끌 수 있다', () => {
@@ -89,8 +90,8 @@ describe('formatClock', () => {
 });
 
 describe('routeForNotificationData', () => {
-  it('식사 알림만 오늘 탭으로', () => {
-    expect(routeForNotificationData({ kind: 'meal-reminder' })).toBe('/(tabs)/today');
+  it('식사 알림만 밀리 탭으로', () => {
+    expect(routeForNotificationData({ kind: 'meal-reminder' })).toBe('/(tabs)/milly');
     expect(routeForNotificationData({ kind: 'other' })).toBeNull();
     expect(routeForNotificationData(null)).toBeNull();
     expect(routeForNotificationData('meal-reminder')).toBeNull();

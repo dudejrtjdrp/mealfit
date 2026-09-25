@@ -25,6 +25,8 @@ interface FavoritesState {
   /** 담겨 있으면 빼고, 없으면 맨 앞에 담는다. 결과 상태(담김=true)를 돌려준다 */
   toggle: (entry: Omit<FavoriteEntry, 'addedAt'>) => Promise<boolean>;
   remove: (menuId: string) => Promise<void>;
+  /** 되돌리기: 뺀 항목을 담았던 시각(addedAt) 그대로 제자리에 되돌린다 (이미 있으면 그대로) */
+  restore: (entry: FavoriteEntry) => Promise<void>;
 }
 
 async function persist(items: FavoriteEntry[]) {
@@ -63,6 +65,14 @@ export const useFavorites = create<FavoritesState>((set, get) => ({
 
   remove: async (menuId) => {
     const next = get().items.filter((x) => x.menuId !== menuId);
+    set({ items: next });
+    await persist(next);
+  },
+
+  restore: async (entry) => {
+    const { items } = get();
+    if (items.some((x) => x.menuId === entry.menuId)) return;
+    const next = [...items, entry].sort((a, b) => b.addedAt.localeCompare(a.addedAt));
     set({ items: next });
     await persist(next);
   },
@@ -109,6 +119,8 @@ export interface FrequentItem {
 /**
  * "자주 먹어요" 목록: 즐겨찾기(최근 담은 순) → 기간 안에 2번 이상 먹은 것(많이 먹은 순, 같으면 최근 순).
  * 같은 메뉴는 한 번만 — 즐겨찾기 행에도 최근 기록을 붙인다.
+ * 즐겨찾기는 사용자가 직접 담은 것이라 limit 로 자르지 않고 전부 싣는다. limit 는 빈도 항목이 채울 자리
+ * (전체가 limit 가 될 때까지) — 즐겨찾기가 limit 이상이면 빈도 항목은 붙지 않는다.
  */
 export function rankFrequent(logs: MealLog[], favorites: FavoriteEntry[], limit = 8): FrequentItem[] {
   const byKey = new Map<string, { count: number; last: MealLog }>();
@@ -130,11 +142,13 @@ export function rankFrequent(logs: MealLog[], favorites: FavoriteEntry[], limit 
     const hit = byKey.get(k);
     out.push({ key: k, name: f.name, menuId: f.menuId, lastLog: hit?.last, count: hit?.count ?? 0, favorite: f });
   }
+  const room = Math.max(0, limit - out.length);
   const often = [...byKey.entries()]
     .filter(([k, v]) => v.count >= 2 && !seen.has(k))
-    .sort(([, a], [, b]) => b.count - a.count || b.last.time.localeCompare(a.last.time));
+    .sort(([, a], [, b]) => b.count - a.count || b.last.time.localeCompare(a.last.time))
+    .slice(0, room);
   for (const [k, v] of often) {
     out.push({ key: k, name: v.last.name, menuId: v.last.menuId, lastLog: v.last, count: v.count });
   }
-  return out.slice(0, limit);
+  return out;
 }
