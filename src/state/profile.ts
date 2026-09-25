@@ -3,10 +3,11 @@ import { create } from 'zustand';
 import { classifyDietByRules } from '@/domain/diet';
 import { computeTargets } from '@/domain/targets';
 import type { DailyTargets, DietClassification, Profile } from '@/domain/types';
+import { getAuthUserId } from '@/services/authState';
 import { getRepos } from '@/services/repo';
 
 import type { OnboardingDraft } from './onboarding';
-import { useSession } from './session';
+import { discardMigratedLocalBackup, useSession } from './session';
 
 /** 목표량 계산 — 도메인 오류가 나도 화면은 살아 있게 null */
 export function safeTargets(profile: Profile | null): DailyTargets | null {
@@ -42,6 +43,8 @@ interface ProfileState {
   /** 드래프트 → Profile 조립 → 저장. 저장 실패해도 메모리에는 반영하고 false 반환 */
   completeOnboarding: (draft: OnboardingDraft, nickname?: string) => Promise<{ profile: Profile; saved: boolean }>;
   updateProfile: (partial: Partial<Profile>) => Promise<boolean>;
+  /** 로그인 직후 서버에 프로필이 없을 때 이 기기의 프로필을 그대로 이어 쓴다 (id 는 로그인 사용자 id) */
+  adoptProfile: (profile: Profile) => Promise<Profile>;
   /**
    * 로그아웃·탈퇴.
    * - 로컬 저장소: 둘 다 이 기기의 프로필을 지운다(탈퇴는 기록까지)
@@ -92,7 +95,10 @@ export const useProfile = create<ProfileState>((set, get) => ({
     };
     set({ profile, targets: safeTargets(profile), status: 'ready' });
     try {
-      await getRepos().profile.save(profile);
+      const repos = getRepos();
+      // 게스트로 새로 시작: 예전에 서버로 옮긴 백업·플래그를 비워야 이 데이터가 다음 로그인 때 옮겨진다
+      if (repos.backend === 'local') await discardMigratedLocalBackup();
+      await repos.profile.save(profile);
       return { profile, saved: true };
     } catch (e) {
       console.warn('[profile] save 실패', e);
@@ -112,6 +118,17 @@ export const useProfile = create<ProfileState>((set, get) => ({
       console.warn('[profile] update 실패', e);
       return false;
     }
+  },
+
+  adoptProfile: async (p) => {
+    const profile: Profile = { ...p, id: getAuthUserId() ?? p.id };
+    set({ profile, targets: safeTargets(profile), status: 'ready' });
+    try {
+      await getRepos().profile.save(profile);
+    } catch (e) {
+      console.warn('[profile] adopt 저장 실패 — 이번 실행 동안 메모리로 유지', e);
+    }
+    return profile;
   },
 
   signOut: async (kind = 'logout') => {

@@ -18,7 +18,7 @@ import {
 import { setAuthUserId } from '@/services/authState';
 import { newId } from '@/services/id';
 import { createLocalRepos } from '@/services/repo/local';
-import { migrateLocalToSupabase } from '@/services/repo/migrate';
+import { discardMigratedBackup, migrateLocalToSupabase } from '@/services/repo/migrate';
 import { createSupabaseRepos } from '@/services/repo/supabase';
 import { getSupabase } from '@/services/supabase';
 
@@ -72,6 +72,18 @@ function migrateOnce(db: SupabaseClient, userId: string): Promise<void> {
     .finally(() => migrating.delete(userId));
   migrating.set(userId, p);
   return p;
+}
+
+/**
+ * 이미 서버로 옮긴 로컬 백업 비우기 (migrate 플래그가 있을 때만).
+ * 로그아웃 뒤나 세션 없이 켰을 때 예전 계정 데이터가 게스트 화면에 뜨거나, 새 게스트 데이터가 다음 로그인 때 건너뛰어지지 않게.
+ */
+export async function discardMigratedLocalBackup(): Promise<void> {
+  try {
+    await discardMigratedBackup({ storage: AsyncStorage, local: createLocalRepos(AsyncStorage) });
+  } catch (e) {
+    console.warn('[session] 옮긴 로컬 백업 정리 실패', e);
+  }
 }
 
 export const useSession = create<SessionState>((set, get) => {
@@ -148,8 +160,10 @@ export const useSession = create<SessionState>((set, get) => {
         }
 
         try {
-          const { data } = await db.auth.getSession();
+          const { data, error } = await db.auth.getSession();
           if (data.session) return await activate(db, data.session);
+          // 확실히 로그아웃 상태일 때만: 이미 옮긴 백업을 비워 게스트로 새로 시작 (서버에는 남아 있다)
+          if (!error) await discardMigratedLocalBackup();
         } catch (e) {
           console.warn('[session] Supabase 세션 확인 실패', e);
         }
@@ -207,6 +221,7 @@ export const useSession = create<SessionState>((set, get) => {
         } catch (e) {
           console.warn('[session] Supabase 로그아웃 실패 (로컬 세션은 정리)', e);
         }
+        await discardMigratedLocalBackup();
       }
       setAuthUserId(null);
       try {
