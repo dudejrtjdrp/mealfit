@@ -10,6 +10,7 @@
  *     (공식 사이트는 조리 전 생닭 중량만) 한국소비자원 시험 값·그 평균으로 계산 → 전부 trust 'estimated' + servingNote 한 줄.
  * (b) 중량을 모르는 나머지(순살·윙·사이드, 카페 베이글·케이크·아이스크림 레디팩 …) → 숫자는 그대로 두고
  *     제공량 표기만 인제스트의 "모르는 1인분" 형식("100 g 기준" + 안내 한 줄)으로 바꾼다. 같은 id 유지.
+ *     (2026-09-26 부터 perServing.ts 가 이 중 근거가 있는 것을 1조각·1잔·1회 섭취참고량으로 다시 바꾼다)
  * (c) "반마리" 행인데 100 g 당 열량이 같은 메뉴 1마리 행과 25% 넘게 다른 것(데이터 자체가 이상한 것)은 (b) 로만 처리한다.
  *
  * (a) 의 원래 메뉴는 hidden 으로 돌려줘 예전 기록(menuId)이 id 로 계속 찾히게 한다 (perSlice 와 같음).
@@ -70,6 +71,22 @@ const kyParts = (rawG: number, kind: Kind = '1마리'): PortionRule => {
   };
 };
 
+/**
+ * 순살(뼈 없음): 교촌 공식 조리 전 중량 × 같은 조리 전후 비율 (2026-09-26 공식 메뉴 페이지 확인:
+ * 간장·레드·반반[간장+레드] 순살 "정육, 조리 전 중량 700g", [S] 350 g · 허니순살 "정육+안심 500g", [반마리] 250 g ·
+ * 반반순살[레드+허니] 600 g · 살살후라이드 "정육+가슴살 630g" · 파채소이살살 420 g)
+ */
+const kyBoneless = (rawG: number, kind: Kind = '1마리'): PortionRule => {
+  const g = Math.round(rawG * KY_COOKED_RATIO);
+  return {
+    kind,
+    grams: g,
+    gramsLabel: `약 ${g} g`,
+    note: `순살 조리 전 ${rawG} g(교촌 공식)에 교촌 1마리의 조리 전후 무게 비율을 곱한 추정치예요`,
+    source: KYOCHON_MENU_URL,
+  };
+};
+
 // ── BBQ: 조리 후 1마리 중량 공개가 없어 소비자원 24개 제품 평균 ──
 const bbq = (kind: Kind): PortionRule => {
   const g = kind === '1마리' ? KCA_CHICKEN_2022.averageG : Math.round(KCA_CHICKEN_2022.averageG / 2);
@@ -114,6 +131,17 @@ export const CHICKEN_PORTIONS: Record<string, Record<string, PortionRule>> = {
     '교촌콤보 (S)': kyParts(460, '반마리'),
     '레드콤보 (S)': kyParts(460, '반마리'),
     '블랙시크릿 콤보 (S)': kyParts(460, '반마리'),
+    // 순살 — 식약처 이름 "교촌순살" 은 지금의 간장순살
+    교촌순살: kyBoneless(700),
+    레드순살: kyBoneless(700),
+    반반순살: kyBoneless(700),
+    '교촌순살 (S)': kyBoneless(350, '반마리'),
+    '레드순살 (S)': kyBoneless(350, '반마리'),
+    허니순살: kyBoneless(500),
+    '허니순살 (S)': kyBoneless(250, '반마리'),
+    레허반반순살: kyBoneless(600),
+    살살후라이드: kyBoneless(630),
+    파채소이살살: kyBoneless(420),
   },
   bbq: Object.fromEntries(
     [

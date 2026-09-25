@@ -2,6 +2,7 @@ import type { Brand, MenuItem, Store } from '../domain/types';
 import brandsJson from './brands.json';
 import { mergeSeedOptionsIntoOfficial } from './dedupe';
 import { applyPerPortion } from './perPortion';
+import { applyPerServing, type ServingRule } from './perServing';
 import { applyPerSlice } from './perSlice';
 import { DATASETS, PACKAGED_BRAND_ID, mergeBrands, mergeMenus } from './ingest/nutrition';
 import { getMockStores as buildMockStores } from './mockStores';
@@ -37,6 +38,8 @@ interface Catalog {
   perSlice: { slicedByBrand: Record<string, number>; cakesByBrand: Record<string, number> };
   /** 1마리·반마리로 바꾼 치킨 수 · "100 g 기준" 으로 표기만 바로잡은 메뉴 수 (브랜드별) */
   perPortion: { portionedByBrand: Record<string, number>; relabeledByBrand: Record<string, number> };
+  /** 한 번 먹는 단위로 바꾼 메뉴 수 (규칙별·브랜드별) */
+  perServing: { byRule: Record<ServingRule, number>; byBrand: Record<string, number> };
 }
 
 /**
@@ -60,7 +63,9 @@ function buildCatalog(): Catalog {
   const sliced = applyPerSlice(deduped.menus);
   // 100 g 당 값이 "1인분 (100 g)" 으로 잡힌 치킨은 1마리·반마리로, 나머지는 "100 g 기준" 표기로 (perPortion.ts — 출처 있는 중량만)
   const portioned = applyPerPortion(sliced.menus);
-  const menus = portioned.menus;
+  // 그래도 남은 한 판·홀·100 g 기준 메뉴는 한 번 먹는 단위로 (perServing.ts — 1회 섭취참고량·브랜드 컵 용량·조각 무게, 전부 추정 + 근거 한 줄)
+  const served = applyPerServing(portioned.menus);
+  const menus = served.menus;
   const brands = [...mergeBrands(brandsJson as Brand[], mfds.brands, menus), PACKAGED_BRAND];
 
   const menusByBrand = new Map<string, MenuItem[]>();
@@ -74,7 +79,7 @@ function buildCatalog(): Catalog {
     menus,
     brandById: new Map(brands.map((b) => [b.id, b])),
     // 목록에서 뺀 시드 메뉴도 id 로는 찾을 수 있게 둔다 — 예전 기록(menuId)·딥링크가 "정보 없음"으로 바뀌지 않게
-    menuById: new Map([...merged.hidden, ...deduped.hidden, ...sliced.hidden, ...portioned.hidden, ...menus].map((m) => [m.id, m])),
+    menuById: new Map([...merged.hidden, ...deduped.hidden, ...sliced.hidden, ...portioned.hidden, ...served.hidden, ...menus].map((m) => [m.id, m])),
     menusByBrand,
     // 긴 키워드부터 비교해 "CU" 같은 짧은 키워드가 먼저 잡히지 않게 한다
     keywordIndex: brands
@@ -85,6 +90,7 @@ function buildCatalog(): Catalog {
     mergedSeedsByBrand: deduped.mergedByBrand,
     perSlice: { slicedByBrand: sliced.slicedByBrand, cakesByBrand: sliced.cakesByBrand },
     perPortion: { portionedByBrand: portioned.portionedByBrand, relabeledByBrand: portioned.relabeledByBrand },
+    perServing: { byRule: served.byRule, byBrand: served.byBrand },
   };
 }
 
@@ -189,6 +195,10 @@ export function getPerSliceCounts() {
 /** 1마리·반마리로 바꾼 치킨 수 · 100 g 기준 표기로 바로잡은 메뉴 수 (브랜드별) — 검증·디버그용 */
 export function getPerPortionCounts() {
   return data().perPortion;
+}
+/** 한 번 먹는 단위(1조각·1잔·1회 섭취참고량)로 바꾼 메뉴 수 (규칙별·브랜드별) — 검증·디버그용 */
+export function getPerServingCounts() {
+  return data().perServing;
 }
 /** 공식 사이즈판과 합쳐 목록에서 뺀 시드 옵션판 수 (브랜드별) — 검증·디버그용 */
 export function getMergedSeedCounts(): Record<string, number> {

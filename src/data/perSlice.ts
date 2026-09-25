@@ -6,8 +6,8 @@
  * (a) 같은 브랜드에 공식 "(조각)" 메뉴가 있는 홀케이크 → 홀은 목록에서 빼고 조각 메뉴(공식값·trust 유지)를 쓴다.
  * (b) 1조각 값이 없는 피자 → 한 판 값을 브랜드가 공개한 사이즈별 조각 수로 나눈다. trust 'estimated' + servingNote 한 줄.
  *     조각 수는 아래 PIZZA_SLICES 에 출처와 함께 적은 것만 쓴다.
- * (c) 조각 수를 확인할 수 없는 브랜드·사이즈(피자7번가·지정환·피자마루·미스터피자·알볼로·피자파는집, 피자헛 P,
- *     사이즈 표기 없는 메뉴, 조각 메뉴가 없는 홀케이크)는 바꾸지 않는다.
+ * (c) 조각 수를 확인할 수 없는 브랜드·사이즈(지정환·피자마루·미스터피자·알볼로·피자파는집, 피자헛 P,
+ *     사이즈 표기 없는 메뉴, 조각 메뉴가 없는 홀케이크)는 여기서 바꾸지 않고 perServing.ts 가 무게 기준으로 나눈다.
  *
  * 예전 기록(menuId)은 기록 당시 영양을 담고 있으므로, 원래 한 판·홀 메뉴는 hidden 으로 돌려줘 id 로 계속 찾히게 한다
  * (수량 단위도 예전 그대로 '인분'). 1조각 메뉴는 새 id `${원래 id}${SLICE_ID_SUFFIX}` 로 목록에 선다.
@@ -35,6 +35,12 @@ export const PIZZA_SLICES: Record<string, { sizes: Partial<Record<PizzaSize, num
     // 파파존스 공식 Threads(@papajohnskr): "레귤러 6 라지 8 패밀리 8 파티 10" — 데이터의 (P)는 파티(가장 큰 사이즈)
     // 2026-09-25 공식 주문 페이지(https://pji.co.kr/menu/pizza/3241, L·F 판매 메뉴)에서 컷팅 옵션 "기본(8조각)" 확인 — L·F 8 교차 확인. R 6·P 10 은 Threads 만
     source: 'https://www.threads.com/@papajohnskr/post/DZkPdcdiVEH',
+  },
+  pizza7: {
+    sizes: { R: 8, L: 8 },
+    // 7번가피자 공식 메뉴 → 영양성분(popup.php?popSeq=…&popCate=2) 표: "1회 중량 · 1회 조각수 · 총 중량" 열
+    // 예) 샘스테이크 L 석쇠 129 g × 8 ≈ 1,034 g, 샘스테이크 R 석쇠 2조각 170 g → 679 g ÷ 85 g = 8조각 (2026-09-26 확인)
+    source: 'https://www.7thpizza.com/sub/menu/list.php',
   },
 };
 

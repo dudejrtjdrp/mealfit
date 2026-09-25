@@ -46,10 +46,13 @@ describe('100 g 당 값이 1인분으로 잡힌 치킨 → 1마리·반마리 (p
     expect(c.portionedByBrand.kyochon).toBeGreaterThanOrEqual(10);
     expect(c.portionedByBrand.goobne).toBe(8);
     expect(c.relabeledByBrand.baskin).toBe(29);
+    // 표기만 바로잡은 메뉴(숫자는 그대로라 등급도 그대로)는 perServing 이 1회 섭취참고량으로 다시 바꾸고, 원래 id 로는 100 g 기준이 찾힌다
     const bagel = byName('hollys', '블루베리 베이글')!;
-    expect(bagel.serving).toBe('100 g 기준');
-    expect(bagel.servingNote).toBe('1인분 제공량 정보가 없어 100 g 기준으로 표시해요.');
-    expect(bagel.trust).toBe('official'); // 숫자는 그대로라 등급도 그대로
+    expect(bagel.serving).toBe('1회 섭취참고량 (70 g)');
+    const old = getMenu(bagel.id.replace(/-serving$/, ''))!;
+    expect(old.serving).toBe('100 g 기준');
+    expect(old.servingNote).toBe('1인분 제공량 정보가 없어 100 g 기준으로 표시해요.');
+    expect(old.trust).toBe('official');
   });
 
   it('바꾼 메뉴는 모두 estimated + 한 줄 설명, official 은 sourceUrl 이 있다', () => {
@@ -57,7 +60,7 @@ describe('100 g 당 값이 1인분으로 잡힌 치킨 → 1마리·반마리 (p
       if (m.id.endsWith(PORTION_ID_SUFFIX)) {
         expect(m.trust).toBe('estimated');
         expect(m.servingNote).toMatch(/추정치예요$/);
-        expect(m.serving).toMatch(/^(1마리|반마리) \((뼈 포함 )?약 \d+ g\)$/);
+        expect(m.serving).toMatch(/^(1마리|반마리) \((뼈 포함 )?약 \d+ g\)$/); // 순살은 "뼈 포함" 없이
         expect(menuQtyUnit(m)).toBe('인분');
       }
       if (m.trust === 'official') expect(m.sourceUrl).toMatch(/^https:\/\//);
