@@ -246,19 +246,17 @@ function StoreCard({ store, pick, onPress }: { store: Store; pick: StorePick | n
           {brand?.blurb ? ` · ${brand.blurb}` : ''}
         </Text>
         {lead && top ? (
-          <View style={styles.pick}>
-            <Ionicons name={lead.verdict === 'good' ? 'checkmark-circle' : 'ellipse'} size={14} color={colors[lead.verdict]} />
-            <Text variant="captionMedium" style={[styles.pickLead, { color: colors[lead.verdict] }]}>
-              {VERDICT_LABEL[lead.verdict]} {lead.n}개
-            </Text>
-            <Text variant="caption" color="ink2" numberOfLines={1} style={styles.pickName}>
-              · 추천: {top.menu.name}
-            </Text>
-            {topKcal != null ? (
-              <Text variant="caption" color="ink3">
-                {formatNumber(topKcal)}kcal
+          <View style={styles.pickWrap}>
+            <View style={styles.pick}>
+              <Ionicons name={lead.verdict === 'good' ? 'checkmark-circle' : 'ellipse'} size={14} color={colors[lead.verdict]} />
+              <Text variant="captionMedium" numberOfLines={1} style={[styles.pickLead, { color: colors[lead.verdict] }]}>
+                {VERDICT_LABEL[lead.verdict]} {lead.n}개
               </Text>
-            ) : null}
+            </View>
+            <Text variant="caption" color="ink2" numberOfLines={1}>
+              추천 {top.menu.name}
+              {topKcal != null ? <Text variant="caption" color="ink3">{` · ${formatNumber(topKcal)}kcal`}</Text> : null}
+            </Text>
           </View>
         ) : null}
         <CoverageBadge coverage={store.coverage} menuCount={pick?.known} size="sm" style={styles.badge} />
@@ -287,9 +285,9 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.8 },
   cardBody: { flex: 1, minWidth: 0, gap: 4 },
   badge: { marginTop: 4, alignSelf: 'flex-start' },
-  pick: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  pickLead: { fontFamily: fonts.semibold },
-  pickName: { flexShrink: 1 },
+  pickWrap: { marginTop: 2, gap: 2 },
+  pick: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  pickLead: { fontFamily: fonts.semibold, flexShrink: 0 },
   foldRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.section },
   foldText: { flex: 1 },
   flip: { transform: [{ rotate: '180deg' }] },

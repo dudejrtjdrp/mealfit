@@ -33,11 +33,11 @@ function Ring({ size, stroke, progress }: { size: number; stroke: number; progre
 }
 
 export interface KcalRingProps {
-  /** 가운데 큰 숫자 (예: 여유 kcal 또는 목표 kcal) */
+  /** 가운데 큰 숫자 (예: 남은 kcal 또는 목표 kcal) */
   value: number;
   /** 링 채움 비율 0~1 — 오늘 채운 만큼 */
   progress: number;
-  /** 숫자 아래 작은 단위 (기본 "kcal 여유") */
+  /** 숫자 아래 작은 단위 (기본 "kcal 남았어요") */
   caption?: string;
   /** 링 아래 "목표 1,800 kcal" — 없으면 숨김 */
   target?: number;
@@ -49,7 +49,7 @@ export interface KcalRingProps {
 }
 
 /** 칼로리 도넛 링 (C1·E1·B7) — 트랙 헤어라인색, 채움 그린, 가운데 큰 Bold 숫자 + 작은 단위 */
-export function KcalRing({ value, progress, caption = 'kcal 여유', target, size = 130, stroke = 12, numberSize, style }: KcalRingProps) {
+export function KcalRing({ value, progress, caption = 'kcal 남았어요', target, size = 130, stroke = 12, numberSize, style }: KcalRingProps) {
   return (
     <View style={[styles.ringWrap, style]}>
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
