@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { TARGETS, log } from '../../domain/__tests__/fixtures';
 import { resetReposForTest } from '../../services/repo';
-import { defaultMealType, useDay } from '../day';
+import { clearLogRangeCache, defaultMealType, dominantVerdict, useDay, weekTally } from '../day';
 import { useProfile } from '../profile';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -17,6 +17,7 @@ beforeEach(async () => {
   resetReposForTest();
   useProfile.setState({ targets: TARGETS });
   useDay.setState({ date: DATE, logs: [], summary: null, status: 'idle' });
+  clearLogRangeCache();
 });
 
 describe('day store', () => {
@@ -76,5 +77,34 @@ describe('day store', () => {
     expect(defaultMealType(at(12))).toBe('lunch');
     expect(defaultMealType(at(19))).toBe('dinner');
     expect(defaultMealType(at(22))).toBe('snack');
+  });
+
+  it('logsInRange: 날짜별로 묶고, 기록이 바뀌면 캐시를 비운다', async () => {
+    await useDay.getState().load(DATE);
+    await useDay.getState().addLog(log({ id: 'm', date: '2026-09-14', verdict: 'good' }));
+    await useDay.getState().addLog(log({ id: 't', date: DATE, verdict: 'ok' }));
+    let week = await useDay.getState().logsInRange('2026-09-14', '2026-09-20');
+    expect(Object.keys(week).sort()).toEqual(['2026-09-14', DATE]);
+
+    await useDay.getState().removeLog('t');
+    week = await useDay.getState().logsInRange('2026-09-14', '2026-09-20');
+    expect(Object.keys(week)).toEqual(['2026-09-14']);
+
+    // 되돌리기: 지운 기록을 다시 add
+    await useDay.getState().addLog(log({ id: 't', date: DATE, verdict: 'ok' }));
+    week = await useDay.getState().logsInRange('2026-09-14', '2026-09-20');
+    expect(week[DATE].map((l) => l.id)).toEqual(['t']);
+  });
+
+  it('dominantVerdict: 가장 많은 판정, 같으면 좋은 쪽', () => {
+    expect(dominantVerdict([])).toBeUndefined();
+    expect(dominantVerdict([{}, {}])).toBeUndefined();
+    expect(dominantVerdict([{ verdict: 'pass' }, { verdict: 'pass' }, { verdict: 'good' }])).toBe('pass');
+    expect(dominantVerdict([{ verdict: 'ok' }, { verdict: 'good' }])).toBe('good');
+    expect(dominantVerdict([{ verdict: 'ok' }, { verdict: 'pass' }, {}])).toBe('ok');
+  });
+
+  it('weekTally: 좋음 끼니 수 · 기록한 날 수', () => {
+    expect(weekTally({ a: [{ verdict: 'good' }, { verdict: 'ok' }], b: [{ verdict: 'good' }], c: [] })).toEqual({ good: 2, days: 2 });
   });
 });

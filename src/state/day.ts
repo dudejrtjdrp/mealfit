@@ -2,7 +2,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { create } from 'zustand';
 
 import { summarizeDay, toDateKey } from '@/domain/summary';
-import type { DailyTargets, DaySummary, MealLog, MealType } from '@/domain/types';
+import type { DailyTargets, DaySummary, MealLog, MealType, Verdict } from '@/domain/types';
 import { getRepos } from '@/services/repo';
 
 import { useProfile } from './profile';
@@ -26,8 +26,41 @@ interface DayState {
   updateLog: (log: MealLog) => Promise<boolean>;
   removeLog: (id: string) => Promise<boolean>;
   datesWithLogs: (from: string, to: string) => Promise<string[]>;
+  /** from~to(포함) 날짜별 기록 — 기록 탭 주간 캘린더용. 한 주를 한 번에 읽고 기록이 바뀔 때까지 캐시 */
+  logsInRange: (from: string, to: string) => Promise<Record<string, MealLog[]>>;
+  /** 최근 N일(오늘 포함) 기록 전체, 최신순 — 기록 추가의 "자주 먹어요"·"최근" */
+  recentLogs: (days: number) => Promise<MealLog[]>;
   /** 목표량이 바뀌었을 때 요약만 다시 계산 */
   recompute: () => void;
+}
+
+/** 기간별 기록 캐시 — 기록이 추가·수정·삭제되면 통째로 비운다 */
+const rangeCache = new Map<string, Promise<Record<string, MealLog[]>>>();
+export function clearLogRangeCache() {
+  rangeCache.clear();
+}
+
+const VERDICT_ORDER: Verdict[] = ['good', 'ok', 'pass'];
+
+/** 그날 기록의 판정 중 가장 많은 것 (같으면 좋음 > 괜찮음 > 패스). 판정 있는 기록이 없으면 undefined */
+export function dominantVerdict(logs: Pick<MealLog, 'verdict'>[]): Verdict | undefined {
+  const n: Record<Verdict, number> = { good: 0, ok: 0, pass: 0 };
+  for (const l of logs) if (l.verdict) n[l.verdict] += 1;
+  let best: Verdict | undefined;
+  for (const v of VERDICT_ORDER) if (n[v] > 0 && (!best || n[v] > n[best])) best = v;
+  return best;
+}
+
+/** 주간 요약 재료: 좋음 판정 끼니 수 · 기록한 날 수 */
+export function weekTally(byDate: Record<string, Pick<MealLog, 'verdict'>[]>): { good: number; days: number } {
+  let good = 0;
+  let days = 0;
+  for (const logs of Object.values(byDate)) {
+    if (!logs.length) continue;
+    days += 1;
+    good += logs.filter((l) => l.verdict === 'good').length;
+  }
+  return { good, days };
 }
 
 const sortLogs = (logs: MealLog[]) => [...logs].sort((a, b) => a.time.localeCompare(b.time));
@@ -61,8 +94,10 @@ export const useDay = create<DayState>((set, get) => ({
       const next = sortLogs([...logs.filter((l) => l.id !== log.id), log]);
       set({ logs: next, summary: summarize(date, next) });
     }
+    rangeCache.clear();
     try {
       await getRepos().logs.add(log);
+      rangeCache.clear();
       return true;
     } catch (e) {
       console.warn('[day] add 실패', e);
@@ -74,8 +109,10 @@ export const useDay = create<DayState>((set, get) => ({
     const { date, logs } = get();
     const next = sortLogs(log.date === date ? logs.map((l) => (l.id === log.id ? log : l)) : logs.filter((l) => l.id !== log.id));
     set({ logs: next, summary: summarize(date, next) });
+    rangeCache.clear();
     try {
       await getRepos().logs.update(log);
+      rangeCache.clear();
       return true;
     } catch (e) {
       console.warn('[day] update 실패', e);
@@ -87,8 +124,10 @@ export const useDay = create<DayState>((set, get) => ({
     const { date, logs } = get();
     const next = logs.filter((l) => l.id !== id);
     set({ logs: next, summary: summarize(date, next) });
+    rangeCache.clear();
     try {
       await getRepos().logs.remove(id);
+      rangeCache.clear();
       return true;
     } catch (e) {
       console.warn('[day] remove 실패', e);
@@ -102,6 +141,46 @@ export const useDay = create<DayState>((set, get) => ({
     } catch {
       return [];
     }
+  },
+
+  logsInRange: async (from, to) => {
+    const key = `${from}~${to}`;
+    let hit = rangeCache.get(key);
+    if (!hit) {
+      hit = (async () => {
+        const repo = getRepos().logs;
+        const dates = await repo.datesWithLogs(from, to);
+        const lists = await Promise.all(dates.map((d) => repo.listByDate(d)));
+        const out: Record<string, MealLog[]> = {};
+        dates.forEach((d, i) => {
+          if (lists[i].length) out[d] = lists[i];
+        });
+        return out;
+      })();
+      rangeCache.set(key, hit);
+      hit.catch(() => rangeCache.delete(key));
+    }
+    try {
+      const byDate = { ...(await hit) };
+      // 오늘 목록은 저장이 끝나기 전에도 화면 상태가 최신이다
+      const { date, logs, status } = get();
+      if (status === 'ready' && date >= from && date <= to) {
+        if (logs.length) byDate[date] = logs;
+        else delete byDate[date];
+      }
+      return byDate;
+    } catch {
+      return {};
+    }
+  },
+
+  recentLogs: async (days) => {
+    const end = new Date();
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - Math.max(0, days - 1));
+    const byDate = await get().logsInRange(toDateKey(start), toDateKey(end));
+    return Object.values(byDate)
+      .flat()
+      .sort((a, b) => b.time.localeCompare(a.time));
   },
 
   recompute: () => {
