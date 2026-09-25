@@ -3,7 +3,8 @@
  * 앱 번들(mfds-products.json 3.7만 개)은 오프라인·키 없음 폴백이고, 검색의 기본은 이 테이블이다 (2026-09-24 효님 결정).
  * 스키마·인덱스: supabase/migrations/0002_products.sql
  */
-import { normalizeName, searchMenus } from '@/data';
+import { getBrand, getMenusByBrand, normalizeName, searchMenus } from '@/data';
+import { rankKey, rankMatches } from '@/data/searchRank';
 import { DATASETS, PACKAGED_BRAND_ID } from '@/data/ingest/nutrition';
 import type { MenuItem, Nutrients } from '@/domain/types';
 
@@ -93,21 +94,23 @@ export async function searchProductsRemote(query: string, limit = 40): Promise<M
 }
 
 /**
- * 이름으로 가장 비슷한 메뉴 (영양 정보 있는 것만): 이름이 같음 > 검색어로 시작 > 이름 길이 차이가 작은 순.
- * 직접 입력에서 칼로리를 모를 때 "비슷한 메뉴로 계산"하는 기준 — 순수 함수.
+ * 이름으로 가장 비슷한 메뉴 (영양 정보 있는 것만) — 순위는 검색과 같은 규칙(data/searchRank):
+ * 이름이 같음 > 이름의 머리(끝)가 검색어("황금올리브 치킨" ← 치킨) > 앞 단어 끝 > 꾸밈말 자리("치킨 클럽"·"라면왕김통깨"),
+ * 같은 단계면 매장 메뉴 > 시판 제품, 그 음식을 주로 파는 브랜드(치킨 → BBQ·교촌·굽네) > 가끔 파는 브랜드, 이름 길이 차이가 작은 순.
+ * 직접 입력에서 칼로리를 모를 때 "비슷한 메뉴로 계산"하는 기준.
  */
 export function pickSimilar(query: string, candidates: MenuItem[]): MenuItem | undefined {
   const q = normalizeName(query);
   if (!q) return undefined;
-  const scored = candidates
-    .filter((m) => m.nutrients != null && m.trust !== 'none')
-    .map((m, i) => {
-      const n = normalizeName(m.name);
-      const rank = n === q ? 0 : n.startsWith(q) ? 1 : n.includes(q) ? 2 : 3;
-      return { m, rank, diff: Math.abs(n.length - q.length), i };
-    });
-  scored.sort((a, b) => a.rank - b.rank || a.diff - b.diff || a.i - b.i);
-  return scored[0]?.m;
+  const seen = new Set<string>();
+  const usable = candidates.filter((m) => {
+    if (m.nutrients == null || m.trust === 'none' || seen.has(m.id)) return false;
+    seen.add(m.id);
+    return true;
+  });
+  const keys = usable.map((m) => rankKey(m, getBrand(m.brandId)?.name ?? ''));
+  // 친화도 = 후보 중 그 브랜드 메뉴 수 ÷ 브랜드 전체 메뉴 수 (시판 제품은 제조사 전체를 몰라 0)
+  return rankMatches(q, usable, keys, (g) => (g.startsWith('pkg:') ? 0 : getMenusByBrand(g).length))[0];
 }
 
 /**
@@ -118,8 +121,9 @@ export async function findSimilarMenu(name: string): Promise<MenuItem | undefine
   const words = name.split(/\s+/).filter((w) => normalizeName(w).length >= 2);
   const queries = [name, ...words.sort((a, b) => b.length - a.length)].filter((q, i, arr) => arr.indexOf(q) === i);
   for (const q of queries) {
-    const local = searchMenus(q, 40);
-    const remote = (await searchProductsRemote(q, 20)) ?? [];
+    const local = searchMenus(q, 120);
+    const seen = new Set(local.map((m) => m.id));
+    const remote = ((await searchProductsRemote(q, 20)) ?? []).filter((m) => !seen.has(m.id));
     const hit = pickSimilar(q, [...local, ...remote]);
     if (hit) return hit;
   }

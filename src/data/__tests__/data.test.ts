@@ -2,6 +2,8 @@ import { haversineM } from '../../domain/geo';
 import { judgeMenu, nonMealKind, rankMenus } from '../../domain/judge';
 import { drinkKey, mergeSeedOptionsIntoOfficial } from '../dedupe';
 import { applyPerSlice, cakeKey, PIZZA_SLICES, pizzaSize, SLICE_ID_SUFFIX, toSlice } from '../perSlice';
+import { PORTION_ID_SUFFIX } from '../perPortion';
+import { matchTier, rankKey, rankMatches } from '../searchRank';
 import { menuQtyUnit } from '../../domain/qty';
 import {
   getBrand,
@@ -77,8 +79,15 @@ describe('공공데이터 번들 (src/data/generated/mfds.json)', () => {
     expect(bytes).toBeLessThanOrEqual(5 * 1024 * 1024);
   });
 
-  it('공공데이터 메뉴는 official · 데이터셋 출처 · 이름 있음 (1조각으로 나눈 피자만 estimated)', () => {
+  it('공공데이터 메뉴는 official · 데이터셋 출처 · 이름 있음 (1조각으로 나눈 피자·1마리로 환산한 치킨만 estimated)', () => {
     for (const m of getMenus().filter((x) => x.sourceName?.startsWith('식약처'))) {
+      if (m.id.endsWith(PORTION_ID_SUFFIX)) {
+        // 100 g 기준 → 1마리 환산 (perPortion) — 근거 문구 필수, 출처는 환산 근거 URL
+        expect(m.trust).toBe('estimated');
+        expect(m.servingNote).toBeTruthy();
+        expect(m.sourceUrl).toMatch(/^https?:\/\//);
+        continue;
+      }
       if (m.id.endsWith(SLICE_ID_SUFFIX)) expect(m).toMatchObject({ trust: 'estimated', servingNote: expect.stringMatching(/^한 판\(\d+조각\) 영양을 나눈 1조각 기준이에요$/) });
       else expect(m.trust).toBe('official');
       expect(m.sourceUrl).toMatch(/^https:\/\/www\.data\.go\.kr\/data\/151000(70|66)\/standard\.do$/);
@@ -279,11 +288,49 @@ describe('searchMenus (기록 추가 E2)', () => {
     expect(searchMenus('스타벅스', 5).every((m) => m.brandId === 'starbucks')).toBe(true);
   });
 
-  it('목록 순서를 지키고 getMenus 필터와 결과가 같다', () => {
+  it('결과 집합은 getMenus 필터와 같고(매장 메뉴가 시판 제품보다 앞), 머리말 순위로 정렬된다', () => {
     const norm = (s: string) => s.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
     const q = '라떼';
-    const naive = getMenus().filter((m) => norm(m.name).includes(q) || norm(getBrand(m.brandId)?.name ?? '').includes(q)).slice(0, 40);
-    expect(searchMenus(q).map((m) => m.id)).toEqual(naive.map((m) => m.id));
+    const naive = getMenus().filter((m) => norm(m.name).includes(q) || norm(getBrand(m.brandId)?.name ?? '').includes(q));
+    const got = searchMenus(q, 100000).filter((m) => m.brandId !== 'packaged');
+    expect(new Set(got.map((m) => m.id))).toEqual(new Set(naive.map((m) => m.id)));
+    // 검색어가 이름 끝(머리)인 메뉴가 꾸밈말 자리("라떼쿠키" 같은)보다 먼저
+    const tiers = searchMenus(q, 200).map((m) => matchTier(q, rankKey(m, getBrand(m.brandId)?.name ?? '')));
+    expect(tiers).toEqual([...tiers].sort((a, b) => a - b));
+  });
+
+  it('머리말 순위: 치킨 → 치킨 브랜드의 치킨, 황금올리브 → BBQ 황금올리브 치킨, 라면·콜라·사과는 꾸밈말 메뉴가 뒤로', () => {
+    const top = (q: string, n: number) => searchMenus(q, n);
+    // 스타벅스 "치킨 클럽"(샌드위치)이 아니라 치킨 전문 브랜드의 치킨이 먼저
+    const chicken = top('치킨', 10);
+    expect(chicken.every((m) => ['bbq', 'kyochon', 'goobne'].includes(m.brandId))).toBe(true);
+    expect(chicken.every((m) => /치킨/.test(m.name))).toBe(true);
+    const clubAt = searchMenus('치킨', 2000).findIndex((m) => m.name === '치킨 클럽');
+    expect(clubAt).toBeGreaterThan(50);
+
+    const gold = top('황금올리브', 1)[0];
+    expect(gold).toMatchObject({ brandId: 'bbq', name: '황금올리브 치킨' });
+
+    // 라면: 라면이 "라면왕김통깨"(과자)보다 앞
+    const ramen = searchMenus('라면', 2000);
+    const firstRamen = ramen.findIndex((m) => /라면$/.test(m.name.replace(/\s*(큰사발|용기)$/, '')));
+    expect(firstRamen).toBeLessThan(5);
+    expect(ramen.findIndex((m) => m.name === '라면왕김통깨')).toBeGreaterThan(50);
+
+    // 콜라: 콜라가 맨 앞, "콜라겐 요거트스무디"는 한참 뒤
+    expect(top('콜라', 1)[0].name).toBe('콜라');
+    const cola = searchMenus('콜라', 2000);
+    expect(cola.findIndex((m) => m.name === '콜라겐 요거트스무디')).toBeGreaterThan(cola.findIndex((m) => m.name === '코카콜라'));
+
+    // 사과: "사과" 가 맨 앞, 사과유자차는 뒤
+    expect(top('사과', 1)[0].name).toBe('사과');
+    expect(top('사과', 10).some((m) => m.name.startsWith('사과유자차'))).toBe(false);
+  });
+
+  it('브랜드 검색은 그 브랜드 메뉴가 먼저 (시판 "스타벅스 …" 제품보다 앞)', () => {
+    const got = searchMenus('스타벅스', 60);
+    expect(got).toHaveLength(60);
+    expect(got.every((m) => m.brandId === 'starbucks')).toBe(true);
   });
 
   it('1만여 개에서 한 번 검색이 충분히 빠르다', () => {
@@ -291,6 +338,40 @@ describe('searchMenus (기록 추가 E2)', () => {
     const t = Date.now();
     for (let i = 0; i < 50; i++) searchMenus(`없는메뉴${i}`);
     expect((Date.now() - t) / 50).toBeLessThan(20);
+  });
+});
+
+describe('searchRank 순수 함수 (머리말 순위)', () => {
+  const k = (name: string, brand = '', over: Partial<MenuItem> = {}) => rankKey({ name, brandId: 'b', ...over }, brand);
+
+  it('이름 끝(머리)이 검색어면 꾸밈말 자리보다 앞 — 끝의 반마리·사이즈·온도 말은 떼고 본다', () => {
+    expect(matchTier('치킨', k('치킨'))).toBe(0);
+    expect(matchTier('치킨', k('치킨 (L)'))).toBe(1);
+    expect(matchTier('치킨', k('치킨', 'BBQ'))).toBe(0);
+    expect(matchTier('치킨', k('BBQ 치킨', 'BBQ'))).toBe(1);
+    expect(matchTier('치킨', k('황금올리브 치킨 반마리'))).toBe(2);
+    expect(matchTier('치킨', k('황금올리브 치킨 레드착착'))).toBe(3);
+    expect(matchTier('치킨', k('치킨 클럽'))).toBe(3);
+    expect(matchTier('치킨', k('치킨버거'))).toBe(4);
+    expect(matchTier('콜라', k('콜라겐 요거트스무디'))).toBe(4);
+    expect(matchTier('콜라', k('유자 피나콜라다'))).toBe(5);
+    expect(matchTier('치킨', k('허니콤보', '교촌치킨'))).toBe(4);
+    expect(matchTier('스타벅스', k('카페 라떼', '스타벅스'))).toBe(2);
+    expect(matchTier('피자', k('카페 라떼', '스타벅스'))).toBe(-1);
+  });
+
+  it('같은 단계면 매장 메뉴 > 시판 제품, 그 음식을 주로 파는 브랜드 > 가끔 파는 브랜드, 짧은 이름', () => {
+    const items = [
+      { name: '로스트 치킨', brandId: 'cafe' },
+      { name: '크리스피 치킨', brandId: 'packaged', maker: '하림' },
+      { name: '양념 치킨', brandId: 'chick' },
+      { name: '스노윙 치킨', brandId: 'chick' },
+      { name: '후라이드 치킨', brandId: 'chick' },
+    ];
+    const keys = items.map((m) => rankKey(m));
+    const totals: Record<string, number> = { cafe: 40, chick: 5 };
+    const ranked = rankMatches('치킨', items, keys, (g) => totals[g] ?? 0).map((m) => m.name);
+    expect(ranked).toEqual(['양념 치킨', '스노윙 치킨', '후라이드 치킨', '로스트 치킨', '크리스피 치킨']);
   });
 });
 

@@ -1,9 +1,11 @@
 import type { Brand, MenuItem, Store } from '../domain/types';
 import brandsJson from './brands.json';
 import { mergeSeedOptionsIntoOfficial } from './dedupe';
+import { applyPerPortion } from './perPortion';
 import { applyPerSlice } from './perSlice';
 import { DATASETS, PACKAGED_BRAND_ID, mergeBrands, mergeMenus } from './ingest/nutrition';
 import { getMockStores as buildMockStores } from './mockStores';
+import { rankKey, rankMatches, type RankKey } from './searchRank';
 
 /** scripts/ingest-nutrition.mjs 가 만드는 식약처 공공데이터 번들 */
 interface MfdsBundle {
@@ -33,6 +35,8 @@ interface Catalog {
   mergedSeedsByBrand: Record<string, number>;
   /** 1조각 기준으로 바꾼 피자·조각 메뉴로 대신한 홀케이크 수 (브랜드별) */
   perSlice: { slicedByBrand: Record<string, number>; cakesByBrand: Record<string, number> };
+  /** 1마리·반마리로 바꾼 치킨 수 · "100 g 기준" 으로 표기만 바로잡은 메뉴 수 (브랜드별) */
+  perPortion: { portionedByBrand: Record<string, number>; relabeledByBrand: Record<string, number> };
 }
 
 /**
@@ -54,7 +58,9 @@ function buildCatalog(): Catalog {
   const deduped = mergeSeedOptionsIntoOfficial(merged.menus);
   // 피자 한 판·홀케이크처럼 나눠 먹는 단위가 1인분으로 잡힌 메뉴는 1조각 기준으로 (perSlice.ts — 공식 조각값 또는 공개 조각 수로 나눈 값만)
   const sliced = applyPerSlice(deduped.menus);
-  const menus = sliced.menus;
+  // 100 g 당 값이 "1인분 (100 g)" 으로 잡힌 치킨은 1마리·반마리로, 나머지는 "100 g 기준" 표기로 (perPortion.ts — 출처 있는 중량만)
+  const portioned = applyPerPortion(sliced.menus);
+  const menus = portioned.menus;
   const brands = [...mergeBrands(brandsJson as Brand[], mfds.brands, menus), PACKAGED_BRAND];
 
   const menusByBrand = new Map<string, MenuItem[]>();
@@ -68,7 +74,7 @@ function buildCatalog(): Catalog {
     menus,
     brandById: new Map(brands.map((b) => [b.id, b])),
     // 목록에서 뺀 시드 메뉴도 id 로는 찾을 수 있게 둔다 — 예전 기록(menuId)·딥링크가 "정보 없음"으로 바뀌지 않게
-    menuById: new Map([...merged.hidden, ...deduped.hidden, ...sliced.hidden, ...menus].map((m) => [m.id, m])),
+    menuById: new Map([...merged.hidden, ...deduped.hidden, ...sliced.hidden, ...portioned.hidden, ...menus].map((m) => [m.id, m])),
     menusByBrand,
     // 긴 키워드부터 비교해 "CU" 같은 짧은 키워드가 먼저 잡히지 않게 한다
     keywordIndex: brands
@@ -78,6 +84,7 @@ function buildCatalog(): Catalog {
     seedPolicy: merged.seedPolicy,
     mergedSeedsByBrand: deduped.mergedByBrand,
     perSlice: { slicedByBrand: sliced.slicedByBrand, cakesByBrand: sliced.cakesByBrand },
+    perPortion: { portionedByBrand: portioned.portionedByBrand, relabeledByBrand: portioned.relabeledByBrand },
   };
 }
 
@@ -179,34 +186,36 @@ export function getSeedPolicy() {
 export function getPerSliceCounts() {
   return data().perSlice;
 }
+/** 1마리·반마리로 바꾼 치킨 수 · 100 g 기준 표기로 바로잡은 메뉴 수 (브랜드별) — 검증·디버그용 */
+export function getPerPortionCounts() {
+  return data().perPortion;
+}
 /** 공식 사이즈판과 합쳐 목록에서 뺀 시드 옵션판 수 (브랜드별) — 검증·디버그용 */
 export function getMergedSeedCounts(): Record<string, number> {
   return data().mergedSeedsByBrand;
 }
 
-// 기록 추가(E2) 검색용: 정규화 이름을 한 번만 계산해 두고(3만여 개), 키 입력마다 정규식을 다시 돌리지 않는다
-let searchIndex: { menu: MenuItem; key: string; brandKey: string }[] | null = null;
+// 기록 추가(E2) 검색용: 정규화 이름·순위 키를 한 번만 계산해 두고(3만여 개), 키 입력마다 정규식을 다시 돌리지 않는다
+let searchIndex: { menus: MenuItem[]; keys: RankKey[]; groupTotals: Map<string, number> } | null = null;
 /**
- * 메뉴명·브랜드명·제조사명에 검색어가 들어간 메뉴를 최대 limit 개 (찾는 즉시 멈춘다).
- * 매장 메뉴(주변 판정과 같은 데이터)가 앞, 시판 제품(라면·과자 등 식약처 가공식품)이 뒤.
+ * 메뉴명·브랜드명·제조사명에 검색어가 들어간 메뉴를 순위대로 최대 limit 개 (searchRank.ts).
+ * 이름의 머리(끝)가 검색어인 메뉴 > 꾸밈말 자리 · 매장 메뉴 > 시판 제품 · 그 음식을 주로 파는 브랜드 > 가끔 파는 브랜드 · 짧은 이름 순.
+ * ("치킨" → BBQ·교촌·굽네 치킨이 스타벅스 "치킨 클럽"보다 앞, "라면" → 라면이 "라면왕김통깨"보다 앞)
  */
 export function searchMenus(query: string, limit = 40): MenuItem[] {
   const q = normalizeName(query);
   if (!q) return [];
   if (!searchIndex) {
     const { brands, menus } = data();
-    const brandKeys = new Map(brands.map((b) => [b.id, normalizeName(b.name)]));
-    const entry = (m: MenuItem) => ({ menu: m, key: normalizeName(m.name), brandKey: m.maker ? normalizeName(m.maker) : (brandKeys.get(m.brandId) ?? '') });
-    searchIndex = [...menus.map(entry), ...loadProducts().list.map(entry)];
+    const brandNames = new Map(brands.map((b) => [b.id, b.name]));
+    const all = [...menus, ...loadProducts().list];
+    const keys = all.map((m) => rankKey(m, brandNames.get(m.brandId) ?? ''));
+    const groupTotals = new Map<string, number>();
+    for (const k of keys) groupTotals.set(k.group, (groupTotals.get(k.group) ?? 0) + 1);
+    searchIndex = { menus: all, keys, groupTotals };
   }
-  const out: MenuItem[] = [];
-  for (const x of searchIndex) {
-    if (x.key.includes(q) || x.brandKey.includes(q)) {
-      out.push(x.menu);
-      if (out.length >= limit) break;
-    }
-  }
-  return out;
+  const idx = searchIndex;
+  return rankMatches(q, idx.menus, idx.keys, (g) => idx.groupTotals.get(g) ?? 0).slice(0, limit);
 }
 /** 카카오 place_name → 브랜드 매칭 ("GS25 역삼센터점" → gs25) */
 export function matchBrand(placeName: string): Brand | undefined {
