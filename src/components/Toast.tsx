@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FullWindowOverlay } from 'react-native-screens';
 
 import { colors, fonts, radius, shadow, spacing } from '@/theme';
 
@@ -28,7 +29,17 @@ export function showToast(text: string, kind: ToastMsg['kind'] = 'success', acti
   listeners.forEach((l) => l(msg));
 }
 
-/** 루트 레이아웃에 한 번 배치 — 진한 알약 + 그린 체크 (+ 액션 버튼) */
+/**
+ * iOS 네이티브 모달(log/add · nearby/location)은 루트 뷰 위에 따로 뜨는 창이라, 루트에 둔 토스트가 그 아래에 가려진다.
+ * iOS 에서만 FullWindowOverlay(모든 화면 위의 별도 창)에 그린다 — 웹·안드로이드는 모달도 같은 뷰 트리라 그대로.
+ * 토스트가 있을 때만 마운트하고, 그 밖의 영역 터치는 아래 화면으로 그대로 간다. VoiceOver 가 토스트에 갇히지 않게 모달 아님.
+ */
+function Overlay({ children }: { children: ReactNode }) {
+  if (Platform.OS !== 'ios') return <>{children}</>;
+  return <FullWindowOverlay unstable_accessibilityContainerViewIsModal={false}>{children}</FullWindowOverlay>;
+}
+
+/** 루트 레이아웃에 한 번 배치(모달 위에서도 이 하나가 보인다) — 진한 알약 + 그린 체크 (+ 액션 버튼) */
 export function ToastHost() {
   const insets = useSafeAreaInsets();
   const [msg, setMsg] = useState<ToastMsg | null>(null);
@@ -67,34 +78,36 @@ export function ToastHost() {
   if (!msg) return null;
   const action = msg.action;
   return (
-    <View pointerEvents="box-none" style={[styles.host, { bottom: insets.bottom + 100 }]}>
-      <Animated.View
-        accessibilityLiveRegion="polite"
-        pointerEvents={action ? 'box-none' : 'none'}
-        style={[styles.toast, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}
-      >
-        <Ionicons name={msg.kind === 'success' ? 'checkmark-circle' : 'information-circle'} size={20} color={msg.kind === 'success' ? colors.primary : colors.ink3} />
-        <Text variant="bodyMedium" color="inkOnPrimary" style={styles.text}>
-          {msg.text}
-        </Text>
-        {action ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={action.label}
-            hitSlop={8}
-            onPress={() => {
-              hide();
-              action.onPress();
-            }}
-            style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-          >
-            <Text variant="bodyMedium" color="primary" style={styles.actionText}>
-              {action.label}
-            </Text>
-          </Pressable>
-        ) : null}
-      </Animated.View>
-    </View>
+    <Overlay>
+      <View pointerEvents="box-none" style={[styles.host, { bottom: insets.bottom + 100 }]}>
+        <Animated.View
+          accessibilityLiveRegion="polite"
+          pointerEvents={action ? 'box-none' : 'none'}
+          style={[styles.toast, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}
+        >
+          <Ionicons name={msg.kind === 'success' ? 'checkmark-circle' : 'information-circle'} size={20} color={msg.kind === 'success' ? colors.primary : colors.ink3} />
+          <Text variant="bodyMedium" color="inkOnPrimary" style={styles.text}>
+            {msg.text}
+          </Text>
+          {action ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              hitSlop={8}
+              onPress={() => {
+                hide();
+                action.onPress();
+              }}
+              style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+            >
+              <Text variant="bodyMedium" color="primary" style={styles.actionText}>
+                {action.label}
+              </Text>
+            </Pressable>
+          ) : null}
+        </Animated.View>
+      </View>
+    </Overlay>
   );
 }
 
