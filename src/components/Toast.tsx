@@ -34,16 +34,24 @@ export function ToastHost() {
   const [msg, setMsg] = useState<ToastMsg | null>(null);
   const anim = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** 지금 보이는 토스트 id — 늦게 끝난 페이드아웃이 다른 토스트를 닫지 않게 */
+  const shown = useRef(0);
 
   const hide = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = undefined;
-    Animated.timing(anim, { toValue: 0, duration: 180, useNativeDriver: false }).start(() => setMsg(null));
+    const hiding = shown.current;
+    // 페이드아웃 중에 새 토스트가 오면 이 애니메이션은 중단(finished=false)된다 — 그때 새 토스트를 지우지 않게
+    Animated.timing(anim, { toValue: 0, duration: 180, useNativeDriver: false }).start(({ finished }) => {
+      if (finished) setMsg((cur) => (cur && cur.id === hiding ? null : cur));
+    });
   }, [anim]);
 
   useEffect(() => {
     const l: Listener = (m) => {
+      shown.current = m.id;
       setMsg(m);
+      anim.stopAnimation();
       anim.setValue(0);
       Animated.timing(anim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
       if (timer.current) clearTimeout(timer.current);
