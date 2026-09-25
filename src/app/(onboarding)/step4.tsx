@@ -1,9 +1,9 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useState } from 'react';
 
 import { Button, ChatFooter, ChatHeader, ChatInput, ChatScreen, ChoiceList, MeSay, MillySay } from '@/components';
 import { GOAL_LABEL } from '@/data/labels';
 import type { Goal } from '@/domain/types';
-import { ChatHistory, useAdvance, useNickname } from '@/onboarding/common';
+import { ChatHistory, useAdvance, useHistory } from '@/onboarding/common';
 import {
   GOAL_OPTIONS,
   NO_SECONDARY_LABEL,
@@ -12,7 +12,6 @@ import {
   UNIT,
   answerText,
   checkNumber,
-  historyBefore,
   matchOption,
   secondaryAnswer,
   type Option,
@@ -27,7 +26,6 @@ export default function Step4() {
   const draft = useOnboarding((s) => s.draft);
   const reached = useOnboarding((s) => s.reached);
   const set = useOnboarding((s) => s.set);
-  const nickname = useNickname();
   const { go, goSoon } = useAdvance(4, '/(onboarding)/step5');
 
   const primary = draft.primaryGoal;
@@ -43,7 +41,7 @@ export default function Step4() {
   const cur = order.find((q) => !done[q]);
   const [text, setText] = useState('');
   const [miss, setMiss] = useState(false);
-  const history = useMemo(() => historyBefore(4, draft, { nickname }), [draft, nickname]);
+  const history = useHistory(4);
 
   const secondaryOptions = SECONDARY_GOALS.filter((g) => g !== primary);
   const chosen = draft.secondaryGoals.filter((g) => g !== primary);

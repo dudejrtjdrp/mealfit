@@ -5,17 +5,22 @@ import {
   NO_SECONDARY_LABEL,
   SEX_OPTIONS,
   SKIP_DIET_LABEL,
+  SKIP_NAME_LABEL,
   THIS_YEAR,
   appendSentence,
   checkNumber,
   groupLines,
   historyBefore,
   matchOption,
+  nicknameAnswer,
+  nicknameToFill,
+  normalizeNickname,
   secondaryAnswer,
 } from '../script';
 
 const base: OnboardingDraft = { secondaryGoals: [], dietDescription: '' };
 const full: OnboardingDraft = {
+  nickname: '성효',
   sex: 'female',
   birthYear: 1995,
   heightCm: 163,
@@ -84,21 +89,29 @@ describe('historyBefore — 지난 단계 대화', () => {
     expect(historyBefore(1, base)).toEqual([]);
   });
 
-  it('B2 부터 밀리 인사와 시작 답이 쌓인다 (닉네임 반영)', () => {
-    const h = historyBefore(2, base, { nickname: '성효' });
-    expect(h[0]).toMatchObject({ from: 'milly', text: '반가워요, 성효님! 저는 밀리예요.' });
-    expect(h[h.length - 1]).toMatchObject({ from: 'me', text: '좋아요, 시작할게요' });
+  it('B2 부터 밀리 인사·시작 답·이름 문답이 쌓인다', () => {
+    const h = historyBefore(2, { ...base, nickname: '지은' });
+    expect(h[0]).toMatchObject({ from: 'milly', text: '반가워요! 저는 밀리예요.' });
+    expect(h.filter((l) => l.from === 'me').map((l) => l.text)).toEqual(['좋아요, 시작할게요', '지은']);
+    expect(h.at(-1)).toMatchObject({ from: 'milly', text: '좋아요, 지은님이라고 부를게요.' });
   });
 
-  it('닉네임이 없거나 기본값이면 이름 없이 인사', () => {
-    expect(historyBefore(2, base, { nickname: '회원' })[0].text).toBe('반가워요! 저는 밀리예요.');
+  it('첫인사는 이름을 묻기 전이라 로그인 세션 이름(greetName)만 쓴다', () => {
+    expect(historyBefore(2, { ...base, nickname: '지은' }, { nickname: '지은', greetName: '성효' })[0].text).toBe('반가워요, 성효님! 저는 밀리예요.');
+    expect(historyBefore(2, base, { greetName: '회원' })[0].text).toBe('반가워요! 저는 밀리예요.');
+  });
+
+  it('이름을 건너뛰면 "건너뛸게요" + 이름 없이 이어간다', () => {
+    const h = historyBefore(2, { ...base, nickname: '' });
+    expect(h.find((l) => l.id === 'b1-name-a')?.text).toBe(SKIP_NAME_LABEL);
+    expect(h.at(-1)?.text).toBe('좋아요, 그럼 바로 시작할게요.');
   });
 
   it('B7 에서는 B1~B6 답이 모두 사용자 말풍선으로 들어 있다', () => {
     const me = historyBefore(7, full, { nickname: '성효' })
       .filter((l) => l.from === 'me')
       .map((l) => l.text);
-    expect(me).toEqual(['좋아요, 시작할게요', '여성', '1995년', '163cm', '56kg', '보통', '체중 감량', '52kg', '12주', '혈당 관리', '아침은 간단히 먹는 편이에요.', '좋아요, 이대로 할게요']);
+    expect(me).toEqual(['좋아요, 시작할게요', '성효', '여성', '1995년', '163cm', '56kg', '보통', '체중 감량', '52kg', '12주', '혈당 관리', '아침은 간단히 먹는 편이에요.', '좋아요, 이대로 할게요']);
   });
 
   it('감량·증량이 아니면 목표 체중 질문이 없고, 부 목적이 없으면 "없어요"', () => {
@@ -138,5 +151,30 @@ describe('groupLines · appendSentence', () => {
     expect(b).toBe('빵보다 밥을 좋아해요.\n매운 음식을 좋아해요.');
     expect(appendSentence(b, '매운 음식을 좋아해요.')).toBe(b);
     expect(appendSentence('가'.repeat(499), '매운 음식을 좋아해요.').length).toBe(500);
+  });
+});
+
+describe('닉네임', () => {
+  it('입력 정리: 공백·끝의 "님" 제거, 12자 제한', () => {
+    expect(normalizeNickname('  지은  ')).toBe('지은');
+    expect(normalizeNickname('지은님')).toBe('지은');
+    expect(normalizeNickname('김 지은')).toBe('김 지은');
+    expect(normalizeNickname('님')).toBe('님');
+    expect(normalizeNickname('   ')).toBe('');
+    expect(normalizeNickname('가'.repeat(20))).toHaveLength(12);
+  });
+
+  it('말풍선: 비었으면 "건너뛸게요"', () => {
+    expect(nicknameAnswer('지은')).toBe('지은');
+    expect(nicknameAnswer('')).toBe(SKIP_NAME_LABEL);
+    expect(nicknameAnswer(undefined)).toBe(SKIP_NAME_LABEL);
+  });
+
+  it('로그인 뒤: 프로필 이름이 비었거나 기본값일 때만 세션 이름으로 채운다', () => {
+    expect(nicknameToFill('회원', '성효')).toBe('성효');
+    expect(nicknameToFill('', '성효')).toBe('성효');
+    expect(nicknameToFill('지은', '성효')).toBeUndefined();
+    expect(nicknameToFill('회원', '회원')).toBeUndefined();
+    expect(nicknameToFill('회원', undefined)).toBeUndefined();
   });
 });

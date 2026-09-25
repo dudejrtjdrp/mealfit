@@ -1,12 +1,12 @@
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, Card, ChatFooter, ChatHeader, ChatScreen, ChoiceList, EmptyState, KcalRing, MeSay, MillySay, MillyTyping, NutrientBar, showToast, type NutrientKey } from '@/components';
 import { formatNumber } from '@/domain/summary';
-import { ChatHistory, useNickname } from '@/onboarding/common';
-import { SAY, historyBefore } from '@/onboarding/script';
+import { ChatHistory, useHistory, useNickname } from '@/onboarding/common';
+import { SAY } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 import { useProfile } from '@/state/profile';
 import { spacing } from '@/theme';
@@ -21,7 +21,7 @@ export default function Step7() {
   const { targets, completeOnboarding } = useProfile();
   const [done, setDone] = useState(false);
   const [perm, setPerm] = useState<Perm>('idle');
-  const history = useMemo(() => historyBefore(7, draft, { nickname }), [draft, nickname]);
+  const history = useHistory(7);
 
   useEffect(() => {
     let alive = true;

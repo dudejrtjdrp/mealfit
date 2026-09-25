@@ -1,22 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { Button, ChatFooter, ChatHeader, ChatInput, ChatScreen, ChoiceList, MeSay, MillySay } from '@/components';
 import type { ActivityLevel } from '@/domain/types';
-import { ChatHistory, useAdvance, useNickname } from '@/onboarding/common';
-import { ACTIVITY_OPTIONS, SAY, historyBefore, matchOption } from '@/onboarding/script';
+import { ChatHistory, useAdvance, useHistory } from '@/onboarding/common';
+import { ACTIVITY_OPTIONS, SAY, matchOption } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 
 /** B3 활동량 5단계 — 설명이 붙은 버튼 스택 */
 export default function Step3() {
   const draft = useOnboarding((s) => s.draft);
   const set = useOnboarding((s) => s.set);
-  const nickname = useNickname();
   const { go, goSoon } = useAdvance(3, '/(onboarding)/step4');
 
   const [answered, setAnswered] = useState(draft.activity != null);
   const [text, setText] = useState('');
   const [miss, setMiss] = useState(false);
-  const history = useMemo(() => historyBefore(3, draft, { nickname }), [draft, nickname]);
+  const history = useHistory(3);
 
   const pick = (level: ActivityLevel) => {
     set({ activity: level });

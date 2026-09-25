@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { BottomSheet, Button, Card, ChatFooter, ChatHeader, ChatScreen, ChoiceList, ListRow, MeSay, MillySay, MillyTyping, SproutIcon, Text, showToast } from '@/components';
@@ -7,8 +7,8 @@ import { DIET_TYPES } from '@/domain/diet';
 import type { DietClassification, DietType } from '@/domain/types';
 import { classifyDiet } from '@/services/ai/classifyDiet';
 import { getRepos } from '@/services/repo';
-import { ChatHistory, useAdvance, useNickname } from '@/onboarding/common';
-import { SAY, historyBefore } from '@/onboarding/script';
+import { ChatHistory, useAdvance, useHistory, useNickname } from '@/onboarding/common';
+import { SAY } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 import { fallbackDiet } from '@/state/profile';
 import { colors, radius, spacing } from '@/theme';
@@ -41,7 +41,7 @@ export default function Step6() {
   const [accepted, setAccepted] = useState(reached >= 6 && !!draft.diet);
   const [sheet, setSheet] = useState(false);
   const toasted = useRef(false);
-  const history = useMemo(() => historyBefore(6, draft, { nickname }), [draft, nickname]);
+  const history = useHistory(6);
 
   useEffect(() => {
     if (draft.diet) return;

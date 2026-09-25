@@ -2,6 +2,7 @@
  * 온보딩 챗봇(밀리) 대본 — 순수 함수만 (React 의존 없음, jest 테스트).
  * 수집 데이터·검증 범위·도메인 로직(목표량 계산·성향 분류)은 기존 B1~B7 그대로이고,
  * 여기서는 질문 문구, 선택지, 입력 검증 문구, 지난 단계 대화 기록(히스토리)만 만든다.
+ * B1 에서 닉네임도 묻는다(로그인이 온보딩 뒤로 가서 세션 이름이 없을 수 있다).
  */
 import { ACTIVITY_LABEL, GOAL_LABEL } from '../data/labels';
 import { DIET_TYPES } from '../domain/diet';
@@ -69,6 +70,36 @@ export const DIET_EXAMPLES: { label: string; sentence: string }[] = [
   { label: '단 음식은 적게', sentence: '단 음식은 적게 먹으려고 해요.' },
 ];
 export const DIET_MAX = 500;
+
+// ── 닉네임 (로그인이 온보딩 뒤로 가서 챗봇 앞부분에서 묻는다) ──────────────
+
+export const NAME_MAX = 12;
+export const SKIP_NAME_LABEL = '건너뛸게요';
+/** 이름을 안 알려주면 쓰는 기본 호칭 (services/auth NICKNAME_FALLBACK 과 같은 값) */
+export const DEFAULT_NICKNAME = '회원';
+
+/** 자유 입력 닉네임 정리: 앞뒤 공백·연속 공백 정리, 끝의 "님" 제거("지은님" → "지은"), 12자 제한. 비면 '' */
+export function normalizeNickname(text: string): string {
+  let t = text.replace(/\s+/g, ' ').trim();
+  if (t.length > 1 && t.endsWith('님')) t = t.slice(0, -1).trim();
+  return t.slice(0, NAME_MAX).trim();
+}
+
+/** 사용자 말풍선: 닉네임 또는 "건너뛸게요" */
+export function nicknameAnswer(nickname?: string): string {
+  return nickname?.trim() ? nickname.trim() : SKIP_NAME_LABEL;
+}
+
+const isDefaultNickname = (n?: string) => !n?.trim() || n.trim() === DEFAULT_NICKNAME;
+
+/**
+ * 로그인 뒤 프로필 닉네임을 세션 닉네임으로 채울지 — 프로필이 비었거나 기본값("회원")이고
+ * 세션에 진짜 이름이 있을 때만 그 이름, 아니면 undefined (사용자가 정한 이름은 덮지 않는다)
+ */
+export function nicknameToFill(profileNickname: string | undefined, sessionNickname: string | undefined): string | undefined {
+  if (!isDefaultNickname(profileNickname) || isDefaultNickname(sessionNickname)) return undefined;
+  return sessionNickname!.trim();
+}
 export const SKIP_DIET_LABEL = '지금은 건너뛸게요';
 
 /** 공백·문장부호를 뺀 소문자 */
@@ -170,13 +201,17 @@ export function answerText(field: NumberField, n: number): string {
 
 // ── 밀리 대사 ────────────────────────────────────────────
 
-const named = (nickname?: string) => (nickname && nickname !== '회원' ? `${nickname}님` : '');
+const named = (nickname?: string) => (nickname && nickname !== DEFAULT_NICKNAME ? `${nickname}님` : '');
 
 export const SAY = {
   hello: (nickname?: string) => (named(nickname) ? `반가워요, ${named(nickname)}! 저는 밀리예요.` : '반가워요! 저는 밀리예요.'),
   intro: '먹기 전에 주변 메뉴를 먼저 살펴보고, 오늘 더 먹을 수 있는 만큼 알려드릴게요.',
   introAsk: '몇 가지만 물어볼게요. 1분이면 충분해요.',
   introReply: '좋아요, 시작할게요',
+  haveAccount: '이미 계정이 있어요',
+  askName: '뭐라고 불러드릴까요?',
+  askNameSub: '앱에서 이 이름으로 불러드릴게요.',
+  nameThanks: (nickname?: string) => (named(nickname) ? `좋아요, ${named(nickname)}이라고 부를게요.` : '좋아요, 그럼 바로 시작할게요.'),
   sex: '먼저 기본 정보부터요. 성별이 어떻게 되세요?',
   birthYear: '태어난 연도는요?',
   heightCm: '키는 몇 cm예요?',
@@ -196,7 +231,7 @@ export const SAY = {
   resultPick: '다른 유형을 고를래요',
   resultPicked: (label: string) => `좋아요, **${label}**으로 정리해둘게요.`,
   target: (kcal: string) => `다 됐어요! 오늘은 **${kcal}kcal** 드실 수 있어요.`,
-  targetSub: '알려주신 정보로 계산한 하루 목표량이에요. 먹을 때마다 여유분을 보여드릴게요.',
+  targetSub: '알려주신 정보로 계산한 하루 목표량이에요. 먹을 때마다 남은 양을 보여드릴게요.',
   location: '주변 매장 메뉴를 먼저 판정하려면 위치가 필요해요. 지금 허용할까요?',
   locationYes: '허용할게요',
   locationLater: '나중에 할게요',
@@ -218,7 +253,7 @@ export function secondaryAnswer(goals: Goal[]): string {
  * step 번째 화면 위에 쌓아 둘 "지난 대화" — 1 ~ step-1 단계에서 이미 주고받은 말.
  * 드래프트에 답이 없으면 그 줄은 빼고, 다음 단계로 넘어간 적이 있는 답만 싣는다.
  */
-export function historyBefore(step: number, draft: OnboardingDraft, ctx: { nickname?: string } = {}): ChatLine[] {
+export function historyBefore(step: number, draft: OnboardingDraft, ctx: { nickname?: string; greetName?: string } = {}): ChatLine[] {
   const out: ChatLine[] = [];
   const milly = (id: string, text: string) => out.push({ id, from: 'milly', text });
   const me = (id: string, text: string | undefined) => {
@@ -226,10 +261,15 @@ export function historyBefore(step: number, draft: OnboardingDraft, ctx: { nickn
   };
 
   if (step > 1) {
-    milly('b1-hello', SAY.hello(ctx.nickname));
+    // 첫인사는 이름을 묻기 전이라 로그인 세션 이름(greetName)만 쓴다
+    milly('b1-hello', SAY.hello(ctx.greetName));
     milly('b1-intro', SAY.intro);
     milly('b1-ask', SAY.introAsk);
     me('b1-reply', SAY.introReply);
+    milly('b1-name', SAY.askName);
+    milly('b1-name-sub', SAY.askNameSub);
+    me('b1-name-a', nicknameAnswer(draft.nickname));
+    milly('b1-name-ok', SAY.nameThanks(draft.nickname?.trim() || undefined));
   }
   if (step > 2) {
     milly('b2-sex', SAY.sex);

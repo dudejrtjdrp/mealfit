@@ -1,9 +1,9 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { Button, ChatFooter, ChatHeader, ChatInput, ChatScreen, ChoiceList, MeSay, MillySay } from '@/components';
 import type { Sex } from '@/domain/types';
-import { ChatHistory, useAdvance, useNickname } from '@/onboarding/common';
-import { SAY, SEX_OPTIONS, UNIT, answerText, checkNumber, historyBefore, matchOption, type NumberField } from '@/onboarding/script';
+import { ChatHistory, useAdvance, useHistory } from '@/onboarding/common';
+import { SAY, SEX_OPTIONS, UNIT, answerText, checkNumber, matchOption, type NumberField } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 
 type Q = 'sex' | 'birthYear' | 'heightCm' | 'weightKg';
@@ -17,7 +17,6 @@ type Answers = { sex?: Sex; birthYear?: number; heightCm?: number; weightKg?: nu
 export default function Step2() {
   const draft = useOnboarding((s) => s.draft);
   const set = useOnboarding((s) => s.set);
-  const nickname = useNickname();
   const { go, goSoon } = useAdvance(2, '/(onboarding)/step3');
 
   const [ans, setAns] = useState<Answers>(() => ({ sex: draft.sex, birthYear: draft.birthYear, heightCm: draft.heightCm, weightKg: draft.weightKg }));
@@ -25,7 +24,7 @@ export default function Step2() {
   const [text, setText] = useState('');
   const [miss, setMiss] = useState(false);
 
-  const history = useMemo(() => historyBefore(2, draft, { nickname }), [draft, nickname]);
+  const history = useHistory(2);
 
   /** 다음 질문 입력칸에 전에 답했던 값을 채워 둔다 */
   const moveOn = (next: Answers) => {

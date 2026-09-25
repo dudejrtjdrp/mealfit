@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import type { JudgeContext } from '@/domain/judge';
 import type { Profile } from '@/domain/types';
+import { nicknameToFill } from '@/onboarding/script';
 import { getRepos } from '@/services/repo';
 import { createLocalRepos } from '@/services/repo/local';
 
@@ -32,6 +33,12 @@ export async function reloadAfterLogin(): Promise<Profile | null> {
       .profile.get()
       .catch(() => null);
     if (local?.onboardingDone) profile = await useProfile.getState().adoptProfile(local);
+  }
+  // 온보딩에서 이름을 건너뛰었으면('회원') 계정 이름으로 채운다 — 직접 정한 이름은 덮지 않는다
+  const fill = profile ? nicknameToFill(profile.nickname, useSession.getState().session?.nickname) : undefined;
+  if (fill) {
+    await useProfile.getState().updateProfile({ nickname: fill });
+    profile = useProfile.getState().profile;
   }
   await useDay.getState().load();
   return profile;

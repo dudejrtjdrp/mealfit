@@ -1,11 +1,11 @@
 import { router, type Href } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { MeSay, MillySay } from '@/components';
 import { useOnboarding } from '@/state/onboarding';
 import { useSession } from '@/state/session';
 
-import { groupLines, type ChatLine } from './script';
+import { DEFAULT_NICKNAME, groupLines, historyBefore, type ChatLine } from './script';
 
 /** 지난 단계 대화 — 이번 화면 위에 그대로 쌓아 둔다 (애니메이션 없이) */
 export function ChatHistory({ lines }: { lines: ChatLine[] }) {
@@ -18,8 +18,25 @@ export function ChatHistory({ lines }: { lines: ChatLine[] }) {
   );
 }
 
+/** 로그인 세션 이름 (기본값 "회원"이면 없음) — 이름을 묻기 전 첫인사에 쓴다 */
+export function useGreetName(): string | undefined {
+  const n = useSession((s) => s.session?.nickname);
+  return n && n !== DEFAULT_NICKNAME ? n : undefined;
+}
+
+/** 부를 이름: B1 에서 답한 이름 → 없으면(건너뜀·아직) 로그인 세션 이름 */
 export function useNickname(): string | undefined {
-  return useSession((s) => s.session?.nickname);
+  const fromDraft = useOnboarding((s) => s.draft.nickname?.trim());
+  const greet = useGreetName();
+  return fromDraft || greet;
+}
+
+/** step 번째 화면 위에 쌓을 지난 대화 */
+export function useHistory(step: number): ChatLine[] {
+  const draft = useOnboarding((s) => s.draft);
+  const nickname = useNickname();
+  const greetName = useGreetName();
+  return useMemo(() => historyBefore(step, draft, { nickname, greetName }), [step, draft, nickname, greetName]);
 }
 
 /**

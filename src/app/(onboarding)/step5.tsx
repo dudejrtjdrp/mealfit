@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, CHAT_INDENT, ChatFooter, ChatHeader, ChatInput, ChatScreen, Chip, ChoiceList, MeSay, MillySay, Text } from '@/components';
-import { ChatHistory, useAdvance, useNickname } from '@/onboarding/common';
-import { DIET_EXAMPLES, DIET_MAX, SAY, SKIP_DIET_LABEL, appendSentence, historyBefore } from '@/onboarding/script';
+import { ChatHistory, useAdvance, useHistory } from '@/onboarding/common';
+import { DIET_EXAMPLES, DIET_MAX, SAY, SKIP_DIET_LABEL, appendSentence } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 import { spacing } from '@/theme';
 
@@ -12,12 +12,11 @@ export default function Step5() {
   const draft = useOnboarding((s) => s.draft);
   const reached = useOnboarding((s) => s.reached);
   const set = useOnboarding((s) => s.set);
-  const nickname = useNickname();
   const { go, goSoon } = useAdvance(5, '/(onboarding)/step6');
 
   const [answered, setAnswered] = useState(reached >= 5);
   const [text, setText] = useState(draft.dietDescription);
-  const history = useMemo(() => historyBefore(5, draft, { nickname }), [draft, nickname]);
+  const history = useHistory(5);
 
   const send = () => {
     const t = text.trim();

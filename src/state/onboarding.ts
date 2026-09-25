@@ -2,8 +2,10 @@ import { create } from 'zustand';
 
 import type { ActivityLevel, DietClassification, Goal, Sex } from '@/domain/types';
 
-/** 온보딩 B2~B6 입력 드래프트 — 뒤로 가도 유지된다 */
+/** 온보딩 B1~B6 입력 드래프트 — 뒤로 가도 유지된다 */
 export interface OnboardingDraft {
+  /** B1 에서 물어본 호칭. '' 이면 건너뜀 → 저장할 때 세션 이름 또는 '회원' */
+  nickname?: string;
   sex?: Sex;
   birthYear?: number;
   heightCm?: number;
