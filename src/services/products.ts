@@ -6,6 +6,7 @@
 import { getBrand, getMenusByBrand, normalizeName, searchMenus } from '@/data';
 import { rankKey, rankMatches } from '@/data/searchRank';
 import { DATASETS, PACKAGED_BRAND_ID } from '@/data/ingest/nutrition';
+import { toPackagedServing } from '@/data/packagedServing';
 import type { MenuItem, Nutrients } from '@/domain/types';
 
 import { getSupabase } from './supabase';
@@ -61,6 +62,18 @@ export function productRowToMenu(row: ProductRow): MenuItem {
   return menu;
 }
 
+/**
+ * 서버 행 → 검색·기록에 쓰는 메뉴. 대용량 포장은 앱 번들과 같은 규칙으로 1회 섭취참고량 메뉴(`…-serving`)로 바꾸고,
+ * 원래 포장 메뉴도 세션 캐시에 둬 예전 기록(원래 id)이 그대로 찾힌다.
+ */
+export function productRowToServing(row: ProductRow): MenuItem {
+  const raw = productRowToMenu(row);
+  const served = toPackagedServing(raw);
+  cache.set(raw.id, raw);
+  if (served) cache.set(served.id, served);
+  return served ?? raw;
+}
+
 /** 이번 실행에서 서버로 받은 제품 — 상세 화면(D4)·기록이 id 로 다시 찾을 수 있게 세션 캐시에 둔다 */
 const cache = new Map<string, MenuItem>();
 export function getCachedRemoteProduct(id: string): MenuItem | undefined {
@@ -85,8 +98,7 @@ export async function searchProductsRemote(query: string, limit = 40): Promise<M
       .order('name')
       .limit(limit);
     if (error || !data) return null;
-    const items = (data as ProductRow[]).map(productRowToMenu);
-    for (const m of items) cache.set(m.id, m);
+    const items = (data as ProductRow[]).map(productRowToServing);
     return items;
   } catch {
     return null;

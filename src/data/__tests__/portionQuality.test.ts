@@ -5,7 +5,8 @@
 import { nonMealKind } from '../../domain/judge';
 import { menuQtyUnit } from '../../domain/qty';
 import type { MenuItem } from '../../domain/types';
-import { getMenu, getMenus, getMenusByBrand, getPerServingCounts } from '../index';
+import { getMenu, getMenus, getMenusByBrand, getPackagedServingCounts, getPerServingCounts } from '../index';
+import { PACK_SERVING_ID_SUFFIX, packagedRef, toPackagedServing } from '../packagedServing';
 import { PORTION_ID_SUFFIX } from '../perPortion';
 import {
   applyPerServing,
@@ -242,5 +243,97 @@ describe('perServing 순수 함수', () => {
     expect(r.hidden.map((m) => m.id)).toEqual(['alvolo-mfds-a', 'ediya-mfds-c', 'pb-mfds-e']);
     expect(r.byRule).toMatchObject({ pizzaWhole: 1, ref: 1, multiPack: 1 });
     expect(input[1].serving).toBe('1인분 (985 g)'); // 입력은 그대로
+  });
+});
+
+describe('대용량 가공식품 → 식약처 1회 섭취참고량 (packagedServing)', () => {
+  /** 시판 제품 번들 전체 — 바뀐 것은 새 id(-serving)로, 아니면 원래 id 로 */
+  const bundle = () =>
+    (require('../generated/mfds-products.json') as { menus: { id: string }[] }).menus.map((x) => getMenu(`${x.id}${PACK_SERVING_ID_SUFFIX}`) ?? getMenu(x.id)!);
+  /** 이번 변경 전 번들에서 'bulk' 로 잡히던 수 (2026-09-26) */
+  const BULK_BEFORE = 816;
+
+  it('매장 메뉴 목록에는 대용량(bulk) 포장이 남지 않는다 — 편의점 우유·아메리카노 1 L·민생구리 6개가 1회 섭취참고량으로', () => {
+    expect(getMenus().filter((m) => nonMealKind(m) === 'bulk').map((m) => m.name)).toEqual([]);
+    expect(getPackagedServingCounts().catalog).toBe(6);
+  });
+
+  it('시판 제품 번들: 식품유형을 아는 대용량은 바꾸고, 남은 대용량(믹스·파우더·농축액·통조림·생선까스 등)은 여전히 추천에서 빠진다', () => {
+    const list = bundle();
+    const converted = list.filter((m) => m.id.endsWith(PACK_SERVING_ID_SUFFIX));
+    const stillBulk = list.filter((m) => nonMealKind(m) === 'bulk');
+    expect(getPackagedServingCounts().products).toBe(converted.length);
+    expect(converted.length).toBeGreaterThanOrEqual(400);
+    expect(converted.length + stillBulk.length).toBe(BULK_BEFORE);
+    for (const m of converted) {
+      expect(m).toMatchObject({ trust: 'estimated' });
+      expect(m.serving).toMatch(/^1회 섭취참고량 \(\d+ (g|ml)\)$/);
+      expect(m.servingNote).toMatch(/^전체 .+ 제품 · 식약처 1회 섭취참고량\(.+ \d+ (g|ml)\) 기준 추정이에요$/);
+      expect(menuQtyUnit(m)).toBe('회분');
+      expect(nonMealKind(m)).toBeNull();
+      // 예전 기록(원래 포장 id)은 그대로 찾히고 여전히 대용량
+      expect(nonMealKind(getMenu(m.id.slice(0, -PACK_SERVING_ID_SUFFIX.length))!)).toBe('bulk');
+    }
+  });
+
+  it(`시판 제품도 1개·1인분·1잔으로 ${KCAL_CAP.toLocaleString()} kcal 을 넘는 것은 추천에서 빠지는 식재료·대용량으로 남은 것뿐이다`, () => {
+    const over = bundle().filter((m) => (m.nutrients?.kcal ?? 0) > KCAL_CAP);
+    expect(over.filter((m) => nonMealKind(m) === null).map((m) => `${m.name} ${m.serving}`)).toEqual([]);
+    // 1회 섭취참고량으로 바꾼 것은 한 번 먹는 양다운 크기 (가장 큰 것: 김치볶음밥 210 g 956 kcal — 원자료 값 그대로)
+    for (const m of bundle().filter((x) => x.id.endsWith(PACK_SERVING_ID_SUFFIX))) expect({ n: m.name, k: Math.min(m.nutrients!.kcal, 1000) }).toEqual({ n: m.name, k: m.nutrients!.kcal });
+  });
+
+  it('대표 전후: 순백목장우유 1.8 L · CU 블랙아메리카노 1 L · 민생구리 (매장 메뉴)', () => {
+    const milk = byName('gs25', '순백목장우유')!;
+    expect(milk).toMatchObject({ serving: '1회 섭취참고량 (200 ml)', servingNote: '전체 1.8 L 제품 · 식약처 1회 섭취참고량(우유 200 ml) 기준 추정이에요' });
+    expect(milk.nutrients!.kcal).toBe(140); // 1,260 kcal × 200/1800
+    const coffee = byName('cu', '블랙아메리카노')!;
+    expect(coffee).toMatchObject({ serving: '1회 섭취참고량 (240 ml)', servingNote: '전체 1 L 제품 · 식약처 1회 섭취참고량(커피 240 ml) 기준 추정이에요' });
+    expect(coffee.nutrients!.kcal).toBe(12);
+    const ramen = byName('emart24', '민생구리')!;
+    expect(ramen).toMatchObject({ serving: '1회 섭취참고량 (120 g)' });
+    expect(ramen.nutrients!.kcal).toBe(Math.round((2427 * 120) / 575));
+  });
+
+  it('대표 전후: 진짜장면 1,132 g · 부셔먹는라면스낵 360 g (시판 제품)', () => {
+    const find = (name: string, total: string) => bundle().find((m) => m.name === name && m.servingNote?.startsWith(`전체 ${total} 제품`));
+    expect(find('진짜장면', '1,132 g')).toMatchObject({ serving: '1회 섭취참고량 (200 g)' });
+    expect(find('진짜장면', '1,132 g')!.nutrients!.kcal).toBe(Math.round((2207 * 200) / 1132));
+    expect(find('부셔먹는라면스낵불닭', '360 g')).toMatchObject({ serving: '1회 섭취참고량 (30 g)' });
+  });
+
+  it('packagedRef: 식품유형 규칙 (앞선 규칙이 이긴다, 재료·가루·농축은 null)', () => {
+    const l = (n: string, u: 'g' | 'ml' = 'g', c?: 'drink') => packagedRef(n, u, c)?.label ?? null;
+    expect(l('순백목장우유', 'ml')).toBe('우유');
+    expect(l('헤이즐넛향', 'ml')).toBe('커피');
+    expect(l('부셔먹는라면스낵불닭')).toBe('과자');
+    expect(l('진짜장면')).toBe('생면·숙면');
+    expect(l('민생구리')).toBe('유탕면(봉지)');
+    expect(l('왕뚜껑 컵라면')).toBe('유탕면(용기)');
+    expect(l('한돈등갈비김치찜')).toBe('갈비가공품');
+    expect(l('하림 냄비요리 춘천식닭갈비')).toBe('양념육');
+    expect(l('마라멘보관자')).toBeNull(); // "라멘" 이 아니다
+    expect(l('육즙가득 실속 동그랑땡')).toBe('분쇄가공육제품');
+    expect(l('백설 핫케이크믹스')).toBeNull();
+    expect(l('웰메이드 오렌지농축액', 'g', 'drink')).toBeNull();
+    expect(l('KIMBU수타식중화면')).toBeNull(); // 조리 전 면은 재료
+    expect(l('일품 석류', 'g', 'drink')).toBe('음료류');
+  });
+
+  it('toPackagedServing: 농도 높은 가루 수프·차 청은 바꾸지 않고, 한 번에 먹는 단품도 그대로', () => {
+    const mk = (name: string, serving: string, kcal: number, category: 'meal' | 'drink' = 'meal') => ({
+      id: 'pkg-x',
+      brandId: 'packaged',
+      name,
+      category,
+      serving,
+      nutrients: { kcal },
+      trust: 'official' as const,
+      sourceName: '식약처·가공식품',
+    });
+    expect(toPackagedServing(mk('곡물스프', '1개 (270 g)', 1274))).toBeNull(); // 4.7 kcal/g → 가루
+    expect(toPackagedServing(mk('복음자리 생강차', '1개 (600 ml)', 1500, 'drink'))).toBeNull(); // 청
+    expect(toPackagedServing(mk('신라면', '1개 (120 g)', 500))).toBeNull(); // bulk 아님
+    expect(toPackagedServing(mk('감자탕', '1개 (2200 g)', 1782))).toMatchObject({ id: 'pkg-x-serving', serving: '1회 섭취참고량 (250 g)', nutrients: { kcal: 203 } });
   });
 });

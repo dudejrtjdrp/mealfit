@@ -2,6 +2,7 @@ import type { Brand, MenuItem, Store } from '../domain/types';
 import brandsJson from './brands.json';
 import { mergeSeedOptionsIntoOfficial } from './dedupe';
 import { applyPerPortion } from './perPortion';
+import { applyPackagedServing } from './packagedServing';
 import { applyPerServing, type ServingRule } from './perServing';
 import { applyPerSlice } from './perSlice';
 import { DATASETS, PACKAGED_BRAND_ID, mergeBrands, mergeMenus } from './ingest/nutrition';
@@ -40,6 +41,8 @@ interface Catalog {
   perPortion: { portionedByBrand: Record<string, number>; relabeledByBrand: Record<string, number> };
   /** 한 번 먹는 단위로 바꾼 메뉴 수 (규칙별·브랜드별) */
   perServing: { byRule: Record<ServingRule, number>; byBrand: Record<string, number> };
+  /** 1회 섭취참고량으로 바꾼 대용량 가공식품 수 (매장 메뉴) */
+  packagedConverted: number;
 }
 
 /**
@@ -65,7 +68,9 @@ function buildCatalog(): Catalog {
   const portioned = applyPerPortion(sliced.menus);
   // 그래도 남은 한 판·홀·100 g 기준 메뉴는 한 번 먹는 단위로 (perServing.ts — 1회 섭취참고량·브랜드 컵 용량·조각 무게, 전부 추정 + 근거 한 줄)
   const served = applyPerServing(portioned.menus);
-  const menus = served.menus;
+  // 매장 메뉴로 들어온 대용량 가공식품(편의점 우유 1.8 L·아메리카노 1 L)은 1회 섭취참고량으로 (packagedServing.ts — 시판 제품 번들·서버 제품과 같은 규칙)
+  const packed = applyPackagedServing(served.menus);
+  const menus = packed.menus;
   const brands = [...mergeBrands(brandsJson as Brand[], mfds.brands, menus), PACKAGED_BRAND];
 
   const menusByBrand = new Map<string, MenuItem[]>();
@@ -79,7 +84,7 @@ function buildCatalog(): Catalog {
     menus,
     brandById: new Map(brands.map((b) => [b.id, b])),
     // 목록에서 뺀 시드 메뉴도 id 로는 찾을 수 있게 둔다 — 예전 기록(menuId)·딥링크가 "정보 없음"으로 바뀌지 않게
-    menuById: new Map([...merged.hidden, ...deduped.hidden, ...sliced.hidden, ...portioned.hidden, ...served.hidden, ...menus].map((m) => [m.id, m])),
+    menuById: new Map([...merged.hidden, ...deduped.hidden, ...sliced.hidden, ...portioned.hidden, ...served.hidden, ...packed.hidden, ...menus].map((m) => [m.id, m])),
     menusByBrand,
     // 긴 키워드부터 비교해 "CU" 같은 짧은 키워드가 먼저 잡히지 않게 한다
     keywordIndex: brands
@@ -91,6 +96,7 @@ function buildCatalog(): Catalog {
     perSlice: { slicedByBrand: sliced.slicedByBrand, cakesByBrand: sliced.cakesByBrand },
     perPortion: { portionedByBrand: portioned.portionedByBrand, relabeledByBrand: portioned.relabeledByBrand },
     perServing: { byRule: served.byRule, byBrand: served.byBrand },
+    packagedConverted: packed.converted,
   };
 }
 
@@ -101,15 +107,18 @@ function data(): Catalog {
 
 // ───────── 시판 제품 (라면·과자·음료 등 2.3만 개) ─────────
 // 6MB 번들이라 매장 화면과는 무관하게, 검색·상세에서 처음 필요할 때만 로드한다.
-let products: { list: MenuItem[]; byId: Map<string, MenuItem> } | null = null;
+let products: { list: MenuItem[]; byId: Map<string, MenuItem>; converted: number } | null = null;
 
-function loadProducts(): { list: MenuItem[]; byId: Map<string, MenuItem> } {
+function loadProducts(): { list: MenuItem[]; byId: Map<string, MenuItem>; converted: number } {
   if (products) return products;
   const bundle = require('./generated/mfds-products.json') as ProductsBundle;
   const ds = DATASETS.processed;
   // 용량 때문에 접어 둔 공통 필드(brandId·출처)를 되살린다
-  const list = bundle.menus.map((m) => ({ ...m, brandId: PACKAGED_BRAND_ID, sourceUrl: ds.url, sourceName: ds.sourceName }));
-  products = { list, byId: new Map(list.map((m) => [m.id, m])) };
+  const raw = bundle.menus.map((m) => ({ ...m, brandId: PACKAGED_BRAND_ID, sourceUrl: ds.url, sourceName: ds.sourceName }));
+  // 여러 번 나눠 먹는 대용량 포장은 1회 섭취참고량으로 (packagedServing.ts). 원래 포장 id 도 예전 기록용으로 찾힌다
+  const packed = applyPackagedServing(raw);
+  const list = packed.menus;
+  products = { list, byId: new Map([...packed.hidden, ...list].map((m) => [m.id, m])), converted: packed.converted };
   return products;
 }
 
@@ -199,6 +208,10 @@ export function getPerPortionCounts() {
 /** 한 번 먹는 단위(1조각·1잔·1회 섭취참고량)로 바꾼 메뉴 수 (규칙별·브랜드별) — 검증·디버그용 */
 export function getPerServingCounts() {
   return data().perServing;
+}
+/** 1회 섭취참고량으로 바꾼 대용량 가공식품 수 — 매장 메뉴·시판 제품 번들 (검증·디버그용) */
+export function getPackagedServingCounts(): { catalog: number; products: number } {
+  return { catalog: data().packagedConverted, products: loadProducts().converted };
 }
 /** 공식 사이즈판과 합쳐 목록에서 뺀 시드 옵션판 수 (브랜드별) — 검증·디버그용 */
 export function getMergedSeedCounts(): Record<string, number> {

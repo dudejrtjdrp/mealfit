@@ -4,7 +4,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 
 import { PACKAGED_BRAND_ID } from '../../data/ingest/nutrition';
 import type { MenuItem } from '../../domain/types';
-import { findSimilarMenu, pickSimilar, productRowToMenu, type ProductRow } from '../products';
+import { findSimilarMenu, getCachedRemoteProduct, pickSimilar, productRowToMenu, productRowToServing, type ProductRow } from '../products';
 
 describe('서버 제품 행 → MenuItem', () => {
   const row: ProductRow = {
@@ -23,6 +23,22 @@ describe('서버 제품 행 → MenuItem', () => {
     const m = productRowToMenu({ ...row, category: 'weird', caffeine: 60 });
     expect(m.category).toBe('snack');
     expect(m.tags).toEqual(['카페인 있음']);
+  });
+
+  it('대용량 포장 행은 앱 번들과 같은 규칙으로 1회 섭취참고량 메뉴가 되고, 원래 id 도 세션 캐시로 찾힌다 (예전 기록)', () => {
+    const bulk: ProductRow = { ...row, id: 'pkg-milk18', name: '순백목장우유', category: 'drink', serving: '1개 (1800 ml)', kcal: 1260, carbs: 90, protein: 54, fat: 72, sat_fat: 45, sugar: 90, sodium: 900 };
+    const m = productRowToServing(bulk);
+    expect(m).toMatchObject({
+      id: 'pkg-milk18-serving',
+      serving: '1회 섭취참고량 (200 ml)',
+      trust: 'estimated',
+      servingNote: '전체 1.8 L 제품 · 식약처 1회 섭취참고량(우유 200 ml) 기준 추정이에요',
+    });
+    expect(m.nutrients).toMatchObject({ kcal: 140, protein: 6, sodium: 100 });
+    expect(getCachedRemoteProduct('pkg-milk18-serving')).toBe(m);
+    expect(getCachedRemoteProduct('pkg-milk18')?.serving).toBe('1개 (1800 ml)');
+    // 한 번에 먹는 단품은 그대로
+    expect(productRowToServing(row)).toMatchObject({ id: 'pkg-p1', serving: '1개 (120 g)' });
   });
 });
 

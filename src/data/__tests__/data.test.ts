@@ -182,14 +182,20 @@ describe('조리용 식재료·대용량 (nonMealKind) — 추천·순위에서 
   const profile = { primaryGoal: 'maintain' as const, secondaryGoals: [], diet: { type: 'balanced' as const, evidence: [], source: 'rule' as const } };
   const remaining = { kcal: 2579, carbs: 330, protein: 100, fat: 70, sugar: 50, sodium: 2000, emphasis: ['carbs', 'protein', 'fat'] as ('carbs' | 'protein' | 'fat')[] };
 
-  it('GS25 두부·우유 팩·밀가루가 식재료·대용량으로 표시된다', () => {
+  it('GS25 두부·밀가루는 식재료, 우유 팩은 1회 섭취참고량으로 바뀌고 원래 팩만 대용량', () => {
     const flagged = new Map(getMenusByBrand('gs25').map((m) => [m.name, nonMealKind(m)]));
     expect(flagged.get('유어스 국산콩두부 찌개/부침겸용')).toBe('ingredient');
     expect(flagged.get('리얼프라이스 국산콩 왕두부')).toBe('ingredient');
     expect(flagged.get('유기농 우리밀 밀가루')).toBe('ingredient');
-    expect(flagged.get('순백목장우유')).toBe('bulk');
-    expect(flagged.get('1974 우유')).toBe('bulk');
     expect(flagged.get('리얼프라이스 김치볶음밥')).toBeNull();
+    // 우유 팩(900 ml·1.8 L)은 목록에서 1회 섭취참고량(200 ml)으로 바뀌어 한 끼 후보가 되고 (2026-09-26 효님: "식 표준 한 번 섭취량으로"),
+    // 원래 팩 메뉴(예전 기록 id)는 여전히 대용량이다
+    for (const name of ['순백목장우유', '1974 우유']) {
+      const m = getMenusByBrand('gs25').find((x) => x.name === name)!;
+      expect(m.serving).toBe('1회 섭취참고량 (200 ml)');
+      expect(flagged.get(name)).toBeNull();
+      expect(nonMealKind(getMenu(m.id.replace(/-serving$/, ''))!)).toBe('bulk');
+    }
   });
 
   it('식당·카페 메뉴는 거의 건드리지 않는다 (가공식품이 아닌 메뉴 중 표시된 것 1개 이하)', () => {
