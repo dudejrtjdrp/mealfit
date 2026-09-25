@@ -216,3 +216,28 @@ export function shortAreaName(name: string): string {
   const isAddress = /(시|도|특별시|광역시)$/.test(parts[0]) || /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/.test(parts[0]);
   return isAddress && /(동|가|읍|면|리)$/.test(last) ? last : name.trim();
 }
+
+const menuKeyIndex = new WeakMap<MenuItem[], string[]>();
+/**
+ * 매장 메뉴 이름 검색 (D2 검색 화면). 주변에 있는 브랜드(preferBrandIds)의 메뉴가 앞, 그다음 이름이 검색어로 시작하는 메뉴.
+ * 정규화 이름은 목록마다 한 번만 만든다.
+ */
+export function searchStoreMenus(menus: MenuItem[], query: string, opts: { limit?: number; preferBrandIds?: ReadonlySet<string> } = {}): MenuItem[] {
+  const q = normalizeName(query);
+  if (!q) return [];
+  let keys = menuKeyIndex.get(menus);
+  if (!keys) {
+    keys = menus.map((m) => normalizeName(m.name));
+    menuKeyIndex.set(menus, keys);
+  }
+  const prefer = opts.preferBrandIds;
+  const hits: { m: MenuItem; rank: number; i: number }[] = [];
+  for (let i = 0; i < menus.length; i++) {
+    const k = keys[i];
+    if (!k.includes(q)) continue;
+    const m = menus[i];
+    hits.push({ m, rank: (prefer?.has(m.brandId) ? 0 : 2) + (k.startsWith(q) ? 0 : 1), i });
+  }
+  hits.sort((a, b) => a.rank - b.rank || a.i - b.i);
+  return hits.slice(0, opts.limit ?? 30).map((h) => h.m);
+}

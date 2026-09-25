@@ -9,7 +9,7 @@ import { YEOKSAM_CENTER } from '../../data/mockStores';
 import { clearNearbyCache } from '../../services/kakao';
 import * as location from '../../services/location';
 import { getBrands } from '../../data';
-import { filterStores, groupByVerdict, nearestOfBrand, searchBrands, shortAreaName, splitByInfo, summarizeRanked, useNearby } from '../nearby';
+import { filterStores, groupByVerdict, nearestOfBrand, searchBrands, searchStoreMenus, shortAreaName, splitByInfo, summarizeRanked, useNearby } from '../nearby';
 
 const loc = location as jest.Mocked<typeof location>;
 
@@ -210,5 +210,18 @@ describe('shortAreaName', () => {
     expect(shortAreaName('스타벅스 여의도점')).toBe('스타벅스 여의도점');
     expect(shortAreaName('지정한 위치')).toBe('지정한 위치');
     expect(shortAreaName('역삼동')).toBe('역삼동');
+  });
+});
+
+describe('searchStoreMenus', () => {
+  const m = (id: string, name: string, brandId = 'a') => ({ id, brandId, name, category: 'meal' as const, serving: '', nutrients: { kcal: 100 }, trust: 'official' as const });
+  const menus = [m('1', '카페 라떼', 'b'), m('2', '라떼', 'b'), m('3', '바닐라 라떼', 'a'), m('4', '아메리카노', 'a')];
+
+  it('이름에 검색어가 든 메뉴 — 주변 브랜드 먼저, 그 안에서 앞에서 맞는 것 먼저', () => {
+    expect(searchStoreMenus(menus, '라떼').map((x) => x.id)).toEqual(['2', '1', '3']);
+    expect(searchStoreMenus(menus, '라떼', { preferBrandIds: new Set(['a']) }).map((x) => x.id)).toEqual(['3', '2', '1']);
+    expect(searchStoreMenus(menus, ' 라 떼 ', { limit: 1 }).map((x) => x.id)).toEqual(['2']);
+    expect(searchStoreMenus(menus, '')).toEqual([]);
+    expect(searchStoreMenus(menus, '없는메뉴')).toEqual([]);
   });
 });

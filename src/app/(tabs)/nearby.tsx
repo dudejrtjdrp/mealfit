@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomSheet, BrandTile, ChevronDownIcon, ChevronRightIcon, Chip, CoverageBadge, EmptyState, PinIcon, Skeleton, Text, showToast } from '@/components';
+import { BottomSheet, BrandTile, ChevronDownIcon, ChevronRightIcon, Chip, CoverageBadge, EmptyState, IconButton, PinIcon, Skeleton, Text, showToast } from '@/components';
 import { getBrand, getMenusByBrand } from '@/data';
 import { STORE_CATEGORY_LABEL, formatDistance } from '@/data/labels';
 import { applyOptions, rankMenus } from '@/domain/judge';
@@ -144,9 +144,12 @@ export default function Nearby() {
         refreshControl={<RefreshControl refreshing={busy && stores.length > 0} onRefresh={() => void refresh()} tintColor={colors.primary} />}
       >
         <View style={styles.header}>
-          <Text variant="h1" accessibilityRole="header">
-            주변
-          </Text>
+          <View style={styles.titleRow}>
+            <Text variant="h1" accessibilityRole="header">
+              주변
+            </Text>
+            <IconButton name="search" label="매장·메뉴 검색" onPress={() => router.push('/nearby/search')} color={colors.ink} />
+          </View>
           <View style={styles.locRow}>
             <Pressable
               accessibilityRole="button"
@@ -269,6 +272,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingBottom: spacing.xxxl },
   header: { paddingHorizontal: spacing.page, paddingTop: spacing.lg, minHeight: size.header },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: -10 },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   area: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, flexShrink: 1 },
   areaText: { flexShrink: 1 },
