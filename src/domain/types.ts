@@ -218,11 +218,17 @@ export interface MealLog {
 }
 
 /** 오늘 합계 + 남은 여유 */
+/** 목표를 넘으면 빨강으로 보여주는 영양소 — 단백질은 많을수록 좋은 쪽이라 넘어도 '달성'이지 초과 표시가 아니다 */
+export type OverNutrient = 'kcal' | 'carbs' | 'fat' | 'sugar' | 'sodium';
+
 export interface DaySummary {
   date: string;
   consumed: Nutrients;
   targets: DailyTargets;
+  /** 목표 - 먹은 양, 0 하한 (판정 엔진 입력) */
   remaining: DailyTargets;
+  /** 목표보다 더 먹은 양 (양수만, 소수 첫째 자리). 넘지 않은 영양소는 키가 없다 — 2026-09-25 효님 결정: 넘은 양도 보여준다 */
+  over: Partial<Record<OverNutrient, number>>;
   /** 'empty' 기록 없음 · 'room' 여유 있음 · 'almost' 거의 다 참(80%↑) · 'over' 넘김 */
   status: 'empty' | 'room' | 'almost' | 'over';
   logs: MealLog[];
