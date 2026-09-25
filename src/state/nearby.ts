@@ -1,9 +1,10 @@
 import { Platform } from 'react-native';
 import { create } from 'zustand';
 
+import { normalizeName } from '@/data';
 import { YEOKSAM_CENTER } from '@/data/mockStores';
 import type { LatLng } from '@/domain/geo';
-import type { Store, StoreCategory } from '@/domain/types';
+import type { Brand, Judgement, MenuItem, Store, StoreCategory, Verdict } from '@/domain/types';
 import { searchNearbyStores, type Radius } from '@/services/kakao';
 import * as location from '@/services/location';
 
@@ -134,4 +135,72 @@ function sameArea(a: LatLng, b: LatLng) {
 /** 카테고리 필터 적용 */
 export function filterStores(stores: Store[], category: CategoryFilter): Store[] {
   return category === 'all' ? stores : stores.filter((s) => s.category === category);
+}
+
+/** 정보 있는 매장(위) · 정보 없는 매장(아래 한 줄로 접는다)으로 나눈다. 순서는 그대로 */
+export function splitByInfo(stores: Store[]): { known: Store[]; noInfo: Store[] } {
+  const known: Store[] = [];
+  const noInfo: Store[] = [];
+  for (const s of stores) (s.coverage === 'none' || !s.brandId ? noInfo : known).push(s);
+  return { known, noInfo };
+}
+
+/** 주변 목록에서 그 브랜드의 가장 가까운 매장 (검색에서 브랜드를 고를 때) */
+export function nearestOfBrand(stores: Store[], brandId: string): Store | undefined {
+  let best: Store | undefined;
+  for (const s of stores) if (s.brandId === brandId && (!best || s.distanceM < best.distanceM)) best = s;
+  return best;
+}
+
+/** 브랜드 이름·매칭 키워드로 찾기 (대소문자·공백·기호 무시). 이름이 검색어로 시작하는 브랜드가 앞 */
+export function searchBrands(brands: Brand[], query: string): Brand[] {
+  const q = normalizeName(query);
+  if (!q) return [];
+  const hits: { b: Brand; rank: number }[] = [];
+  for (const b of brands) {
+    if (b.matchKeywords.length === 0) continue; // 시판 제품 가상 브랜드 등 매장이 아닌 것
+    const name = normalizeName(b.name);
+    const rank = name.startsWith(q) ? 0 : name.includes(q) ? 1 : b.matchKeywords.some((k) => normalizeName(k).includes(q)) ? 2 : -1;
+    if (rank >= 0) hits.push({ b, rank });
+  }
+  return hits.sort((a, b) => a.rank - b.rank).map((h) => h.b);
+}
+
+export interface RankedMenu {
+  menu: MenuItem;
+  judgement: Judgement;
+}
+
+/** 매장 메뉴를 판정별로 묶는다 (각 묶음 안은 들어온 순서 = 순위 순). 정보 없는 메뉴는 따로 */
+export function groupByVerdict<T extends RankedMenu>(ranked: T[]): Record<Verdict | 'unknown', T[]> {
+  const out: Record<Verdict | 'unknown', T[]> = { good: [], ok: [], pass: [], unknown: [] };
+  for (const r of ranked) out[r.judgement.unknown ? 'unknown' : r.judgement.verdict].push(r);
+  return out;
+}
+
+export interface StorePick {
+  /** 판정 좋음 메뉴 수 */
+  good: number;
+  /** 판정 괜찮음 메뉴 수 */
+  ok: number;
+  /** 영양 정보가 있는 메뉴 수 */
+  known: number;
+  /** 1순위 메뉴 (좋음·괜찮음 중에서만 — 오늘은 패스 메뉴는 추천하지 않는다) */
+  top: RankedMenu | null;
+}
+
+/** 매장 카드 한 줄 요약용 — rankMenus 결과(순위 순)를 받는다 */
+export function summarizeRanked(ranked: RankedMenu[]): StorePick {
+  let good = 0;
+  let ok = 0;
+  let known = 0;
+  let top: RankedMenu | null = null;
+  for (const r of ranked) {
+    if (r.judgement.unknown) continue;
+    known++;
+    if (r.judgement.verdict === 'good') good++;
+    else if (r.judgement.verdict === 'ok') ok++;
+    if (!top && r.judgement.verdict !== 'pass') top = r;
+  }
+  return { good, ok, known, top };
 }

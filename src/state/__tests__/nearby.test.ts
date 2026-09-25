@@ -8,7 +8,8 @@ jest.mock('../../services/location', () => ({
 import { YEOKSAM_CENTER } from '../../data/mockStores';
 import { clearNearbyCache } from '../../services/kakao';
 import * as location from '../../services/location';
-import { filterStores, useNearby } from '../nearby';
+import { getBrands } from '../../data';
+import { filterStores, groupByVerdict, nearestOfBrand, searchBrands, splitByInfo, summarizeRanked, useNearby } from '../nearby';
 
 const loc = location as jest.Mocked<typeof location>;
 
@@ -135,5 +136,67 @@ describe('위치 설정 (지정 위치)', () => {
     expect(s.center).toEqual(SEOLLEUNG);
     expect(s.areaName).toBe('지정한 위치');
     expect(s.status).toBe('ready');
+  });
+});
+
+describe('주변 목록 도우미', () => {
+  const store = (id: string, over: Partial<import('../../domain/types').Store> = {}) => ({
+    id,
+    name: id,
+    brandId: 'gs25',
+    category: 'convenience' as const,
+    coverage: 'full' as const,
+    distanceM: 100,
+    lat: 0,
+    lng: 0,
+    ...over,
+  });
+
+  it('정보 없는 매장(커버리지 none·브랜드 모름)은 아래로 나눈다', () => {
+    const { known, noInfo } = splitByInfo([
+      store('a'),
+      store('b', { coverage: 'none', brandId: 'mega' }),
+      store('c', { brandId: undefined, coverage: 'none' }),
+      store('d', { coverage: 'partial' }),
+    ]);
+    expect(known.map((s) => s.id)).toEqual(['a', 'd']);
+    expect(noInfo.map((s) => s.id)).toEqual(['b', 'c']);
+  });
+
+  it('가장 가까운 같은 브랜드 매장', () => {
+    const list = [store('far', { distanceM: 400 }), store('cu', { brandId: 'cu', distanceM: 50 }), store('near', { distanceM: 120 })];
+    expect(nearestOfBrand(list, 'gs25')?.id).toBe('near');
+    expect(nearestOfBrand(list, 'starbucks')).toBeUndefined();
+  });
+
+  it('브랜드 검색: 이름·키워드, 대소문자·공백 무시, 앞에서 맞는 게 먼저', () => {
+    const brands = getBrands();
+    expect(searchBrands(brands, 'gs').map((b) => b.id)).toContain('gs25');
+    expect(searchBrands(brands, '스타')[0].id).toBe('starbucks');
+    expect(searchBrands(brands, '  ')).toEqual([]);
+    // 매장이 아닌 시판 제품 가상 브랜드는 나오지 않는다
+    expect(searchBrands(brands, '가공식품')).toEqual([]);
+  });
+
+  it('판정별 묶기와 카드 요약 (오늘은 패스 메뉴는 추천하지 않는다)', () => {
+    const j = (verdict: 'good' | 'ok' | 'pass', unknown = false) => ({ verdict, score: 0, reasons: [], unknown });
+    const m = (id: string) => ({ id, brandId: 'x', name: id, category: 'meal' as const, serving: '', nutrients: { kcal: 100 }, trust: 'official' as const });
+    const ranked = [
+      { menu: m('p1'), judgement: j('pass') },
+      { menu: m('o1'), judgement: j('ok') },
+      { menu: m('g1'), judgement: j('good') },
+      { menu: m('g2'), judgement: j('good') },
+      { menu: m('u1'), judgement: j('pass', true) },
+    ];
+    const g = groupByVerdict(ranked);
+    expect(g.good.map((r) => r.menu.id)).toEqual(['g1', 'g2']);
+    expect(g.ok.map((r) => r.menu.id)).toEqual(['o1']);
+    expect(g.pass.map((r) => r.menu.id)).toEqual(['p1']);
+    expect(g.unknown.map((r) => r.menu.id)).toEqual(['u1']);
+
+    const pick = summarizeRanked(ranked);
+    expect(pick).toMatchObject({ good: 2, ok: 1, known: 4 });
+    expect(pick.top?.menu.id).toBe('o1');
+    expect(summarizeRanked([{ menu: m('p'), judgement: j('pass') }]).top).toBeNull();
   });
 });

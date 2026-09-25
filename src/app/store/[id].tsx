@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -22,23 +23,39 @@ import {
   summarizeTrust,
   type NutrientKey,
 } from '@/components';
+import { Segmented } from '@/components/Segmented';
 import { getBrand, getMenusByBrand, getMockStores } from '@/data';
 import { MENU_CATEGORY_LABEL } from '@/data/labels';
 import { YEOKSAM_CENTER } from '@/data/mockStores';
 import { applyOptions, rankMenus } from '@/domain/judge';
 import { formatNumber } from '@/domain/summary';
-import type { Judgement, MenuCategory, MenuItem, Store } from '@/domain/types';
+import type { Judgement, MenuCategory, MenuItem, Store, Verdict } from '@/domain/types';
 import { judgeProfile } from '@/state/bootstrap';
 import { useDay } from '@/state/day';
-import { useNearby } from '@/state/nearby';
+import { groupByVerdict, useNearby } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 type Sort = 'rank' | 'kcal';
 type Cat = 'all' | MenuCategory;
+type Section = Verdict | 'unknown';
 const CAT_ORDER: MenuCategory[] = ['drink', 'meal', 'snack', 'salad', 'side'];
+const SORTS: { id: Sort; label: string }[] = [
+  { id: 'rank', label: '추천 순' },
+  { id: 'kcal', label: '칼로리 낮은 순' },
+];
 
-/** D3 매장 메뉴 판정 — 신뢰등급 헤더 · 여유분 미니카드 · 카테고리 칩 · 정렬 · 메뉴 카드(순위·핵심수치·판정 배지) */
+/** 판정별 묶음 — 색 + 아이콘 + 말 세 겹 */
+const SECTION_META: Record<Section, { title: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
+  good: { title: '지금 먹기 좋아요', icon: 'checkmark-circle', color: colors.good },
+  ok: { title: '괜찮아요', icon: 'ellipse', color: colors.ok },
+  pass: { title: '오늘은 패스', icon: 'pause-circle', color: colors.pass },
+  unknown: { title: '아직 정보가 없는 메뉴', icon: 'help-circle-outline', color: colors.ink3 },
+};
+/** 처음엔 접어 두는 묶음 (눌러서 펼친다) */
+const COLLAPSED_BY_DEFAULT: Section[] = ['pass', 'unknown'];
+
+/** D3 매장 메뉴 판정 — 출처 배지 헤더 · 남은 양 미니카드 · 카테고리 칩 · 정렬 세그먼트 · 판정별 묶음(좋아요/괜찮아요/패스) */
 export default function StoreMenu() {
   const params = useLocalSearchParams<{ id: string; brandId?: string }>();
   const nearbyStore = useNearby((s) => s.stores.find((x) => x.id === params.id));
@@ -52,23 +69,18 @@ export default function StoreMenu() {
 
   const [cat, setCat] = useState<Cat>('all');
   const [sort, setSort] = useState<Sort>('rank');
+  const [open, setOpen] = useState<Record<Section, boolean>>({ good: true, ok: true, pass: false, unknown: false });
 
   const menus = useMemo(() => (brandId ? getMenusByBrand(brandId) : []), [brandId]);
   const remaining = summary?.remaining ?? targets;
   const ranked = useMemo(() => (remaining ? rankMenus(menus, remaining, { profile: judgeProfile(profile) }) : null), [menus, remaining, profile]);
 
   const cats = CAT_ORDER.filter((c) => menus.some((m) => m.category === c));
-  const list = useMemo(() => {
-    if (!ranked) return [];
-    const withRank = ranked.map((r, i) => ({ ...r, rank: i + 1 }));
-    const filtered = cat === 'all' ? withRank : withRank.filter((r) => r.menu.category === cat);
-    if (sort === 'kcal') {
-      return [...filtered].sort((a, b) => {
-        if (a.judgement.unknown !== b.judgement.unknown) return a.judgement.unknown ? 1 : -1;
-        return (applyOptions(a.menu)?.kcal ?? 0) - (applyOptions(b.menu)?.kcal ?? 0);
-      });
-    }
-    return filtered;
+  const groups = useMemo(() => {
+    if (!ranked) return null;
+    const filtered = cat === 'all' ? ranked : ranked.filter((r) => r.menu.category === cat);
+    const sorted = sort === 'kcal' ? [...filtered].sort((a, b) => (applyOptions(a.menu)?.kcal ?? 0) - (applyOptions(b.menu)?.kcal ?? 0)) : filtered;
+    return groupByVerdict(sorted);
   }, [ranked, cat, sort]);
 
   const title = store?.name ?? brand?.name ?? '매장';
@@ -87,7 +99,7 @@ export default function StoreMenu() {
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.pad}>
-        <StackHeader title={title} right={noInfo ? <TrustBadge trust="none" /> : <TrustBadge trust={trust} />} />
+        <StackHeader title={title} right={<TrustBadge trust={noInfo ? 'none' : trust} size="sm" />} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {noInfo ? (
@@ -114,25 +126,42 @@ export default function StoreMenu() {
               <View style={styles.chipsGap} />
             )}
 
-            <Pressable accessibilityRole="button" accessibilityLabel="정렬 바꾸기" onPress={() => setSort((s) => (s === 'rank' ? 'kcal' : 'rank'))} style={styles.sortBtn}>
-              <Text variant="caption" color="ink3">
-                {sort === 'rank' ? '내게 맞는 순' : '칼로리 낮은 순'}
-              </Text>
-              <ChevronDownIcon size={20} color={colors.ink3} />
-            </Pressable>
+            <Segmented options={SORTS} value={sort} onChange={setSort} accessibilityLabel="정렬" style={styles.sort} />
 
-            {!ranked ? (
+            {!groups ? (
               <View style={styles.list}>
                 {[0, 1, 2].map((i) => (
                   <Skeleton key={i} height={80} borderRadius={radius.lg} />
                 ))}
               </View>
             ) : (
-              <View style={styles.list}>
-                {list.map(({ menu, judgement, rank }) => (
-                  <MenuRow key={menu.id} menu={menu} judgement={judgement} rank={rank} sub={sub} onPress={() => router.push({ pathname: '/menu/[id]', params: { id: menu.id, store: title } })} />
-                ))}
-              </View>
+              (['good', 'ok', 'pass', 'unknown'] as Section[]).map((sec) => {
+                const items = groups[sec];
+                if (items.length === 0) return null;
+                // 위에 보여줄 묶음이 하나도 없으면 접지 않는다 (빈 화면에 접힌 줄만 남지 않게)
+                const above = sec === 'pass' ? groups.good.length + groups.ok.length : sec === 'unknown' ? groups.good.length + groups.ok.length + groups.pass.length : 1;
+                const collapsible = COLLAPSED_BY_DEFAULT.includes(sec) && above > 0;
+                const expanded = !collapsible || open[sec];
+                return (
+                  <View key={sec} style={styles.section}>
+                    <SectionHeader section={sec} count={items.length} collapsible={collapsible} expanded={expanded} onToggle={() => setOpen((o) => ({ ...o, [sec]: !o[sec] }))} />
+                    {expanded ? (
+                      <View style={styles.list}>
+                        {items.map(({ menu, judgement }, i) => (
+                          <MenuRow
+                            key={menu.id}
+                            menu={menu}
+                            judgement={judgement}
+                            rank={sec === 'good' && sort === 'rank' ? i + 1 : undefined}
+                            sub={sub}
+                            onPress={() => router.push({ pathname: '/menu/[id]', params: { id: menu.id, store: title } })}
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })
             )}
           </>
         )}
@@ -147,7 +176,45 @@ export default function StoreMenu() {
   );
 }
 
-function MenuRow({ menu, judgement, rank, sub, onPress }: { menu: MenuItem; judgement: Judgement; rank: number; sub: NutrientKey; onPress: () => void }) {
+function SectionHeader({ section, count, collapsible, expanded, onToggle }: { section: Section; count: number; collapsible: boolean; expanded: boolean; onToggle: () => void }) {
+  const m = SECTION_META[section];
+  const body = (
+    <>
+      <Ionicons name={m.icon} size={16} color={m.color} />
+      <Text variant="h3" style={section === 'unknown' ? { color: colors.ink2 } : { color: m.color }}>
+        {m.title}
+      </Text>
+      <Text variant="h3" color="ink3">
+        {count}
+      </Text>
+      {collapsible ? (
+        <View style={expanded ? styles.chevUp : undefined}>
+          <ChevronDownIcon size={18} color={colors.ink3} />
+        </View>
+      ) : null}
+    </>
+  );
+  if (!collapsible) {
+    return (
+      <View style={styles.sectionHead} accessibilityRole="header">
+        {body}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={`${m.title} ${count}개, ${expanded ? '접기' : '펼치기'}`}
+      onPress={onToggle}
+      style={({ pressed }) => [styles.sectionHead, styles.sectionToggle, pressed && { opacity: 0.6 }]}
+    >
+      {body}
+    </Pressable>
+  );
+}
+
+function MenuRow({ menu, judgement, rank, sub, onPress }: { menu: MenuItem; judgement: Judgement; rank?: number; sub: NutrientKey; onPress: () => void }) {
   const n = applyOptions(menu);
   const unknown = judgement.unknown || !n;
   const subValue = n ? n[sub] : undefined;
@@ -155,8 +222,8 @@ function MenuRow({ menu, judgement, rank, sub, onPress }: { menu: MenuItem; judg
     ? `${formatNumber(n.kcal)} kcal${typeof subValue === 'number' ? ` · ${NUTRIENT_META[sub].short} ${formatNutrient(sub, subValue)}${NUTRIENT_META[sub].unit}` : ''}`
     : '아직 추가되지 않은 정보입니다';
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${rank}위 ${menu.name}, ${meta}`} onPress={onPress} style={({ pressed }) => [styles.menuCard, pressed && { opacity: 0.8 }]}>
-      <Text style={[styles.rank, unknown && { color: colors.ink3 }]}>{rank}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${rank ? `${rank}위 ` : ''}${menu.name}, ${meta}`} onPress={onPress} style={({ pressed }) => [styles.menuCard, pressed && { opacity: 0.8 }]}>
+      {rank ? <Text style={styles.rank}>{rank}</Text> : null}
       <MenuTile menu={menu} size={48} />
       <View style={styles.menuBody}>
         <Text variant="h3" numberOfLines={1}>
@@ -178,8 +245,12 @@ const styles = StyleSheet.create({
   chipsWrap: { marginTop: spacing.xl, flexGrow: 0, marginHorizontal: -spacing.page },
   chips: { paddingHorizontal: spacing.page, gap: spacing.sm },
   chipsGap: { height: spacing.md },
-  sortBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 2, minHeight: 44, marginTop: spacing.sm },
-  list: { marginTop: spacing.xs, gap: 10 },
+  sort: { marginTop: spacing.md },
+  section: { marginTop: spacing.xl },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 28 },
+  sectionToggle: { minHeight: 44, alignSelf: 'flex-start' },
+  chevUp: { transform: [{ rotate: '180deg' }] },
+  list: { marginTop: spacing.sm, gap: 10 },
   menuCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg },
   rank: { width: 16, textAlign: 'center', fontFamily: fonts.bold, fontSize: 18, lineHeight: 20, color: colors.primaryText },
   menuBody: { flex: 1, minWidth: 0, gap: 4 },
