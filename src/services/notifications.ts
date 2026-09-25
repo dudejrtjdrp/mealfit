@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
+import type * as NotificationsApi from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { colors } from '@/theme';
@@ -21,16 +21,35 @@ import {
  * 웹은 알림을 예약할 수 없으니 전부 조용히 아무 일도 하지 않는다.
  */
 
-export const remindersSupported = Platform.OS !== 'web';
+/**
+ * expo-notifications 는 네이티브 모듈이 없으면(이 모듈을 넣기 전 빌드에 새 JS 가 OTA 로 온 경우 등) import 하는 순간 던져
+ * 시작하자마자 앱이 꺼진다. 최상단 import 대신 한 번만 감싼 require 로 불러오고, 없으면 알림 기능 전체를 조용히 끈다.
+ */
+let loaded: typeof NotificationsApi | null | undefined;
+function notificationsModule(): typeof NotificationsApi | null {
+  if (loaded !== undefined) return loaded;
+  try {
+    loaded = require('expo-notifications') as typeof NotificationsApi;
+  } catch (e) {
+    console.warn('[notifications] expo-notifications 를 불러오지 못해 식사 알림을 끕니다', e);
+    loaded = null;
+  }
+  return loaded;
+}
+
+export const remindersSupported = Platform.OS !== 'web' && notificationsModule() !== null;
+
+/** remindersSupported 가 true 일 때만 부른다 (그때는 모듈이 있다) */
+const N = () => notificationsModule()!;
 
 export type ReminderPermission = 'granted' | 'denied' | 'undetermined';
 
 const CHANNEL_ID = 'meal-reminders';
 
-function toPermission(p: Notifications.NotificationPermissionsStatus): ReminderPermission {
+function toPermission(p: NotificationsApi.NotificationPermissionsStatus): ReminderPermission {
   if (p.granted) return 'granted';
   const ios = p.ios?.status;
-  if (ios === Notifications.IosAuthorizationStatus.PROVISIONAL || ios === Notifications.IosAuthorizationStatus.EPHEMERAL) return 'granted';
+  if (ios === N().IosAuthorizationStatus.PROVISIONAL || ios === N().IosAuthorizationStatus.EPHEMERAL) return 'granted';
   if (p.status === 'denied' || !p.canAskAgain) return 'denied';
   return 'undetermined';
 }
@@ -38,9 +57,9 @@ function toPermission(p: Notifications.NotificationPermissionsStatus): ReminderP
 /** 안드로이드 8+ 는 채널이 있어야 알림이 뜨고, 13+ 는 채널을 만든 뒤에 권한을 물을 수 있다 */
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+  await N().setNotificationChannelAsync(CHANNEL_ID, {
     name: '식사 시간 알림',
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: N().AndroidImportance.DEFAULT,
     lightColor: colors.primary,
   });
 }
@@ -48,7 +67,7 @@ async function ensureChannel(): Promise<void> {
 export async function getReminderPermission(): Promise<ReminderPermission> {
   if (!remindersSupported) return 'denied';
   try {
-    return toPermission(await Notifications.getPermissionsAsync());
+    return toPermission(await N().getPermissionsAsync());
   } catch {
     return 'undetermined';
   }
@@ -62,7 +81,7 @@ export async function requestReminderPermission(): Promise<ReminderPermission> {
     if (now !== 'undetermined') return now;
     await ensureChannel();
     return toPermission(
-      await Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowSound: true, allowBadge: false } }),
+      await N().requestPermissionsAsync({ ios: { allowAlert: true, allowSound: true, allowBadge: false } }),
     );
   } catch {
     return 'denied';
@@ -79,7 +98,7 @@ export async function loadReminderSettings(): Promise<MealReminderSettings> {
 }
 
 async function cancelOurs(): Promise<void> {
-  await Promise.all(MEAL_SLOTS.map((slot) => Notifications.cancelScheduledNotificationAsync(REMINDER_ID[slot]).catch(() => {})));
+  await Promise.all(MEAL_SLOTS.map((slot) => N().cancelScheduledNotificationAsync(REMINDER_ID[slot]).catch(() => {})));
 }
 
 /** 설정대로 매일 반복 알림을 다시 건다 (같은 id 라 여러 번 불러도 중복되지 않음). 권한이 없으면 걸지 않는다 */
@@ -92,11 +111,11 @@ export async function applyMealReminders(s: MealReminderSettings): Promise<void>
     if ((await getReminderPermission()) !== 'granted') return;
     await ensureChannel();
     for (const r of plan) {
-      await Notifications.scheduleNotificationAsync({
+      await N().scheduleNotificationAsync({
         identifier: r.id,
         content: { title: r.title, body: r.body, data: r.data, sound: true },
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          type: N().SchedulableTriggerInputTypes.DAILY,
           hour: r.hour,
           minute: r.minute,
           channelId: CHANNEL_ID,
@@ -143,7 +162,7 @@ export function initNotifications(): void {
   if (!remindersSupported || handlerSet) return;
   handlerSet = true;
   try {
-    Notifications.setNotificationHandler({
+    N().setNotificationHandler({
       handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
     });
   } catch {
@@ -158,7 +177,7 @@ export function initNotifications(): void {
 export function addReminderTapListener(onRoute: (route: ReminderRoute) => void): () => void {
   if (!remindersSupported) return () => {};
   try {
-    const sub = Notifications.addNotificationResponseReceivedListener((res) => {
+    const sub = N().addNotificationResponseReceivedListener((res) => {
       const route = routeForNotificationData(res.notification.request.content.data);
       if (route) onRoute(route);
     });
