@@ -17,7 +17,7 @@ import { judgeProfile } from '@/state/bootstrap';
 import { defaultMealType, useDay } from '@/state/day';
 import { ensureFavoritesLoaded, logKey, rankFrequent, useFavorites, type FrequentItem } from '@/state/favorites';
 import { useProfile } from '@/state/profile';
-import { colors, fonts, radius, size, spacing, type } from '@/theme';
+import { colors, radius, size, spacing, type } from '@/theme';
 
 const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 /** "자주 먹어요"는 최근 30일, "최근"은 14일 */
