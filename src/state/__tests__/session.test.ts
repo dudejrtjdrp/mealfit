@@ -8,8 +8,11 @@ jest.mock('@/services/supabase', () => ({
   getSupabase: () => ({ auth: { signInWithOAuth: (...a: unknown[]) => mockSignInWithOAuth(...a), getSession: jest.fn(async () => ({ data: { session: null } })), onAuthStateChange: jest.fn() } }),
 }));
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { OFFLINE_MESSAGE, UNKNOWN_MESSAGE } from '@/services/auth';
 
+import { FAVORITES_KEY, useFavorites } from '../favorites';
 import { useSession } from '../session';
 
 describe('세션 로그인 예외 처리 (withActivate)', () => {
@@ -26,5 +29,16 @@ describe('세션 로그인 예외 처리 (withActivate)', () => {
     mockSignInWithOAuth.mockRejectedValueOnce(new TypeError('Network request failed'));
     const res = await useSession.getState().signInOAuth('kakao');
     expect(res).toMatchObject({ ok: false, message: OFFLINE_MESSAGE });
+  });
+});
+
+describe('로그아웃·탈퇴·이 기기 데이터 지우기', () => {
+  it('즐겨찾기를 메모리와 기기에서 모두 지운다 (다음에 이 기기를 쓰는 사람에게 보이지 않게)', async () => {
+    await useFavorites.getState().toggle({ menuId: 'a', name: '라떼' });
+    expect(await AsyncStorage.getItem(FAVORITES_KEY)).not.toBeNull();
+
+    await useSession.getState().signOut();
+    expect(useFavorites.getState().items).toEqual([]);
+    expect(await AsyncStorage.getItem(FAVORITES_KEY)).toBeNull();
   });
 });

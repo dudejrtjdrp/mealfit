@@ -15,12 +15,15 @@ import {
   type Session,
   sessionFromSupabase,
 } from '@/services/auth';
-import { setAuthUserId } from '@/services/authState';
+import { getAuthUserId, setAuthUserId } from '@/services/authState';
 import { newId } from '@/services/id';
 import { createLocalRepos } from '@/services/repo/local';
 import { discardMigratedBackup, migrateLocalToSupabase } from '@/services/repo/migrate';
 import { createSupabaseRepos } from '@/services/repo/supabase';
 import { getSupabase } from '@/services/supabase';
+
+import { emitAccountChange } from './accountEvents';
+import { clearFavorites } from './favorites';
 
 /**
  * 세션 스토어
@@ -89,7 +92,9 @@ export async function discardMigratedLocalBackup(): Promise<void> {
 export const useSession = create<SessionState>((set, get) => {
   /** Supabase 세션을 스토어에 반영 (마이그레이션까지 끝낸 뒤 화면이 프로필을 읽도록) */
   const activate = async (db: SupabaseClient, s: SupabaseSession): Promise<Session> => {
+    const prev = getAuthUserId();
     setAuthUserId(s.user.id);
+    if (prev !== s.user.id) await emitAccountChange('signedIn');
     await migrateOnce(db, s.user.id);
     const session = sessionFromSupabase(s);
     set({ session, status: 'ready' });
@@ -150,8 +155,10 @@ export const useSession = create<SessionState>((set, get) => {
           // 콜백 안에서 Supabase 호출을 await 하면 교착될 수 있어 상태만 동기로 반영
           db.auth.onAuthStateChange((event, s) => {
             if (event === 'SIGNED_OUT' || !s) {
+              const had = getAuthUserId() !== null;
               setAuthUserId(null);
               set({ session: null });
+              if (had) void emitAccountChange('signedOut');
             } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
               setAuthUserId(s.user.id);
               set({ session: sessionFromSupabase(s) });
@@ -230,6 +237,9 @@ export const useSession = create<SessionState>((set, get) => {
         // 무시
       }
       set({ session: null });
+      // 로그아웃·탈퇴·이 기기 데이터 지우기 모두 여기를 지난다: 다음 사람에게 이전 기록·즐겨찾기가 보이지 않게
+      await clearFavorites();
+      await emitAccountChange('signedOut');
     },
   };
 });

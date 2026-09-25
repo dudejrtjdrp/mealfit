@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { TARGETS, log } from '../../domain/__tests__/fixtures';
 import { resetReposForTest } from '../../services/repo';
+import { createLocalRepos } from '../../services/repo/local';
+import { emitAccountChange } from '../accountEvents';
 import { clearLogRangeCache, defaultMealType, dominantVerdict, useDay, weekTally } from '../day';
 import { useProfile } from '../profile';
 
@@ -106,5 +108,31 @@ describe('day store', () => {
 
   it('weekTally: 좋음 끼니 수 · 기록한 날 수', () => {
     expect(weekTally({ a: [{ verdict: 'good' }, { verdict: 'ok' }], b: [{ verdict: 'good' }], c: [] })).toEqual({ good: 2, days: 2 });
+  });
+});
+
+describe('기록 기간 캐시와 계정 전환', () => {
+  const FROM = '2026-09-14';
+  const TO = '2026-09-20';
+
+  it('로그아웃·탈퇴·이 기기 데이터 지우기(계정 전환 알림) 뒤에는 이전 사람의 기록을 캐시에서 보여주지 않는다', async () => {
+    await createLocalRepos(AsyncStorage).logs.add(log({ id: 'prev', date: '2026-09-16' }));
+    expect(Object.keys(await useDay.getState().logsInRange(FROM, TO))).toEqual(['2026-09-16']);
+
+    // 기기 데이터가 지워져도 저장소 인스턴스는 그대로(로컬) — 알림이 없으면 캐시가 남는다
+    await AsyncStorage.clear();
+    expect(Object.keys(await useDay.getState().logsInRange(FROM, TO))).toEqual(['2026-09-16']);
+
+    await emitAccountChange('signedOut');
+    expect(await useDay.getState().logsInRange(FROM, TO)).toEqual({});
+    expect(await useDay.getState().recentLogs(3650)).toEqual([]);
+  });
+
+  it('저장소가 바뀌면(로그인·로그아웃) 캐시를 새로 채운다', async () => {
+    await createLocalRepos(AsyncStorage).logs.add(log({ id: 'prev', date: '2026-09-16' }));
+    expect(Object.keys(await useDay.getState().logsInRange(FROM, TO))).toEqual(['2026-09-16']);
+    await AsyncStorage.clear();
+    resetReposForTest(); // getRepos() 가 새 인스턴스를 돌려준다 (다른 사용자)
+    expect(await useDay.getState().logsInRange(FROM, TO)).toEqual({});
   });
 });

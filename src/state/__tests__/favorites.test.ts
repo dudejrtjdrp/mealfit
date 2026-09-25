@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { log } from '../../domain/__tests__/fixtures';
-import { FAVORITES_KEY, rankFrequent, useFavorites, type FavoriteEntry } from '../favorites';
+import { clearFavorites, FAVORITES_KEY, rankFrequent, useFavorites, type FavoriteEntry } from '../favorites';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
@@ -57,5 +57,14 @@ describe('자주 먹어요 순위', () => {
 
   it('limit 만큼만', () => {
     expect(rankFrequent([], [fav('a', '1'), fav('b', '2'), fav('c', '3')], 2)).toHaveLength(2);
+  });
+});
+
+describe('clearFavorites', () => {
+  it('메모리와 기기 저장값을 모두 비운다', async () => {
+    await useFavorites.getState().toggle({ menuId: 'a', name: '라떼' });
+    await clearFavorites();
+    expect(useFavorites.getState()).toMatchObject({ items: [], status: 'ready' });
+    expect(await AsyncStorage.getItem(FAVORITES_KEY)).toBeNull();
   });
 });

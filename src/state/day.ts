@@ -4,8 +4,9 @@ import { create } from 'zustand';
 import { mealTypeAt } from '@/domain/mealBudget';
 import { summarizeDay, toDateKey } from '@/domain/summary';
 import type { DailyTargets, DaySummary, MealLog, MealType, Verdict } from '@/domain/types';
-import { getRepos } from '@/services/repo';
+import { getRepos, type Repos } from '@/services/repo';
 
+import { onAccountChange } from './accountEvents';
 import { useProfile } from './profile';
 
 /** 현재 시각 기준 기본 끼니 — 판정(이번 끼니 적정량)과 같은 경계: ~10:30 아침 · ~15시 점심 · ~21시 저녁 · 그 외 간식 */
@@ -31,11 +32,19 @@ interface DayState {
   recompute: () => void;
 }
 
-/** 기간별 기록 캐시 — 기록이 추가·수정·삭제되면 통째로 비운다 */
+/**
+ * 기간별 기록 캐시 — 기록이 추가·수정·삭제되면 통째로 비운다.
+ * 저장소(계정/이 기기)가 바뀌거나 로그아웃·탈퇴·이 기기 데이터 지우기가 있으면 역시 비운다 —
+ * 남겨 두면 다른 계정·게스트에게 이전 사람의 주간 점·자주 먹어요·최근 기록이 보인다.
+ */
 const rangeCache = new Map<string, Promise<Record<string, MealLog[]>>>();
+/** 캐시를 채운 저장소 — getRepos() 는 사용자가 바뀌면 새 인스턴스를 돌려준다 */
+let rangeCacheRepos: Repos | null = null;
 export function clearLogRangeCache() {
   rangeCache.clear();
+  rangeCacheRepos = null;
 }
+onAccountChange(() => clearLogRangeCache());
 
 const VERDICT_ORDER: Verdict[] = ['good', 'ok', 'pass'];
 
@@ -141,11 +150,16 @@ export const useDay = create<DayState>((set, get) => ({
   },
 
   logsInRange: async (from, to) => {
+    const repos = getRepos();
+    if (repos !== rangeCacheRepos) {
+      rangeCache.clear();
+      rangeCacheRepos = repos;
+    }
     const key = `${from}~${to}`;
     let hit = rangeCache.get(key);
     if (!hit) {
       hit = (async () => {
-        const repo = getRepos().logs;
+        const repo = repos.logs;
         const dates = await repo.datesWithLogs(from, to);
         const lists = await Promise.all(dates.map((d) => repo.listByDate(d)));
         const out: Record<string, MealLog[]> = {};
@@ -155,7 +169,10 @@ export const useDay = create<DayState>((set, get) => ({
         return out;
       })();
       rangeCache.set(key, hit);
-      hit.catch(() => rangeCache.delete(key));
+      const mine = hit;
+      hit.catch(() => {
+        if (rangeCache.get(key) === mine) rangeCache.delete(key);
+      });
     }
     try {
       const byDate = { ...(await hit) };

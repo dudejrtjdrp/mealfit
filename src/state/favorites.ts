@@ -68,6 +68,20 @@ export const useFavorites = create<FavoritesState>((set, get) => ({
   },
 }));
 
+/**
+ * 로그아웃·탈퇴·이 기기 데이터 지우기: 즐겨찾기를 메모리와 기기에서 모두 지운다.
+ * 즐겨찾기는 계정이 아니라 기기에 있어, 두면 다음에 이 기기를 쓰는 사람(공용 기기)에게 그대로 보인다.
+ * 같은 사람이 다시 로그인하면 잃는 셈이지만, 남의 식습관이 보이는 쪽이 더 나빠 로그아웃에도 지운다.
+ */
+export async function clearFavorites(): Promise<void> {
+  useFavorites.setState({ items: [], status: 'ready' });
+  try {
+    await AsyncStorage.removeItem(FAVORITES_KEY);
+  } catch (e) {
+    console.warn('[favorites] 지우기 실패', e);
+  }
+}
+
 /** 처음 쓰는 화면에서 한 번 불러온다 */
 export function ensureFavoritesLoaded() {
   if (useFavorites.getState().status === 'idle') void useFavorites.getState().load();
