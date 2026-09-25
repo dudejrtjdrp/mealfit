@@ -207,8 +207,15 @@ export default function LoginScreen() {
       ) : null}
 
       <Text variant="small" color="ink3" align="center" style={styles.terms}>
-        로그인하면 <Text variant="small" color="ink2" style={styles.underline}>이용약관</Text>과{' '}
-        <Text variant="small" color="ink2" style={styles.underline}>개인정보처리방침</Text>에 동의하는 것으로 봐요.
+        로그인하면{' '}
+        <Text variant="small" color="ink2" style={styles.underline} accessibilityRole="link" onPress={() => router.push('/legal/terms')}>
+          이용약관
+        </Text>
+        과{' '}
+        <Text variant="small" color="ink2" style={styles.underline} accessibilityRole="link" onPress={() => router.push('/legal/privacy')}>
+          개인정보처리방침
+        </Text>
+        에 동의하는 것으로 봐요.
       </Text>
 
       <BottomSheet

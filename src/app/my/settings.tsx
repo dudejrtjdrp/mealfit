@@ -4,10 +4,12 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
-import { APP_NAME, BottomSheet, Button, Card, ListRow, Screen, StackHeader, TRUST_EXPLAIN, Text, TrustBadge, showToast } from '@/components';
+import { BottomSheet, Button, Card, ListRow, Screen, StackHeader, TRUST_EXPLAIN, Text, TrustBadge, showToast } from '@/components';
 import type { Trust } from '@/domain/types';
+import { CONTACT_EMAIL } from '@/legal/content';
 import { getRepos } from '@/services/repo';
 import { getPermissionStatus, requestPermission, type PermissionStatus } from '@/services/location';
+import { getDevicePermission, requestDevicePermission, type DevicePermission, type PermissionKind } from '@/services/permissions';
 import { MEAL_SLOTS, SLOT_LABEL, formatClock, type MealReminderSettings, type MealSlot } from '@/services/mealReminder';
 import {
   applyMealReminders,
@@ -24,7 +26,8 @@ import { useProfile } from '@/state/profile';
 import { useSession } from '@/state/session';
 import { colors, spacing } from '@/theme';
 
-const PERM_LABEL: Record<PermissionStatus, string> = { granted: '허용됨', denied: '허용 안 됨', undetermined: '아직 묻지 않았어요' };
+const PERM_LABEL: Record<DevicePermission, string> = { granted: '허용됨', denied: '허용 안 됨', undetermined: '아직 묻지 않았어요', browser: '쓸 때 브라우저가 물어봐요' };
+const APP_VERSION = Constants.expoConfig?.version ?? '';
 const TRUST_ORDER: Trust[] = ['official', 'estimated', 'none', 'user'];
 
 /** 계정 정리: 로그아웃 · 탈퇴 · (게스트) 이 기기 데이터 지우기 */
@@ -41,10 +44,12 @@ const slotSummary = (r: MealReminderSettings) =>
     .map((k) => `${SLOT_LABEL[k]} ${formatClock(r[k].hour, r[k].minute)}`)
     .join(' · ');
 
-/** F4 설정 — 위치 권한 · 내 기록(어디에 저장되는지) · 식사 시간 알림 · 영양 정보 출처 안내 · 로그아웃/탈퇴 (게스트는 로그인 · 이 기기 데이터 지우기) */
+/** F4 설정 — 권한(위치·카메라·마이크) · 내 기록(어디에 저장되는지) · 식사 시간 알림 · 영양 정보 출처 안내 · 약관·문의·앱 버전 · 로그아웃/탈퇴 (게스트는 로그인 · 이 기기 데이터 지우기) */
 export default function Settings() {
   const signOut = useProfile((s) => s.signOut);
   const [perm, setPerm] = useState<PermissionStatus>('undetermined');
+  const [camPerm, setCamPerm] = useState<DevicePermission>('undetermined');
+  const [micPerm, setMicPerm] = useState<DevicePermission>('undetermined');
   const [trustOpen, setTrustOpen] = useState(false);
   const [confirm, setConfirm] = useState<Kind | null>(null);
   // 식사 시간 알림 (웹은 섹션 자체를 그리지 않는다)
@@ -98,12 +103,27 @@ export default function Settings() {
     if (p === 'granted' && r.enabled) void applyMealReminders(r);
   }, [enableReminders]);
 
+  /** 위치·카메라·마이크 권한 다시 읽기 (화면 복귀·기기 설정에서 돌아왔을 때) */
+  const refreshPerms = useCallback(() => {
+    void getPermissionStatus().then(setPerm);
+    void getDevicePermission('camera').then(setCamPerm);
+    void getDevicePermission('microphone').then(setMicPerm);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      void getPermissionStatus().then(setPerm);
+      refreshPerms();
       void refreshReminders();
-    }, [refreshReminders]),
+    }, [refreshPerms, refreshReminders]),
   );
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') refreshPerms();
+    });
+    return () => sub.remove();
+  }, [refreshPerms]);
 
   useEffect(() => {
     if (!remindersSupported) return;
@@ -163,6 +183,19 @@ export default function Settings() {
     setPerm(await requestPermission());
   };
 
+  const onDevicePerm = async (kind: PermissionKind, cur: DevicePermission, set: (p: DevicePermission) => void) => {
+    if (cur === 'browser') return showToast('사진·음성을 쓸 때 브라우저가 권한을 물어봐요', 'info');
+    if (cur === 'granted') return showToast('이미 허용했어요', 'info');
+    const what = kind === 'camera' ? '카메라' : '마이크';
+    if (cur === 'denied') return Linking.openSettings().catch(() => showToast(`기기 설정에서 ${what} 권한을 켜 주세요`, 'info'));
+    set(await requestDevicePermission(kind));
+  };
+
+  const onContact = () => {
+    const url = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`[mealing] 문의 (v${APP_VERSION})`)}`;
+    Linking.openURL(url).catch(() => showToast(`${CONTACT_EMAIL} 로 보내 주세요`, 'info'));
+  };
+
   const doSignOut = async (kind: Kind | null = confirm) => {
     setConfirm(null);
     const k = kind ?? 'logout';
@@ -191,14 +224,14 @@ export default function Settings() {
   return (
     <Screen scroll header={<StackHeader title="설정" />}>
       <Card padding={spacing.xs} style={styles.card}>
-        <ListRow
-          title="위치 권한"
-          subtitle={PERM_LABEL[perm]}
-          icon={<Ionicons name="location-outline" size={20} color={colors.ink2} />}
-          onPress={onPerm}
-          style={styles.row}
-        />
+        <PermRow title="위치 권한" icon="location-outline" status={perm} onPress={onPerm} />
         <View style={styles.sep} />
+        <PermRow title="카메라" icon="camera-outline" status={camPerm} onPress={() => void onDevicePerm('camera', camPerm, setCamPerm)} />
+        <View style={styles.sep} />
+        <PermRow title="마이크 · 음성 인식" icon="mic-outline" status={micPerm} onPress={() => void onDevicePerm('microphone', micPerm, setMicPerm)} />
+      </Card>
+
+      <Card padding={spacing.xs} style={styles.card}>
         <ListRow
           title="내 기록"
           subtitle={cloud ? `계정에 저장돼요${email ? ` · ${email}` : ''}` : '이 기기에만 저장돼요'}
@@ -302,6 +335,26 @@ export default function Settings() {
       </Card>
 
       <Card padding={spacing.xs} style={styles.card}>
+        <ListRow title="이용약관" icon={<Ionicons name="document-text-outline" size={20} color={colors.ink2} />} onPress={() => router.push('/legal/terms')} style={styles.row} />
+        <View style={styles.sep} />
+        <ListRow title="개인정보처리방침" icon={<Ionicons name="shield-checkmark-outline" size={20} color={colors.ink2} />} onPress={() => router.push('/legal/privacy')} style={styles.row} />
+        <View style={styles.sep} />
+        <ListRow title="문의하기" subtitle={CONTACT_EMAIL} icon={<Ionicons name="mail-outline" size={20} color={colors.ink2} />} onPress={onContact} style={styles.row} />
+        <View style={styles.sep} />
+        <ListRow
+          title="앱 버전"
+          icon={<Ionicons name="information-circle-outline" size={20} color={colors.ink2} />}
+          chevron={false}
+          right={
+            <Text variant="caption" color="ink3">
+              {APP_VERSION || '확인할 수 없어요'}
+            </Text>
+          }
+          style={styles.row}
+        />
+      </Card>
+
+      <Card padding={spacing.xs} style={styles.card}>
         {guest ? (
           <ListRow title="이 기기 데이터 지우기" subtitle="이 기기에 저장된 프로필과 기록을 지워요." icon={<Ionicons name="trash-outline" size={20} color={colors.ink2} />} onPress={() => ask('wipe')} style={styles.row} />
         ) : (
@@ -313,9 +366,6 @@ export default function Settings() {
         )}
       </Card>
 
-      <Text variant="caption" color="ink3" align="center" style={styles.version}>
-        {APP_NAME} · {Constants.expoConfig?.version ?? ''}
-      </Text>
 
       <BottomSheet
         visible={confirm !== null}
@@ -335,6 +385,26 @@ export default function Settings() {
   );
 }
 
+/** 권한 한 줄 — 상태 표시, 거부됐으면 오른쪽에 "설정 열기" (누르면 기기 설정) */
+function PermRow({ title, icon, status, onPress }: { title: string; icon: keyof typeof Ionicons.glyphMap; status: DevicePermission; onPress: () => void }) {
+  return (
+    <ListRow
+      title={title}
+      subtitle={PERM_LABEL[status]}
+      icon={<Ionicons name={icon} size={20} color={colors.ink2} />}
+      onPress={onPress}
+      right={
+        status === 'denied' ? (
+          <Text variant="captionMedium" color="primaryText">
+            설정 열기
+          </Text>
+        ) : undefined
+      }
+      style={styles.row}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   card: { marginTop: spacing.md },
   row: { paddingHorizontal: spacing.md },
@@ -343,7 +413,6 @@ const styles = StyleSheet.create({
   fold: { marginTop: spacing.md, gap: spacing.md },
   trustRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   trustText: { flex: 1 },
-  version: { marginTop: spacing.xl },
   sheetBtns: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   flex: { flex: 1 },
 });

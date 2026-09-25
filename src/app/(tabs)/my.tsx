@@ -4,7 +4,7 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Card, ChevronRightIcon, EmptyState, IconButton, ListRow, Text } from '@/components';
+import { Card, ChevronRightIcon, EmptyState, IconButton, ListRow, Skeleton, Text } from '@/components';
 import { GOAL_DESCRIPTION, GOAL_LABEL, bmiInfo } from '@/data/labels';
 import { DIET_TYPES } from '@/domain/diet';
 import { toDateKey } from '@/domain/summary';
@@ -39,17 +39,27 @@ function useDaysLoggedThisWeek(): number {
 /** F1 마이 홈 — 프로필(게스트면 로그인 한 줄) · 요약 타일 3장(신체·목표·성향) · 설정 목록 · 프리미엄 미리보기 */
 export default function My() {
   const profile = useProfile((s) => s.profile);
+  const status = useProfile((s) => s.status);
   const guest = useSession((s) => !s.session);
   const cloudAvailable = useSession((s) => s.mode === 'supabase');
   const daysLogged = useDaysLoggedThisWeek();
 
-  if (!profile) {
+  if (!profile && status === 'error') {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
-        <EmptyState pose="sleep" title="프로필을 불러오고 있어요" description="잠시만 기다려 주세요." actionLabel="처음으로" onAction={() => router.replace('/')} />
+        <EmptyState pose="sleep" title="프로필을 불러오지 못했어요" description="연결을 확인하고 다시 시도해 주세요." actionLabel="다시 시도" onAction={() => void useProfile.getState().load()} />
       </SafeAreaView>
     );
   }
+  // 다 읽었는데 프로필이 없다(방금 데이터를 지움 등) → 진입 게이트로 (프로필이 없으면 온보딩)
+  if (!profile && status === 'ready') {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <EmptyState pose="sleep" title="아직 프로필이 없어요" description="몇 가지만 알려주시면 바로 시작할 수 있어요." actionLabel="처음으로" onAction={() => router.replace('/')} />
+      </SafeAreaView>
+    );
+  }
+  if (!profile) return <MySkeleton />;
 
   const { bmi, label: bmiLabel } = bmiInfo(profile.heightCm, profile.weightKg);
   const weightGoal = (profile.primaryGoal === 'lose' || profile.primaryGoal === 'gain') && profile.targetWeightKg != null;
@@ -135,7 +145,9 @@ export default function My() {
           <View style={styles.sep} />
           <ListRow title="식단 성향 수정" subtitle="나에게 맞는 식단을 다시 설정해요." icon={<Ionicons name="leaf-outline" size={20} color={colors.ink2} />} onPress={() => router.push('/my/diet')} style={styles.listRow} />
           <View style={styles.sep} />
-          <ListRow title="설정" subtitle="위치 권한, 데이터, 계정을 설정해요." icon={<Ionicons name="settings-outline" size={20} color={colors.ink2} />} onPress={() => router.push('/my/settings')} style={styles.listRow} />
+          <ListRow title="자주 먹는 메뉴" subtitle="즐겨찾기한 메뉴를 모아 보고 관리해요." icon={<Ionicons name="heart-outline" size={20} color={colors.ink2} />} onPress={() => router.push('/my/favorites')} style={styles.listRow} />
+          <View style={styles.sep} />
+          <ListRow title="설정" subtitle="권한, 알림, 약관, 계정을 설정해요." icon={<Ionicons name="settings-outline" size={20} color={colors.ink2} />} onPress={() => router.push('/my/settings')} style={styles.listRow} />
         </Card>
 
         <Pressable accessibilityRole="button" onPress={() => router.push('/my/premium')} style={({ pressed }) => [styles.premium, pressed && { opacity: 0.9 }]}>
@@ -160,6 +172,44 @@ export default function My() {
           </View>
         </Pressable>
       </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+/** 프로필을 불러오는 동안 — 마이 홈과 같은 자리에 스켈레톤 (헤더·프로필 줄·요약 타일 3장·목록) */
+function MySkeleton() {
+  return (
+    <SafeAreaView edges={['top']} style={styles.root}>
+      <View style={styles.scroll} accessibilityLabel="마이 정보를 불러오고 있어요">
+        <View style={styles.header}>
+          <Text variant="h1" accessibilityRole="header" style={styles.headerTitle}>
+            마이
+          </Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Skeleton width={56} height={56} borderRadius={28} style={styles.skAvatar} />
+          <View style={styles.profileText}>
+            <Skeleton width="45%" height={22} />
+            <Skeleton width="70%" height={14} style={styles.skGap} />
+          </View>
+        </View>
+        <View style={styles.tiles}>
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} height={150} borderRadius={radius.lg} style={styles.skTile} />
+          ))}
+        </View>
+        <Card padding={0} style={styles.listCard}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={styles.skRow}>
+              <Skeleton width={40} height={40} borderRadius={20} />
+              <View style={styles.profileText}>
+                <Skeleton width="40%" height={16} />
+                <Skeleton width="75%" height={12} style={styles.skGap} />
+              </View>
+            </View>
+          ))}
+        </Card>
+      </View>
     </SafeAreaView>
   );
 }
@@ -230,5 +280,9 @@ const styles = StyleSheet.create({
   premiumTitle: { marginTop: 4 },
   premiumSub: { marginTop: 2 },
   illo: { flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 44 },
+  skAvatar: { marginRight: spacing.sm },
+  skGap: { marginTop: spacing.xs },
+  skTile: { flex: 1 },
+  skRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.md },
   illoBar: { width: 9, borderRadius: 3, backgroundColor: colors.primary },
 });

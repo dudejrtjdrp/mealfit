@@ -107,6 +107,9 @@ export default function RootLayout() {
           <Stack.Screen name="my/diet" />
           <Stack.Screen name="my/settings" />
           <Stack.Screen name="my/premium" />
+          <Stack.Screen name="my/favorites" />
+          <Stack.Screen name="legal/terms" />
+          <Stack.Screen name="legal/privacy" />
         </Stack>
         <ToastHost />
       </SafeAreaProvider>

@@ -8,6 +8,7 @@ import { ACTIVITY_LABEL } from '@/data/labels';
 import { computeTargets } from '@/domain/targets';
 import { formatNumber } from '@/domain/summary';
 import type { ActivityLevel, Sex } from '@/domain/types';
+import { NAME_MAX, normalizeNickname } from '@/onboarding/script';
 import { useProfile } from '@/state/profile';
 import { spacing } from '@/theme';
 
@@ -17,10 +18,11 @@ const inRange = (v: string, min: number, max: number) => {
   return v.length > 0 && Number.isFinite(n) && n >= min && n <= max;
 };
 
-/** F2 신체 정보·활동량 수정 (B2·B3 재사용) */
+/** F2 내 정보 수정 — 닉네임(B1 규칙: 정리 후 1~12자) · 신체 정보 · 활동량 (B2·B3 재사용) */
 export default function BodyEdit() {
   const profile = useProfile((s) => s.profile);
   const updateProfile = useProfile((s) => s.updateProfile);
+  const [nickname, setNickname] = useState(profile?.nickname ?? '');
   const [sex, setSex] = useState<Sex>(profile?.sex ?? 'female');
   const [birth, setBirth] = useState(String(profile?.birthYear ?? ''));
   const [height, setHeight] = useState(String(profile?.heightCm ?? ''));
@@ -33,6 +35,7 @@ export default function BodyEdit() {
   useEffect(() => {
     if (filled.current || !profile) return;
     filled.current = true;
+    setNickname(profile.nickname);
     setSex(profile.sex);
     setBirth(String(profile.birthYear));
     setHeight(String(profile.heightCm));
@@ -43,17 +46,21 @@ export default function BodyEdit() {
   const okBirth = inRange(birth, 1930, THIS_YEAR - 10);
   const okHeight = inRange(height, 100, 250);
   const okWeight = inRange(weight, 25, 250);
-  const canSave = !!profile && okBirth && okHeight && okWeight;
+  const cleanName = normalizeNickname(nickname);
+  const okName = cleanName.length > 0;
+  const canSave = !!profile && okName && okBirth && okHeight && okWeight;
 
   const save = async () => {
     if (!profile || !canSave) return;
     setSaving(true);
-    const patch = { sex, birthYear: Number(birth), heightCm: Number(height), weightKg: Number(weight), activity };
-    const ok = await updateProfile(patch);
+    const body = { sex, birthYear: Number(birth), heightCm: Number(height), weightKg: Number(weight), activity };
+    const bodyChanged = (Object.keys(body) as (keyof typeof body)[]).some((k) => body[k] !== profile[k]);
+    const ok = await updateProfile({ nickname: cleanName, ...body });
     setSaving(false);
     let kcal: number | undefined;
     try {
-      kcal = computeTargets({ ...profile, ...patch }).kcal;
+      // 신체 정보가 바뀌었을 때만 목표량 안내 — 닉네임만 바꿨으면 "저장했어요"
+      kcal = ok && bodyChanged ? computeTargets({ ...profile, ...body }).kcal : undefined;
     } catch {
       kcal = undefined;
     }
@@ -62,11 +69,21 @@ export default function BodyEdit() {
   };
 
   return (
-    <Screen scroll header={<StackHeader title="신체 정보" />} footer={<Button title="저장" disabled={!canSave} loading={saving} onPress={save} />}>
+    <Screen scroll header={<StackHeader title="내 정보" />} footer={<Button title="저장" disabled={!canSave} loading={saving} onPress={save} />}>
       <Text variant="caption" color="ink3" style={styles.sub}>
-        바꾸면 오늘 목표량을 바로 다시 계산해요.
+        신체 정보를 바꾸면 오늘 목표량을 바로 다시 계산해요.
       </Text>
       <View style={styles.cards}>
+        <Input
+          kind="text"
+          label="닉네임"
+          icon="person-outline"
+          value={nickname}
+          onChangeText={setNickname}
+          placeholder="예: 지은"
+          maxLength={NAME_MAX}
+          error={okName ? undefined : `닉네임을 1~${NAME_MAX}자로 적어주세요.`}
+        />
         <View>
           <Text variant="captionMedium" color="ink2" style={styles.label}>
             성별
