@@ -1,18 +1,47 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BellIcon, Card, ChevronRightIcon, EmptyState, IconButton, ListRow, Text, showToast } from '@/components';
+import { Card, ChevronRightIcon, EmptyState, IconButton, ListRow, Text } from '@/components';
 import { GOAL_DESCRIPTION, GOAL_LABEL, bmiInfo } from '@/data/labels';
 import { DIET_TYPES } from '@/domain/diet';
+import { toDateKey } from '@/domain/summary';
+import { useDay } from '@/state/day';
 import { useProfile } from '@/state/profile';
+import { useSession } from '@/state/session';
 import { colors, fonts, radius, size, spacing } from '@/theme';
 
-/** F1 마이 홈 — 프로필 · 요약 타일 3장(신체·목표·성향) · 설정 목록 · 프리미엄 미리보기 */
+/** 이번 주(월요일~오늘) 기록한 날 수 — 기록이 바뀌거나 화면에 돌아올 때 다시 센다 */
+function useDaysLoggedThisWeek(): number {
+  const [days, setDays] = useState(0);
+  const logCount = useDay((s) => s.logs.length);
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      const now = new Date();
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+      void useDay
+        .getState()
+        .datesWithLogs(toDateKey(monday), toDateKey(now))
+        .then((d) => {
+          if (alive) setDays(d.length);
+        });
+      return () => {
+        alive = false;
+      };
+    }, [logCount]),
+  );
+  return days;
+}
+
+/** F1 마이 홈 — 프로필(게스트면 로그인 한 줄) · 요약 타일 3장(신체·목표·성향) · 설정 목록 · 프리미엄 미리보기 */
 export default function My() {
   const profile = useProfile((s) => s.profile);
+  const guest = useSession((s) => !s.session);
+  const cloudAvailable = useSession((s) => s.mode === 'supabase');
+  const daysLogged = useDaysLoggedThisWeek();
 
   if (!profile) {
     return (
@@ -35,7 +64,6 @@ export default function My() {
           <Text variant="h1" accessibilityRole="header" style={styles.headerTitle}>
             마이
           </Text>
-          <IconButton icon={<BellIcon color={colors.ink2} />} label="알림" onPress={() => showToast('알림은 곧 열려요', 'info')} />
           <IconButton name="settings-outline" label="설정" color={colors.ink2} onPress={() => router.push('/my/settings')} />
         </View>
 
@@ -57,6 +85,20 @@ export default function My() {
           <ChevronRightIcon size={16} color={colors.ink3} />
         </Pressable>
 
+        {guest && cloudAvailable ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/login')}
+            style={({ pressed }) => [styles.loginCta, pressed && { opacity: 0.8 }]}
+          >
+            <Ionicons name="cloud-upload-outline" size={18} color={colors.primaryText} />
+            <Text variant="captionMedium" color="primaryText" style={styles.loginCtaText}>
+              로그인하고 기록 지키기
+            </Text>
+            <ChevronRightIcon size={14} color={colors.primaryText} />
+          </Pressable>
+        ) : null}
+
         <View style={styles.tiles}>
           <InfoTile title="신체 정보" onPress={() => router.push('/my/body')} pill={bmiLabel}>
             <KV k="키" v={`${profile.heightCm}cm`} />
@@ -64,7 +106,7 @@ export default function My() {
             <KV k="BMI" v={bmi.toFixed(1)} />
           </InfoTile>
 
-          <InfoTile title="목표" onPress={() => router.push('/my/goal')} pill={weightGoal ? '잘 하고 있어요' : '꾸준히 함께해요'}>
+          <InfoTile title="목표" onPress={() => router.push('/my/goal')} pill={daysLogged > 0 ? `이번 주 ${daysLogged}일 기록했어요` : undefined}>
             <Text variant="small" color="ink3">
               {weightGoal ? '목표 체중' : '주 목적'}
             </Text>
@@ -135,7 +177,8 @@ function KV({ k, v }: { k: string; v: string }) {
   );
 }
 
-function InfoTile({ title, onPress, pill, children }: { title: string; onPress: () => void; pill: string; children: ReactNode }) {
+/** 요약 타일 — pill 은 실제 데이터로 말할 게 있을 때만 (고정 칭찬 문구 없음) */
+function InfoTile({ title, onPress, pill, children }: { title: string; onPress: () => void; pill?: string; children: ReactNode }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={({ pressed }) => [styles.tile, pressed && { opacity: 0.85 }]}>
       <View style={styles.tileHead}>
@@ -145,11 +188,13 @@ function InfoTile({ title, onPress, pill, children }: { title: string; onPress: 
         <ChevronRightIcon size={12} color={colors.ink3} />
       </View>
       <View style={styles.tileBody}>{children}</View>
-      <View style={styles.tilePill}>
-        <Text variant="small" color="primaryText" numberOfLines={1} style={styles.tilePillText}>
-          {pill}
-        </Text>
-      </View>
+      {pill ? (
+        <View style={styles.tilePill}>
+          <Text variant="small" color="primaryText" numberOfLines={2} align="center" style={styles.tilePillText}>
+            {pill}
+          </Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -163,6 +208,8 @@ const styles = StyleSheet.create({
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.line, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
   avatarText: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 28, color: colors.ink2 },
   profileText: { flex: 1, minWidth: 0 },
+  loginCta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, paddingHorizontal: spacing.md, minHeight: size.touch, borderRadius: radius.md, backgroundColor: colors.primaryTint },
+  loginCtaText: { flex: 1 },
   tiles: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
   tile: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: spacing.md },
   tileHead: { flexDirection: 'row', alignItems: 'center', gap: 2 },
@@ -172,7 +219,7 @@ const styles = StyleSheet.create({
   tileBig: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 24, color: colors.ink, marginTop: 2 },
   tileDiet: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 20, color: colors.ink },
   tileDesc: { marginTop: 6 },
-  tilePill: { marginTop: spacing.md, height: 26, borderRadius: radius.pill, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  tilePill: { marginTop: spacing.md, minHeight: 26, borderRadius: radius.md, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 4 },
   tilePillText: { fontFamily: fonts.semibold, fontSize: 11 },
   listCard: { marginTop: spacing.lg, paddingHorizontal: spacing.lg },
   listRow: {},

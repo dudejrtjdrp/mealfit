@@ -4,7 +4,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
-import { APP_NAME, BottomSheet, Button, Card, ListRow, Screen, StackHeader, Text, TrustBadge, showToast } from '@/components';
+import { APP_NAME, BottomSheet, Button, Card, ListRow, Screen, StackHeader, TRUST_EXPLAIN, Text, TrustBadge, showToast } from '@/components';
+import type { Trust } from '@/domain/types';
 import { getRepos } from '@/services/repo';
 import { getPermissionStatus, requestPermission, type PermissionStatus } from '@/services/location';
 import { useDay } from '@/state/day';
@@ -13,22 +14,32 @@ import { useSession } from '@/state/session';
 import { colors, spacing } from '@/theme';
 
 const PERM_LABEL: Record<PermissionStatus, string> = { granted: '허용됨', denied: '허용 안 됨', undetermined: '아직 묻지 않았어요' };
+const TRUST_ORDER: Trust[] = ['official', 'estimated', 'none', 'user'];
 
-/** F4 설정 — 위치 권한 · 신뢰등급 안내 · 데이터 저장 위치 · 로그아웃/탈퇴 */
+/** 계정 정리: 로그아웃 · 탈퇴 · (게스트) 이 기기 데이터 지우기 */
+type Kind = 'logout' | 'withdraw' | 'wipe';
+
+const TITLE: Record<Kind, string> = { logout: '로그아웃할까요?', withdraw: '탈퇴할까요?', wipe: '이 기기 데이터를 지울까요?' };
+const ACTION: Record<Kind, string> = { logout: '로그아웃', withdraw: '탈퇴', wipe: '지우기' };
+
+/** F4 설정 — 위치 권한 · 내 기록(어디에 저장되는지) · 영양 정보 출처 안내 · 로그아웃/탈퇴 (게스트는 로그인 · 이 기기 데이터 지우기) */
 export default function Settings() {
   const signOut = useProfile((s) => s.signOut);
   const [perm, setPerm] = useState<PermissionStatus>('undetermined');
   const [trustOpen, setTrustOpen] = useState(false);
-  const [confirm, setConfirm] = useState<'logout' | 'withdraw' | null>(null);
-  const backend = getRepos().backend;
-  const cloud = backend === 'supabase';
+  const [confirm, setConfirm] = useState<Kind | null>(null);
+  const cloud = getRepos().backend === 'supabase';
+  const guest = useSession((s) => !s.session);
+  const cloudAvailable = useSession((s) => s.mode === 'supabase');
   const email = useSession((s) => s.session?.email);
-  const confirmText = (kind: 'logout' | 'withdraw' | null) =>
-    cloud
-      ? kind === 'withdraw'
-        ? 'Supabase 에 저장된 프로필과 식사 기록이 지워져요.'
-        : '기록은 Supabase 에 남아 있어요. 다시 로그인하면 이어서 쓸 수 있어요.'
-      : '이 기기에 저장된 프로필과 세션이 지워져요.';
+  const confirmText = (kind: Kind | null) =>
+    kind === 'wipe'
+      ? '이 기기에 저장된 프로필과 식사 기록이 지워져요. 처음부터 다시 시작해요.'
+      : cloud
+        ? kind === 'withdraw'
+          ? '계정에 저장된 프로필과 식사 기록이 지워져요.'
+          : '기록은 계정에 남아 있어요. 다시 로그인하면 이어서 쓸 수 있어요.'
+        : '이 기기에 저장된 프로필과 세션이 지워져요.';
 
   useFocusEffect(
     useCallback(() => {
@@ -42,21 +53,24 @@ export default function Settings() {
     setPerm(await requestPermission());
   };
 
-  const doSignOut = async (kind: 'logout' | 'withdraw' | null = confirm) => {
+  const doSignOut = async (kind: Kind | null = confirm) => {
     setConfirm(null);
-    await signOut(kind ?? 'logout');
-    showToast(kind === 'withdraw' ? (cloud ? '탈퇴했어요 · 저장된 정보를 지웠어요' : '탈퇴했어요 · 이 기기의 정보를 지웠어요') : '로그아웃했어요', 'info');
+    const k = kind ?? 'logout';
+    // 게스트의 "이 기기 데이터 지우기"는 로컬 저장소 탈퇴와 같다 (프로필·기록 삭제)
+    await signOut(k === 'logout' ? 'logout' : 'withdraw');
+    showToast(k === 'wipe' ? '이 기기의 데이터를 지웠어요' : k === 'withdraw' ? (cloud ? '탈퇴했어요 · 저장된 정보를 지웠어요' : '탈퇴했어요 · 이 기기의 정보를 지웠어요') : '로그아웃했어요', 'info');
     void useDay.getState().load();
-    router.replace('/login');
+    // 진입 게이트가 다시 정한다: 이 기기에 프로필이 없으면 온보딩(첫 화면에서 로그인 가능)
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/');
   };
 
   // 네이티브는 시스템 다이얼로그, 웹은 시트
-  const ask = (kind: 'logout' | 'withdraw') => {
+  const ask = (kind: Kind) => {
     if (Platform.OS === 'web') return setConfirm(kind);
-    const title = kind === 'withdraw' ? '탈퇴할까요?' : '로그아웃할까요?';
-    Alert.alert(title, confirmText(kind), [
+    Alert.alert(TITLE[kind], confirmText(kind), [
       { text: '취소', style: 'cancel' },
-      { text: kind === 'withdraw' ? '탈퇴' : '로그아웃', style: 'destructive', onPress: () => void doSignOut(kind) },
+      { text: ACTION[kind], style: 'destructive', onPress: () => void doSignOut(kind) },
     ]);
   };
 
@@ -72,17 +86,29 @@ export default function Settings() {
         />
         <View style={styles.sep} />
         <ListRow
-          title="데이터 저장 위치"
-          subtitle={cloud ? `Supabase${email ? ` · ${email}` : ''}` : '이 기기'}
+          title="내 기록"
+          subtitle={cloud ? `계정에 저장돼요${email ? ` · ${email}` : ''}` : '이 기기에만 저장돼요'}
           icon={<Ionicons name={cloud ? 'cloud-outline' : 'phone-portrait-outline'} size={20} color={colors.ink2} />}
           chevron={false}
           style={styles.row}
         />
+        {guest ? (
+          <>
+            <View style={styles.sep} />
+            <ListRow
+              title="로그인하기"
+              subtitle={cloudAvailable ? '계정에 저장하면 휴대폰을 바꿔도 이어서 볼 수 있어요.' : '로그인하면 이름으로 불러드릴게요.'}
+              icon={<Ionicons name="log-in-outline" size={20} color={colors.ink2} />}
+              onPress={() => router.push('/login')}
+              style={styles.row}
+            />
+          </>
+        ) : null}
       </Card>
 
       <Card style={styles.card}>
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: trustOpen }} onPress={() => setTrustOpen((v) => !v)} style={styles.foldHead}>
-          <Text variant="h3">신뢰등급이란?</Text>
+          <Text variant="h3">영양 정보는 어디서 왔나요?</Text>
           <Ionicons name={trustOpen ? 'chevron-up' : 'chevron-down'} size={20} color={colors.ink3} />
         </Pressable>
         {trustOpen ? (
@@ -90,18 +116,11 @@ export default function Settings() {
             <Text variant="caption" color="ink2">
               메뉴마다 영양 정보를 어디서 가져왔는지 함께 보여드려요. 숫자를 지어내지 않아요.
             </Text>
-            {(
-              [
-                ['official', '브랜드가 공개한 영양표를 그대로 옮겼어요.'],
-                ['estimated', '공개 자료를 바탕으로 사이즈·옵션을 계산했어요.'],
-                ['none', '아직 확인된 정보가 없어요. 판정하지 않아요.'],
-                ['user', '직접 입력한 기록이에요.'],
-              ] as const
-            ).map(([t, d]) => (
+            {TRUST_ORDER.map((t) => (
               <View key={t} style={styles.trustRow}>
-                <TrustBadge trust={t} />
+                <TrustBadge trust={t} explain={false} />
                 <Text variant="caption" color="ink2" style={styles.trustText}>
-                  {d}
+                  {TRUST_EXPLAIN[t]}
                 </Text>
               </View>
             ))}
@@ -110,9 +129,15 @@ export default function Settings() {
       </Card>
 
       <Card padding={spacing.xs} style={styles.card}>
-        <ListRow title="로그아웃" icon={<Ionicons name="log-out-outline" size={20} color={colors.ink2} />} onPress={() => ask('logout')} style={styles.row} />
-        <View style={styles.sep} />
-        <ListRow title="탈퇴하기" subtitle={cloud ? '저장된 프로필과 기록을 지워요.' : '이 기기의 프로필과 세션을 지워요.'} icon={<Ionicons name="person-remove-outline" size={20} color={colors.ink2} />} onPress={() => ask('withdraw')} style={styles.row} />
+        {guest ? (
+          <ListRow title="이 기기 데이터 지우기" subtitle="이 기기에 저장된 프로필과 기록을 지워요." icon={<Ionicons name="trash-outline" size={20} color={colors.ink2} />} onPress={() => ask('wipe')} style={styles.row} />
+        ) : (
+          <>
+            <ListRow title="로그아웃" icon={<Ionicons name="log-out-outline" size={20} color={colors.ink2} />} onPress={() => ask('logout')} style={styles.row} />
+            <View style={styles.sep} />
+            <ListRow title="탈퇴하기" subtitle={cloud ? '계정에 저장된 프로필과 기록을 지워요.' : '이 기기의 프로필과 세션을 지워요.'} icon={<Ionicons name="person-remove-outline" size={20} color={colors.ink2} />} onPress={() => ask('withdraw')} style={styles.row} />
+          </>
+        )}
       </Card>
 
       <Text variant="caption" color="ink3" align="center" style={styles.version}>
@@ -122,12 +147,12 @@ export default function Settings() {
       <BottomSheet
         visible={confirm !== null}
         onClose={() => setConfirm(null)}
-        title={confirm === 'withdraw' ? '탈퇴할까요?' : '로그아웃할까요?'}
+        title={confirm ? TITLE[confirm] : undefined}
         subtitle={confirmText(confirm)}
         footer={
           <View style={styles.sheetBtns}>
             <Button title="취소" variant="ghost" onPress={() => setConfirm(null)} style={styles.flex} />
-            <Button title={confirm === 'withdraw' ? '탈퇴' : '로그아웃'} onPress={() => void doSignOut()} style={styles.flex} />
+            <Button title={confirm ? ACTION[confirm] : ''} onPress={() => void doSignOut()} style={styles.flex} />
           </View>
         }
       >
