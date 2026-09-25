@@ -235,9 +235,13 @@ export const SAY = {
   location: '주변 매장 메뉴를 먼저 판정하려면 위치가 필요해요. 지금 허용할까요?',
   locationYes: '허용할게요',
   locationLater: '나중에 할게요',
-  locationGranted: '허용했어요. 주변 탭에서 가까운 매장부터 보여드릴게요.',
+  locationGranted: '허용했어요. 근처 매장 메뉴를 살펴볼게요.',
   locationDenied: '괜찮아요. 주변 탭에서 언제든 다시 허용할 수 있어요.',
   locationLaterReply: '좋아요, 나중에 주변 탭에서 허용할 수 있어요.',
+  /** 첫 판정 체험 — 근처 1위 / 예시 메뉴 */
+  firstPick: (good: boolean) => (good ? '지금 근처에서는 이 메뉴가 **좋아요**.' : '지금 근처에서는 이 메뉴가 **괜찮아요**.'),
+  firstPickExample: (good: boolean) => (good ? '예를 들면 이런 메뉴가 지금 **좋아요**.' : '예를 들면 이런 메뉴가 지금 **괜찮아요**.'),
+  firstPickTail: '먹기 전에 이렇게 알려드릴게요.',
   notMatched: '앗, 제가 잘 못 알아들었어요. 위 선택지에서 골라주시면 정확해요.',
 } as const;
 
