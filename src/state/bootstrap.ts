@@ -25,23 +25,30 @@ export async function bootstrapApp(): Promise<void> {
  * 로그인 직후: 저장소가 바뀌었으니(로컬 → 계정) 프로필·오늘 기록을 다시 읽어 화면을 서버 데이터로 바꾼다.
  * 서버에 프로필이 있으면 그게 우선(재방문). 없는데 옮기기가 실패했다면 이 기기의 프로필을 이어 써서
  * 방금 끝낸 온보딩을 잃지 않는다 (기록은 다음 로그인 때 다시 옮긴다).
+ * 서버 프로필을 끝내 못 읽었으면(loaded=false) 아무것도 서버에 쓰지 않는다 — 게스트 프로필을 올리거나 닉네임을 채우면
+ * 기존 계정의 프로필을 게스트 값으로 덮을 수 있다. 호출 쪽은 온보딩 대신 진입 게이트(다시 시도)로 보낸다.
  */
-export async function reloadAfterLogin(): Promise<Profile | null> {
+export async function reloadAfterLogin(): Promise<{ profile: Profile | null; loaded: boolean }> {
   let profile = await useProfile.getState().load();
+  const loaded = useProfile.getState().status === 'ready';
+  if (!loaded) {
+    await useDay.getState().load();
+    return { profile: null, loaded: false };
+  }
   if (!profile?.onboardingDone && getRepos().backend === 'supabase') {
     const local = await createLocalRepos()
       .profile.get()
       .catch(() => null);
     if (local?.onboardingDone) profile = await useProfile.getState().adoptProfile(local);
   }
-  // 온보딩에서 이름을 건너뛰었으면('회원') 계정 이름으로 채운다 — 직접 정한 이름은 덮지 않는다
+  // 온보딩에서 이름을 건너뛰었으면('회원') 계정 이름으로 채운다 — 직접 정한 이름은 덮지 않는다 (서버 프로필을 읽었을 때만)
   const fill = profile ? nicknameToFill(profile.nickname, useSession.getState().session?.nickname) : undefined;
   if (fill) {
     await useProfile.getState().updateProfile({ nickname: fill });
     profile = useProfile.getState().profile;
   }
   await useDay.getState().load();
-  return profile;
+  return { profile, loaded: true };
 }
 
 export function useBootstrap() {

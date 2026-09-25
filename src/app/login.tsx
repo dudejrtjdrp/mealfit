@@ -38,10 +38,16 @@ function goToday() {
 
 /**
  * 로그인 뒤: 계정 저장소 기준으로 프로필·오늘 기록을 다시 읽는다(로컬 데이터는 로그인 때 이미 옮겨졌다).
- * 프로필이 있으면(재방문·방금 온보딩) 오늘 탭, 없으면 온보딩을 이어간다.
+ * 프로필이 있으면(재방문·방금 온보딩) 오늘 탭, 없으면 온보딩을 이어간다. 계정 프로필을 못 읽었으면 진입 게이트로.
  */
 async function routeAfterLogin(from: From) {
-  const profile = await reloadAfterLogin();
+  const { profile, loaded } = await reloadAfterLogin();
+  if (!loaded) {
+    // 계정 정보를 못 읽었다 — 온보딩으로 보내면 새로 만든 프로필이 계정 것을 덮을 수 있어 진입 게이트(다시 시도)로
+    useOnboarding.getState().reset();
+    if (router.canDismiss()) router.dismissAll();
+    return router.replace('/');
+  }
   if (profile?.onboardingDone) return goToday();
   if (from === 'returning' && router.canGoBack()) return router.back();
   router.replace('/(onboarding)/step1');

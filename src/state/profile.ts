@@ -35,10 +35,27 @@ function makeId() {
   return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** 지금 저장소의 주인 — 'local'(이 기기) 또는 'user:<id>'(계정). 메모리 프로필이 어느 저장소 것인지 가린다 */
+function storageOwner(): string {
+  const repos = getRepos();
+  return repos.backend === 'supabase' ? `user:${getAuthUserId() ?? ''}` : 'local';
+}
+
+/** 읽기 실패 시 한 번 더 시도하기 전 대기 */
+export const PROFILE_LOAD_RETRY_MS = 800;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 interface ProfileState {
   profile: Profile | null;
   targets: DailyTargets | null;
-  status: 'loading' | 'ready';
+  /**
+   * error: 저장소가 바뀐 뒤(로그인·오프라인 로그인) 새 저장소의 프로필을 읽지 못했다 — 이전 저장소 프로필은 비우고
+   * 쓰기를 막는다. 진입 게이트가 온보딩 대신 '다시 시도'를 보여준다(온보딩을 새로 하면 계정 프로필을 덮는다).
+   */
+  status: 'loading' | 'ready' | 'error';
+  /** 메모리의 profile 이 속한 저장소 (storageOwner). 다른 저장소로 쓰지 않게 비교한다 */
+  owner: string | null;
+  /** 한 번 재시도. 같은 저장소면 실패해도 메모리 프로필을 유지, 저장소가 바뀌었으면 비우고 status 'error' */
   load: () => Promise<Profile | null>;
   /** 드래프트 → Profile 조립 → 저장. 저장 실패해도 메모리에는 반영하고 false 반환 */
   completeOnboarding: (draft: OnboardingDraft, nickname?: string) => Promise<{ profile: Profile; saved: boolean }>;
@@ -57,17 +74,33 @@ export const useProfile = create<ProfileState>((set, get) => ({
   profile: null,
   targets: null,
   status: 'loading',
+  owner: null,
 
   load: async () => {
-    try {
-      const profile = await getRepos().profile.get();
-      set({ profile, targets: safeTargets(profile), status: 'ready' });
-      return profile;
-    } catch (e) {
-      console.warn('[profile] load 실패', e);
+    const owner = storageOwner();
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const profile = await getRepos().profile.get();
+        if (storageOwner() !== owner) return get().profile; // 그 사이 로그인·로그아웃 — 뒤에 부른 load 가 정한다
+        set({ profile, targets: safeTargets(profile), status: 'ready', owner });
+        return profile;
+      } catch (e) {
+        if (attempt >= 1) {
+          console.warn('[profile] load 실패', e);
+          break;
+        }
+        await sleep(PROFILE_LOAD_RETRY_MS);
+      }
+    }
+    if (storageOwner() !== owner) return get().profile;
+    if (get().owner === owner) {
+      // 같은 저장소의 일시적 실패 — 지금 보이는 프로필을 그대로 둔다
       set({ status: 'ready' });
       return get().profile;
     }
+    // 저장소가 바뀌었는데 새 저장소를 못 읽었다: 이전(게스트) 프로필을 계정 것처럼 보여주거나 서버에 쓰지 않게 비운다
+    set({ profile: null, targets: null, status: 'error', owner });
+    return null;
   },
 
   completeOnboarding: async (draft, nickname) => {
@@ -93,7 +126,7 @@ export const useProfile = create<ProfileState>((set, get) => ({
       createdAt: prev?.createdAt ?? now,
       updatedAt: now,
     };
-    set({ profile, targets: safeTargets(profile), status: 'ready' });
+    set({ profile, targets: safeTargets(profile), status: 'ready', owner: storageOwner() });
     try {
       const repos = getRepos();
       // 게스트로 새로 시작: 예전에 서버로 옮긴 백업·플래그를 비워야 이 데이터가 다음 로그인 때 옮겨진다
@@ -109,6 +142,8 @@ export const useProfile = create<ProfileState>((set, get) => ({
   updateProfile: async (partial) => {
     const cur = get().profile;
     if (!cur) return false;
+    // 다른 저장소에서 온 프로필(로그인 직후 아직 다시 읽기 전 등)은 지금 저장소에 쓰지 않는다 — 계정 프로필을 덮지 않게
+    if (get().owner !== storageOwner()) return false;
     const profile: Profile = { ...cur, ...partial, id: cur.id, updatedAt: new Date().toISOString() };
     set({ profile, targets: safeTargets(profile) });
     try {
@@ -122,7 +157,7 @@ export const useProfile = create<ProfileState>((set, get) => ({
 
   adoptProfile: async (p) => {
     const profile: Profile = { ...p, id: getAuthUserId() ?? p.id };
-    set({ profile, targets: safeTargets(profile), status: 'ready' });
+    set({ profile, targets: safeTargets(profile), status: 'ready', owner: storageOwner() });
     try {
       await getRepos().profile.save(profile);
     } catch (e) {
@@ -144,6 +179,7 @@ export const useProfile = create<ProfileState>((set, get) => ({
     }
     set({ profile: null, targets: null });
     await useSession.getState().signOut();
+    set({ owner: storageOwner() });
   },
 }));
 
