@@ -212,7 +212,7 @@ export interface MealLog {
   /** 옵션·수량 반영 후 최종 영양 */
   nutrients: Nutrients;
   trust: Trust;
-  qty: number; // 0.5 ~ 2, 0.25 단위 (domain/qty QTY_OPTIONS)
+  qty: number; // 0.5 ~ 2, 0.25 단위 · 조각 메뉴는 1 ~ 6 (domain/qty qtyOptionsFor)
   verdict?: Verdict;
   createdAt: string;
 }

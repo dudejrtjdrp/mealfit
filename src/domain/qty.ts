@@ -3,6 +3,14 @@ import type { MenuItem, Nutrients } from './types';
 /** 기록 수량 단계 — 효님 지정 (2026-09-25). 라면 반 개·한 개 반처럼 실제로 먹는 양을 고른다 */
 export const QTY_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 
+/** 조각 단위(피자·홀케이크 1조각 기준) 수량 — 효님 지정 (2026-09-25). 반 조각은 드물어 1~6 정수 */
+export const SLICE_QTY_OPTIONS = [1, 2, 3, 4, 5, 6] as const;
+
+/** 단위별 수량 선택지: 조각 → 1~6조각, 그 밖(개·잔·인분…) → 0.5~2 의 7단계 */
+export function qtyOptionsFor(unit?: string): readonly number[] {
+  return unit === '조각' ? SLICE_QTY_OPTIONS : QTY_OPTIONS;
+}
+
 /** 1개 기준 영양 × 수량. 소수 첫째 자리까지 (kcal·mg 도 같은 규칙 — 기존 기록 편집과 동일) */
 export function scaleNutrients(n: Nutrients, factor: number): Nutrients {
   if (factor === 1) return n;
@@ -29,16 +37,16 @@ export function menuQtyUnit(menu: Pick<MenuItem, 'serving'> | undefined): string
 }
 
 /**
- * 수량 스테퍼 한 칸 이동: QTY_OPTIONS 안에서 앞/뒤 단계로. 끝이면 그대로.
- * 목록에 없는 값(예전 기록 3개 등)은 가장 가까운 단계 쪽으로 한 칸 움직인다.
+ * 수량 스테퍼 한 칸 이동: 단위별 선택지(qtyOptionsFor) 안에서 앞/뒤 단계로. 끝이면 그대로.
+ * 목록에 없는 값(예전 기록 3개, 조각 메뉴의 0.75 등)은 그 방향의 가장 가까운 단계로 한 칸 움직인다.
  */
-export function stepQty(q: number, dir: 1 | -1): number {
-  const opts = QTY_OPTIONS as readonly number[];
+export function stepQty(q: number, dir: 1 | -1, unit?: string): number {
+  const opts = qtyOptionsFor(unit);
   if (dir > 0) return opts.find((o) => o > q) ?? q;
   for (let i = opts.length - 1; i >= 0; i--) if (opts[i] < q) return opts[i];
   return q;
 }
 
-export function canStepQty(q: number, dir: 1 | -1): boolean {
-  return stepQty(q, dir) !== q;
+export function canStepQty(q: number, dir: 1 | -1, unit?: string): boolean {
+  return stepQty(q, dir, unit) !== q;
 }

@@ -15,7 +15,7 @@ export interface QtyStepperProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** 수량 스테퍼 [− 1개 +] — 0.5~2 의 7단계(QTY_OPTIONS) 사이를 한 칸씩. 끝에 닿으면 그쪽 버튼이 꺼진다 */
+/** 수량 스테퍼 [− 1개 +] — 단위별 선택지(qtyOptionsFor: 조각은 1~6, 그 밖은 0.5~2 의 7단계) 사이를 한 칸씩. 끝에 닿으면 그쪽 버튼이 꺼진다 */
 export function QtyStepper({ value, onChange, unit = '인분', size = 'md', style }: QtyStepperProps) {
   const h = size === 'lg' ? 52 : sizes.touch;
   const label = qtyLabel(value, unit);
@@ -24,20 +24,20 @@ export function QtyStepper({ value, onChange, unit = '인분', size = 'md', styl
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(e) => {
         const dir = e.nativeEvent.actionName === 'increment' ? 1 : -1;
-        if (canStepQty(value, dir)) onChange(stepQty(value, dir));
+        if (canStepQty(value, dir, unit)) onChange(stepQty(value, dir, unit));
       }}
     >
-      <StepButton dir={-1} value={value} onChange={onChange} h={h} />
+      <StepButton dir={-1} value={value} unit={unit} onChange={onChange} h={h} />
       <Text style={[styles.value, size === 'lg' && styles.valueLg]} numberOfLines={1}>
         {label}
       </Text>
-      <StepButton dir={1} value={value} onChange={onChange} h={h} />
+      <StepButton dir={1} value={value} unit={unit} onChange={onChange} h={h} />
     </View>
   );
 }
 
-function StepButton({ dir, value, onChange, h }: { dir: 1 | -1; value: number; onChange: (q: number) => void; h: number }) {
-  const on = canStepQty(value, dir);
+function StepButton({ dir, value, unit, onChange, h }: { dir: 1 | -1; value: number; unit: string; onChange: (q: number) => void; h: number }) {
+  const on = canStepQty(value, dir, unit);
   return (
     <Pressable
       accessibilityRole="button"
@@ -45,7 +45,7 @@ function StepButton({ dir, value, onChange, h }: { dir: 1 | -1; value: number; o
       accessibilityState={{ disabled: !on }}
       disabled={!on}
       hitSlop={4}
-      onPress={() => onChange(stepQty(value, dir))}
+      onPress={() => onChange(stepQty(value, dir, unit))}
       style={({ pressed }) => [styles.btn, { width: h, height: h }, pressed && styles.pressed]}
     >
       <Ionicons name={dir > 0 ? 'add' : 'remove'} size={22} color={on ? colors.ink : colors.disabledInk} />
