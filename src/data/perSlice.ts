@@ -33,6 +33,7 @@ export const PIZZA_SLICES: Record<string, { sizes: Partial<Record<PizzaSize, num
   papa_johns: {
     sizes: { R: 6, L: 8, F: 8, P: 10 },
     // 파파존스 공식 Threads(@papajohnskr): "레귤러 6 라지 8 패밀리 8 파티 10" — 데이터의 (P)는 파티(가장 큰 사이즈)
+    // 2026-09-25 공식 주문 페이지(https://pji.co.kr/menu/pizza/3241, L·F 판매 메뉴)에서 컷팅 옵션 "기본(8조각)" 확인 — L·F 8 교차 확인. R 6·P 10 은 Threads 만
     source: 'https://www.threads.com/@papajohnskr/post/DZkPdcdiVEH',
   },
 };
