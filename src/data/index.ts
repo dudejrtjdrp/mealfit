@@ -1,6 +1,7 @@
 import type { Brand, MenuItem, Store } from '../domain/types';
 import brandsJson from './brands.json';
 import { mergeSeedOptionsIntoOfficial } from './dedupe';
+import { applyPerSlice } from './perSlice';
 import { DATASETS, PACKAGED_BRAND_ID, mergeBrands, mergeMenus } from './ingest/nutrition';
 import { getMockStores as buildMockStores } from './mockStores';
 
@@ -30,6 +31,8 @@ interface Catalog {
   seedPolicy: ReturnType<typeof mergeMenus>['seedPolicy'];
   /** 공식 사이즈판과 겹쳐 목록에서 뺀(옵션은 공식판으로 옮긴) 시드 옵션판 수, 브랜드별 */
   mergedSeedsByBrand: Record<string, number>;
+  /** 1조각 기준으로 바꾼 피자·조각 메뉴로 대신한 홀케이크 수 (브랜드별) */
+  perSlice: { slicedByBrand: Record<string, number>; cakesByBrand: Record<string, number> };
 }
 
 /**
@@ -49,7 +52,9 @@ function buildCatalog(): Catalog {
   const merged = mergeMenus(menusJson, mfds.menus);
   // 같은 음료가 시드 옵션판 + 공식 사이즈판으로 두 번 보이지 않게: 공식판을 남기고 시드의 사이즈 외 옵션(시럽·우유 등)을 옮긴다
   const deduped = mergeSeedOptionsIntoOfficial(merged.menus);
-  const menus = deduped.menus;
+  // 피자 한 판·홀케이크처럼 나눠 먹는 단위가 1인분으로 잡힌 메뉴는 1조각 기준으로 (perSlice.ts — 공식 조각값 또는 공개 조각 수로 나눈 값만)
+  const sliced = applyPerSlice(deduped.menus);
+  const menus = sliced.menus;
   const brands = [...mergeBrands(brandsJson as Brand[], mfds.brands, menus), PACKAGED_BRAND];
 
   const menusByBrand = new Map<string, MenuItem[]>();
@@ -63,7 +68,7 @@ function buildCatalog(): Catalog {
     menus,
     brandById: new Map(brands.map((b) => [b.id, b])),
     // 목록에서 뺀 시드 메뉴도 id 로는 찾을 수 있게 둔다 — 예전 기록(menuId)·딥링크가 "정보 없음"으로 바뀌지 않게
-    menuById: new Map([...merged.hidden, ...deduped.hidden, ...menus].map((m) => [m.id, m])),
+    menuById: new Map([...merged.hidden, ...deduped.hidden, ...sliced.hidden, ...menus].map((m) => [m.id, m])),
     menusByBrand,
     // 긴 키워드부터 비교해 "CU" 같은 짧은 키워드가 먼저 잡히지 않게 한다
     keywordIndex: brands
@@ -72,6 +77,7 @@ function buildCatalog(): Catalog {
       .sort((a, b) => b.key.length - a.key.length),
     seedPolicy: merged.seedPolicy,
     mergedSeedsByBrand: deduped.mergedByBrand,
+    perSlice: { slicedByBrand: sliced.slicedByBrand, cakesByBrand: sliced.cakesByBrand },
   };
 }
 
@@ -168,6 +174,10 @@ export function getProductCount(): number {
 /** 시드 정리 정책 결과 (목록에서 뺀/남긴 시드 메뉴 수) — 검증·디버그용 */
 export function getSeedPolicy() {
   return data().seedPolicy;
+}
+/** 1조각 기준으로 바꾼 피자 수·조각 메뉴로 대신한 홀케이크 수 (브랜드별) — 검증·디버그용 */
+export function getPerSliceCounts() {
+  return data().perSlice;
 }
 /** 공식 사이즈판과 합쳐 목록에서 뺀 시드 옵션판 수 (브랜드별) — 검증·디버그용 */
 export function getMergedSeedCounts(): Record<string, number> {

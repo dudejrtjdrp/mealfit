@@ -1,6 +1,8 @@
 import { haversineM } from '../../domain/geo';
 import { judgeMenu, nonMealKind, rankMenus } from '../../domain/judge';
 import { drinkKey, mergeSeedOptionsIntoOfficial } from '../dedupe';
+import { applyPerSlice, cakeKey, PIZZA_SLICES, pizzaSize, SLICE_ID_SUFFIX, toSlice } from '../perSlice';
+import { menuQtyUnit } from '../../domain/qty';
 import {
   getBrand,
   getBrands,
@@ -8,6 +10,7 @@ import {
   getMenus,
   getMenusByBrand,
   getMergedSeedCounts,
+  getPerSliceCounts,
   getMockStores,
   getSeedPolicy,
   matchBrand,
@@ -74,9 +77,10 @@ describe('공공데이터 번들 (src/data/generated/mfds.json)', () => {
     expect(bytes).toBeLessThanOrEqual(5 * 1024 * 1024);
   });
 
-  it('공공데이터 메뉴는 official · 데이터셋 출처 · 이름 있음', () => {
+  it('공공데이터 메뉴는 official · 데이터셋 출처 · 이름 있음 (1조각으로 나눈 피자만 estimated)', () => {
     for (const m of getMenus().filter((x) => x.sourceName?.startsWith('식약처'))) {
-      expect(m.trust).toBe('official');
+      if (m.id.endsWith(SLICE_ID_SUFFIX)) expect(m).toMatchObject({ trust: 'estimated', servingNote: expect.stringMatching(/^한 판\(\d+조각\) 영양을 나눈 1조각 기준이에요$/) });
+      else expect(m.trust).toBe('official');
       expect(m.sourceUrl).toMatch(/^https:\/\/www\.data\.go\.kr\/data\/151000(70|66)\/standard\.do$/);
       expect(m.name.length).toBeGreaterThan(0);
     }
@@ -327,5 +331,102 @@ describe('getMockStores', () => {
       expect(Math.abs(haversineM(CENTER, s) - s.distanceM)).toBeLessThan(1);
       expect(matchBrand(s.name)?.id).toBe(s.brandId);
     }
+  });
+});
+
+describe('피자 한 판·홀케이크 → 1조각 기준 (perSlice)', () => {
+  const profile = { primaryGoal: 'maintain' as const, secondaryGoals: [], diet: { type: 'balanced' as const, evidence: [], source: 'rule' as const } };
+
+  it('공개 조각 수가 있는 브랜드(도미노·피자헛·파파존스)의 한 판 피자는 목록에 1조각으로만 있다', () => {
+    const counts = getPerSliceCounts().slicedByBrand;
+    for (const b of Object.keys(PIZZA_SLICES)) {
+      expect(counts[b]).toBeGreaterThan(20);
+      for (const m of getMenusByBrand(b)) {
+        const size = pizzaSize(m.name);
+        const n = size ? PIZZA_SLICES[b].sizes[size] : undefined;
+        // 조각 수를 아는 사이즈인데 1인분(한 판) 그대로 남은 메뉴가 없다
+        if (n && m.trust === 'official') expect(m.serving.startsWith('1인분 (')).toBe(false);
+        if (m.id.endsWith(SLICE_ID_SUFFIX)) {
+          expect(m.serving).toMatch(/^1조각 \(약 \d+ g\)$/);
+          expect(menuQtyUnit(m)).toBe('조각');
+          expect(m.servingNote).toBe(`한 판(${n}조각) 영양을 나눈 1조각 기준이에요`);
+        }
+      }
+    }
+  });
+
+  it('도미노 리얼불고기 L: 한 판 값을 8로 나누고, 원래 한 판 메뉴는 id 로 그대로 찾힌다 (예전 기록)', () => {
+    const slice = getMenusByBrand('dominos').find((m) => m.id.endsWith(SLICE_ID_SUFFIX) && /\(L\)$/.test(m.name));
+    expect(slice).toBeDefined();
+    const whole = getMenu(slice!.id.slice(0, -SLICE_ID_SUFFIX.length));
+    expect(whole?.trust).toBe('official');
+    expect(whole?.serving.startsWith('1인분 (')).toBe(true);
+    expect(menuQtyUnit(whole)).toBe('인분');
+    expect(slice!.nutrients!.kcal).toBe(Math.round(whole!.nutrients!.kcal / 8));
+    expect(getMenusByBrand('dominos').some((m) => m.id === whole!.id)).toBe(false);
+  });
+
+  it('공식 "(조각)" 메뉴가 있는 홀케이크는 목록에서 빠지고 조각 메뉴가 남는다 (공식값 그대로)', () => {
+    const counts = getPerSliceCounts().cakesByBrand;
+    expect(counts.pascucci).toBeGreaterThanOrEqual(5);
+    const pc = getMenusByBrand('pascucci');
+    expect(pc.some((m) => m.name === '레드벨벳 케이크 (홀)')).toBe(false);
+    expect(pc.find((m) => m.name === '레드벨벳 케이크 (조각)')?.trust).toBe('official');
+    const sb = getMenusByBrand('starbucks');
+    expect(sb.some((m) => m.name === '블루베리 쿠키 치즈 케이크')).toBe(false);
+    expect(sb.some((m) => m.name === '블루베리 쿠키 치즈 케이크 (조각)')).toBe(true);
+    // 조각 메뉴가 없는 홀케이크는 바꾸지 않는다
+    expect(pc.some((m) => m.name === '초코 글레이즈 케이크 (홀)')).toBe(true);
+  });
+
+  it.each([
+    ['12시', new Date(2026, 8, 15, 12)],
+    ['19시', new Date(2026, 8, 15, 19)],
+  ])('도미노 매장 순위(%s)에 좋음·괜찮음 1조각 피자가 올라온다', (_l, now) => {
+    const remaining = { kcal: 1500, carbs: 200, protein: 70, fat: 50, sugar: 40, sodium: 1600, emphasis: ['carbs', 'protein', 'fat'] as ('carbs' | 'protein' | 'fat')[] };
+    const top = rankMenus(getMenusByBrand('dominos'), remaining, { profile, now }).slice(0, 5);
+    expect(top).toHaveLength(5);
+    for (const x of top) {
+      expect(x.judgement.verdict).not.toBe('pass');
+      expect(x.menu.id.endsWith(SLICE_ID_SUFFIX)).toBe(true);
+      expect(nonMealKind(x.menu)).toBeNull();
+    }
+  });
+});
+
+describe('perSlice 순수 함수', () => {
+  const base = { brandId: 'dominos', category: 'meal' as const, trust: 'official' as const, sourceUrl: 'https://example.com' };
+  it('pizzaSize: 끝의 (L)·(M)·" M"', () => {
+    expect(pizzaSize('리얼불고기 피자 (L)')).toBe('L');
+    expect(pizzaSize('씨푸드킹 피자 리치골드 M')).toBe('M');
+    expect(pizzaSize('가든스페셜 피자 (P)')).toBe('P');
+    expect(pizzaSize('맵퍼로니')).toBeNull();
+    expect(pizzaSize('치즈 (L) 스틱')).toBeNull();
+  });
+  it('toSlice: 영양·중량·옵션 델타를 조각 수로 나누고 새 id·estimated·한 줄 설명', () => {
+    const whole: MenuItem = {
+      ...base,
+      id: 'p1',
+      name: '치즈 (L)',
+      serving: '1인분 (849 g)',
+      nutrients: { kcal: 2284, carbs: 250, protein: 112.8, fat: 90, sodium: 3061 },
+      options: [{ id: 'crust', label: '엣지', choices: [{ label: '기본', delta: {}, isDefault: true }, { label: '치즈', delta: { kcal: 400, fat: 20 } }] }],
+    };
+    const s = toSlice(whole, 8);
+    expect(s).toMatchObject({ id: 'p1-slice', serving: '1조각 (약 106 g)', trust: 'estimated', nutrients: { kcal: 286, carbs: 31.3, protein: 14.1, fat: 11.3, sodium: 383 } });
+    expect(s.options?.[0].choices[1].delta).toEqual({ kcal: 50, fat: 2.5 });
+    expect(whole.id).toBe('p1'); // 입력은 그대로
+  });
+  it('applyPerSlice: 모르는 브랜드·사이즈·100 g 기준 표기는 바꾸지 않는다', () => {
+    const mk = (id: string, brandId: string, name: string, serving = '1인분 (900 g)'): MenuItem => ({ ...base, id, brandId, name, serving, nutrients: { kcal: 2000 } });
+    const input = [mk('a', 'pizza7', '스페셜 (L)'), mk('b', 'pizza_hut', '크래프티드 플래츠 (P)'), mk('c', 'papa_johns', '가든 (F)', '100 g 기준'), mk('d', 'pizza_hut', '수퍼슈프림 (M)')];
+    const r = applyPerSlice(input);
+    expect(r.menus.map((m) => m.id)).toEqual(['a', 'b', 'c', 'd-slice']);
+    expect(r.menus[3].servingNote).toBe('한 판(6조각) 영양을 나눈 1조각 기준이에요');
+    expect(r.hidden.map((m) => m.id)).toEqual(['d']);
+  });
+  it('cakeKey: 조각·홀·케이크·어순 공백 무시', () => {
+    expect(cakeKey('뉴욕치즈 케이크 케이크 (조각)')).toBe(cakeKey('뉴욕치즈 케이크'));
+    expect(cakeKey('레드벨벳 케이크 (홀)')).toBe(cakeKey('레드벨벳 케이크 (조각)'));
   });
 });
