@@ -29,8 +29,8 @@ import { getBrand, getMenu, getMenusByBrand } from '@/data';
 import { STORE_CATEGORY_LABEL, formatPrice } from '@/data/labels';
 import { applyOptions, judgeMenu, suggestAlternatives } from '@/domain/judge';
 import { menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
-import { formatNumber, toDateKey } from '@/domain/summary';
-import { MEAL_LABEL, VERDICT_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients, type OptionGroup } from '@/domain/types';
+import { afterEating, formatNumber, overToastSuffix, toDateKey } from '@/domain/summary';
+import { MEAL_LABEL, VERDICT_LABEL, type DailyTargets, type DaySummary, type MealLog, type MealType, type MenuItem, type Nutrients, type OptionGroup } from '@/domain/types';
 import { newId } from '@/services/id';
 import { getCachedRemoteProduct } from '@/services/products';
 import { useJudgeContext } from '@/state/judgeContext';
@@ -170,7 +170,8 @@ export default function MenuDetail() {
     setSaving(false);
     setSheet(false);
     const text = `${MEAL_LABEL[mealType]}으로 기록했어요`;
-    showToast(ok ? text : `${text} · 저장은 다음에 다시 시도할게요`, ok ? 'success' : 'info', {
+    // 이 기록으로 하루 목표를 넘은 상태면 넘은 양도 함께 ("… · 오늘 목표보다 120kcal 넘었어요")
+    showToast(ok ? text + overToastSuffix(useDay.getState().summary) : `${text} · 저장은 다음에 다시 시도할게요`, ok ? 'success' : 'info', {
       label: '되돌리기',
       onPress: () => void useDay.getState().removeLog(log.id),
     });
@@ -270,7 +271,7 @@ export default function MenuDetail() {
                   {servingLabel(menu, selected)}
                 </Text>
               </View>
-              {remaining && targets && nutrients ? <AfterBar menuKcal={nutrients.kcal} remaining={remaining.kcal} target={targets.kcal} /> : null}
+              {remaining && targets && nutrients ? <AfterBar menuKcal={nutrients.kcal} consumed={summary?.consumed.kcal ?? 0} target={targets.kcal} /> : null}
               {menu.servingNote ? (
                 <Text variant="small" color="ink3" style={styles.servingNote}>
                   {menu.servingNote}
@@ -291,7 +292,7 @@ export default function MenuDetail() {
               {detail && remaining && nutrients ? (
                 <View>
                   {rows.map((k) => (
-                    <CompareRow key={k} nutrient={k} nutrients={nutrients} remaining={remaining} />
+                    <CompareRow key={k} nutrient={k} nutrients={nutrients} remaining={remaining} over={summary?.over} />
                   ))}
                 </View>
               ) : null}
@@ -413,43 +414,76 @@ function servingLabel(menu: MenuItem, selected: Record<string, string>): string 
   return cur && cur !== def ? `${cur} 사이즈` : menu.serving;
 }
 
-/** "먹으면 358kcal 남아요" + 하루 막대(먹은 양 · 이 메뉴 · 남는 양) */
-function AfterBar({ menuKcal, remaining, target }: { menuKcal: number; remaining: number; target: number }) {
-  const eaten = Math.max(0, target - remaining);
-  const after = Math.round(remaining - menuKcal);
-  const total = Math.max(target, eaten + menuKcal, 1);
-  const eatenW = eaten / total;
+/**
+ * "먹으면 358kcal 남아요" + 하루 막대(먹은 양 · 이 메뉴 · 남는 양).
+ * 목표를 넘기면 "먹으면 목표보다 120kcal 넘어요"(빨강) + 막대의 목표 밖 부분 빨강,
+ * 이미 넘었으면 "이미 목표보다 N kcal 더 드셨어요 · 먹으면 +M kcal" (2026-09-25 효님 결정)
+ */
+function AfterBar({ menuKcal, consumed, target }: { menuKcal: number; consumed: number; target: number }) {
+  const a = afterEating(consumed, target, menuKcal);
+  const total = Math.max(target, consumed + menuKcal, 1);
+  const eatenIn = Math.min(consumed, target);
+  const eatenOver = Math.max(0, consumed - target);
+  const menuIn = Math.max(0, Math.min(menuKcal, target - consumed));
+  const menuOver = Math.max(0, menuKcal - menuIn);
   const menuW = menuKcal / total;
   const anim = useRef(new Animated.Value(menuW)).current;
   useEffect(() => {
     Animated.timing(anim, { toValue: menuW, duration: 260, useNativeDriver: false }).start();
   }, [menuW, anim]);
+  const isOver = a.kind !== 'left';
 
   return (
-    <View style={styles.after} accessibilityLabel={after >= 0 ? `먹으면 ${formatNumber(after)}kcal 남아요` : '오늘 더 먹을 수 있는 양보다 조금 커요'}>
-      {after >= 0 ? (
+    <View style={styles.after} accessibilityLabel={a.text}>
+      {a.kind === 'left' ? (
         <Text style={styles.afterTitle}>
-          먹으면 <Text style={[styles.afterTitle, styles.afterNum]}>{formatNumber(after)}kcal</Text> 남아요
+          먹으면 <Text style={[styles.afterTitle, styles.afterNum]}>{formatNumber(a.left)}kcal</Text> 남아요
+        </Text>
+      ) : a.kind === 'crosses' ? (
+        <Text style={styles.afterTitle}>
+          먹으면 목표보다 <Text style={[styles.afterTitle, styles.afterOverNum]}>{formatNumber(a.overBy)}kcal</Text> 넘어요
         </Text>
       ) : (
-        <Text style={styles.afterTitle}>오늘 더 먹을 수 있는 양보다 조금 커요</Text>
+        <View>
+          <Text style={styles.afterTitle}>
+            이미 목표보다 <Text style={[styles.afterTitle, styles.afterOverNum]}>{formatNumber(a.alreadyOver)}kcal</Text> 더 드셨어요
+          </Text>
+          <Text variant="captionMedium" color="ink2">
+            먹으면{' '}
+            <Text variant="captionMedium" color="over" style={styles.bold}>
+              +{formatNumber(a.adds)}kcal
+            </Text>
+          </Text>
+        </View>
       )}
       <View style={styles.afterTrack}>
-        <View style={[styles.afterEaten, { width: `${eatenW * 100}%` }]} />
-        <Animated.View style={[styles.afterMenu, { width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
+        <View style={[styles.afterEaten, { width: `${(eatenIn / total) * 100}%` }]} />
+        {eatenOver > 0 ? <View style={[styles.afterEaten, styles.afterEatenOver, { width: `${(eatenOver / total) * 100}%` }]} /> : null}
+        <Animated.View style={[styles.afterMenuWrap, { width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}>
+          {menuIn > 0 ? <View style={[styles.afterMenu, { flex: menuIn }]} /> : null}
+          {menuOver > 0 ? <View style={[styles.afterMenu, styles.afterMenuOver, { flex: menuOver }]} /> : null}
+        </Animated.View>
       </View>
       <View style={styles.afterLegend}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
+          <View style={[styles.legendDot, { backgroundColor: menuIn > 0 ? colors.primary : colors.over }]} />
           <Text variant="small" color="ink2">
             이 메뉴 {formatNumber(menuKcal)}kcal
           </Text>
         </View>
-        {eaten > 0 ? (
+        {consumed > 0 ? (
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
             <Text variant="small" color="ink3">
-              먹은 양 {formatNumber(eaten)}kcal
+              먹은 양 {formatNumber(consumed)}kcal
+            </Text>
+          </View>
+        ) : null}
+        {isOver ? (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.over }]} />
+            <Text variant="small" color="over">
+              목표보다 넘는 양
             </Text>
           </View>
         ) : null}
@@ -461,19 +495,27 @@ function AfterBar({ menuKcal, remaining, target }: { menuKcal: number; remaining
   );
 }
 
-/** 영양소 한 줄: 라벨 · 이 메뉴 값 · 바(남은 양 대비) · "먹으면 N 남아요" */
-function afterCopy(k: NutrientKey, value: number, left: number): string {
+/**
+ * 영양소 한 줄: 라벨 · 이 메뉴 값 · 바(남은 양 대비) · "먹으면 N 남아요".
+ * 목표를 넘기면 "먹으면 목표보다 N 넘어요"(빨강). 단백질은 많을수록 좋은 쪽이라 넘어도 빨강이 아니다
+ */
+function afterCopy(k: NutrientKey, value: number, left: number, overNow: number): { text: string; over: boolean } {
   const unit = NUTRIENT_META[k].unit;
-  if (k === 'protein') return value >= left ? '오늘 필요한 만큼 채워요' : `먹고 나서 ${formatNutrient(k, left - value)}${unit} 더 채우면 돼요`;
-  if (value <= left) return `먹으면 ${formatNutrient(k, left - value)}${unit} 남아요`;
-  return '더 먹을 수 있는 양보다 조금 커요';
+  if (k === 'protein') return { text: value >= left ? '오늘 필요한 만큼 채워요' : `먹고 나서 ${formatNutrient(k, left - value)}${unit} 더 채우면 돼요`, over: false };
+  const after = left - overNow - value;
+  if (after >= 0) return { text: `먹으면 ${formatNutrient(k, after)}${unit} 남아요`, over: false };
+  return { text: `먹으면 목표보다 ${formatNutrient(k, -after)}${unit} 넘어요`, over: true };
 }
 
-function CompareRow({ nutrient, nutrients, remaining }: { nutrient: NutrientKey; nutrients: Nutrients; remaining: DailyTargets }) {
+function CompareRow({ nutrient, nutrients, remaining, over }: { nutrient: NutrientKey; nutrients: Nutrients; remaining: DailyTargets; over?: DaySummary['over'] }) {
   const meta = NUTRIENT_META[nutrient];
   const value = nutrients[nutrient];
   const left = Math.max(0, remaining[nutrient]);
+  const overNow = nutrient === 'protein' ? 0 : (over?.[nutrient] ?? 0);
+  const copy = typeof value === 'number' ? afterCopy(nutrient, value, left, overNow) : null;
   const share = typeof value === 'number' ? (left > 0 ? Math.min(1, value / left) : value > 0 ? 1 : 0) : 0;
+  // 넘기면 바를 꽉 채우고 남은 양 밖으로 나가는 쪽을 빨강
+  const inW = copy?.over && typeof value === 'number' && value > 0 ? Math.min(1, left / value) : share;
 
   return (
     <View style={styles.cmpRow}>
@@ -490,13 +532,20 @@ function CompareRow({ nutrient, nutrients, remaining }: { nutrient: NutrientKey;
             정보 없음
           </Text>
         )}
-        {typeof value === 'number' ? (
-          <Text variant="small" color="ink3" numberOfLines={1} style={styles.cmpRight}>
-            {afterCopy(nutrient, value, left)}
+        {copy ? (
+          <Text variant="small" color={copy.over ? 'over' : 'ink3'} numberOfLines={1} style={styles.cmpRight}>
+            {copy.text}
           </Text>
         ) : null}
       </View>
-      <View style={styles.cmpTrack}>{typeof value === 'number' ? <View style={[styles.cmpFill, { width: `${share * 100}%` }]} /> : null}</View>
+      <View style={[styles.cmpTrack, styles.row]}>
+        {typeof value === 'number' ? (
+          <>
+            {inW > 0 ? <View style={[styles.cmpFill, copy?.over ? styles.flat : null, { width: `${inW * 100}%` }]} /> : null}
+            {copy?.over ? <View style={[styles.cmpFill, styles.cmpFillOver, { width: `${(1 - inW) * 100}%` }]} /> : null}
+          </>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -521,9 +570,16 @@ const styles = StyleSheet.create({
   after: { marginTop: spacing.sm, gap: spacing.sm },
   afterTitle: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 28, letterSpacing: -0.4, color: colors.ink },
   afterNum: { color: colors.primaryText },
+  afterOverNum: { color: colors.over },
+  bold: { fontFamily: fonts.bold },
+  row: { flexDirection: 'row' },
+  flat: { borderRadius: 0 },
   afterTrack: { flexDirection: 'row', height: 10, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
   afterEaten: { height: 10, backgroundColor: colors.border },
+  afterEatenOver: { backgroundColor: colors.over, opacity: 0.45 },
+  afterMenuWrap: { flexDirection: 'row', height: 10 },
   afterMenu: { height: 10, backgroundColor: colors.primary },
+  afterMenuOver: { backgroundColor: colors.over },
   afterLegend: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
@@ -537,6 +593,7 @@ const styles = StyleSheet.create({
   cmpRight: { flex: 1, textAlign: 'right' },
   cmpTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
   cmpFill: { height: 6, borderRadius: radius.pill, backgroundColor: colors.primary },
+  cmpFillOver: { borderRadius: 0, backgroundColor: colors.over },
   guide: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5 },
   guideText: { fontFamily: fonts.semibold },
   optRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },

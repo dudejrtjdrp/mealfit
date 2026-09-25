@@ -9,7 +9,7 @@ import { QtyStepper } from '@/components/QtyStepper';
 import { getBrand, getMenu, normalizeName, searchMenus } from '@/data';
 import { applyOptions, judgeMenu } from '@/domain/judge';
 import { menuQtyUnit, qtyLabel, scaleNutrients } from '@/domain/qty';
-import { formatNumber, toDateKey } from '@/domain/summary';
+import { formatNumber, overToastSuffix, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients, type Profile } from '@/domain/types';
 import { newId } from '@/services/id';
 import { findSimilarMenu, getCachedRemoteProduct, searchProductsRemote } from '@/services/products';
@@ -155,7 +155,10 @@ export default function AddLog() {
   const commit = async (log: MealLog, onUndo?: () => void) => {
     const ok = await addLog(log);
     const text = `${MEAL_LABEL[log.mealType]}으로 기록했어요`;
-    showToast(ok ? text : `${text} · 저장은 다음에 다시 시도할게요`, ok ? 'success' : 'info', {
+    // 이 기록으로 하루 목표를 넘은 상태면 넘은 양도 함께 ("… · 오늘 목표보다 120kcal 넘었어요")
+    const day = useDay.getState();
+    const suffix = log.date === day.date ? overToastSuffix(day.summary) : '';
+    showToast(ok ? text + suffix : `${text} · 저장은 다음에 다시 시도할게요`, ok ? 'success' : 'info', {
       label: '되돌리기',
       onPress: () => {
         void useDay.getState().removeLog(log.id);
