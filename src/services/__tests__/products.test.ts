@@ -3,7 +3,8 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 
 import { PACKAGED_BRAND_ID } from '../../data/ingest/nutrition';
-import { productRowToMenu, type ProductRow } from '../products';
+import type { MenuItem } from '../../domain/types';
+import { pickSimilar, productRowToMenu, type ProductRow } from '../products';
 
 describe('서버 제품 행 → MenuItem', () => {
   const row: ProductRow = {
@@ -22,5 +23,17 @@ describe('서버 제품 행 → MenuItem', () => {
     const m = productRowToMenu({ ...row, category: 'weird', caffeine: 60 });
     expect(m.category).toBe('snack');
     expect(m.tags).toEqual(['카페인 있음']);
+  });
+});
+
+describe('비슷한 메뉴 고르기 (직접 입력 · 잘 모르겠어요)', () => {
+  const m = (id: string, name: string, over: Partial<MenuItem> = {}): MenuItem => ({ id, brandId: 'b', name, category: 'meal', serving: '1인분', nutrients: { kcal: 500 }, trust: 'official', ...over });
+
+  it('같은 이름 > 검색어로 시작 > 길이 차이가 작은 순, 영양 없는 건 건너뛴다', () => {
+    const list = [m('1', '참치 김치찌개 도시락'), m('2', '김치찌개라면'), m('3', '김치찌개', { nutrients: null, trust: 'none' }), m('4', '돼지 김치찌개')];
+    expect(pickSimilar('김치찌개', list)?.id).toBe('2');
+    expect(pickSimilar('김치찌개', [...list, m('5', '김치 찌개')])?.id).toBe('5');
+    expect(pickSimilar('김치찌개', [m('6', '된장국', { nutrients: null, trust: 'none' })])).toBeUndefined();
+    expect(pickSimilar('  ', list)).toBeUndefined();
   });
 });

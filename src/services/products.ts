@@ -3,7 +3,7 @@
  * 앱 번들(mfds-products.json 3.7만 개)은 오프라인·키 없음 폴백이고, 검색의 기본은 이 테이블이다 (2026-09-24 효님 결정).
  * 스키마·인덱스: supabase/migrations/0002_products.sql
  */
-import { normalizeName } from '@/data';
+import { normalizeName, searchMenus } from '@/data';
 import { DATASETS, PACKAGED_BRAND_ID } from '@/data/ingest/nutrition';
 import type { MenuItem, Nutrients } from '@/domain/types';
 
@@ -90,4 +90,38 @@ export async function searchProductsRemote(query: string, limit = 40): Promise<M
   } catch {
     return null;
   }
+}
+
+/**
+ * 이름으로 가장 비슷한 메뉴 (영양 정보 있는 것만): 이름이 같음 > 검색어로 시작 > 이름 길이 차이가 작은 순.
+ * 직접 입력에서 칼로리를 모를 때 "비슷한 메뉴로 계산"하는 기준 — 순수 함수.
+ */
+export function pickSimilar(query: string, candidates: MenuItem[]): MenuItem | undefined {
+  const q = normalizeName(query);
+  if (!q) return undefined;
+  const scored = candidates
+    .filter((m) => m.nutrients != null && m.trust !== 'none')
+    .map((m, i) => {
+      const n = normalizeName(m.name);
+      const rank = n === q ? 0 : n.startsWith(q) ? 1 : n.includes(q) ? 2 : 3;
+      return { m, rank, diff: Math.abs(n.length - q.length), i };
+    });
+  scored.sort((a, b) => a.rank - b.rank || a.diff - b.diff || a.i - b.i);
+  return scored[0]?.m;
+}
+
+/**
+ * 직접 입력한 이름 → 가장 비슷한 메뉴. 앱 번들(매장 메뉴·시판 제품) + 서버 제품에서 찾고,
+ * 이름 전체로 못 찾으면 긴 단어부터 하나씩 다시 찾는다 ("엄마표 김치찌개" → "김치찌개").
+ */
+export async function findSimilarMenu(name: string): Promise<MenuItem | undefined> {
+  const words = name.split(/\s+/).filter((w) => normalizeName(w).length >= 2);
+  const queries = [name, ...words.sort((a, b) => b.length - a.length)].filter((q, i, arr) => arr.indexOf(q) === i);
+  for (const q of queries) {
+    const local = searchMenus(q, 40);
+    const remote = (await searchProductsRemote(q, 20)) ?? [];
+    const hit = pickSimilar(q, [...local, ...remote]);
+    if (hit) return hit;
+  }
+  return undefined;
 }
