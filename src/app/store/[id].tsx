@@ -59,6 +59,7 @@ const COLLAPSED_BY_DEFAULT: Section[] = ['pass', 'unknown'];
 export default function StoreMenu() {
   const params = useLocalSearchParams<{ id: string; brandId?: string }>();
   const nearbyStore = useNearby((s) => s.stores.find((x) => x.id === params.id));
+  const source = useNearby((s) => s.source);
   const store: Store | undefined = nearbyStore ?? getMockStores(YEOKSAM_CENTER).find((s) => s.id === params.id);
   const brandId = store?.brandId ?? (params.brandId || undefined);
   const brand = brandId ? getBrand(brandId) : undefined;
@@ -105,6 +106,7 @@ export default function StoreMenu() {
         {noInfo ? (
           <NoInfoState
             reason={!brand ? '아직 데이터가 없는 매장이에요. 확인된 정보만 보여드려요.' : undefined}
+            requestTarget={{ name: title, brandId, placeId: store && source === 'kakao' ? store.id : undefined }}
             onOtherStores={otherStores}
             onManualLog={() => router.push({ pathname: '/log/add', params: { name: '', store: title } })}
           />
