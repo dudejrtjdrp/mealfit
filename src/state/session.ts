@@ -20,7 +20,7 @@ import { newId } from '@/services/id';
 import { createLocalRepos } from '@/services/repo/local';
 import { discardMigratedBackup, migrateLocalToSupabase } from '@/services/repo/migrate';
 import { createSupabaseRepos } from '@/services/repo/supabase';
-import { getSupabase } from '@/services/supabase';
+import { clearStoredAuthSession, getSupabase, readStoredAuthSession } from '@/services/supabase';
 
 import { emitAccountChange } from './accountEvents';
 import { clearFavorites } from './favorites';
@@ -89,6 +89,36 @@ export async function discardMigratedLocalBackup(): Promise<void> {
   }
 }
 
+/**
+ * Supabase 로그아웃. 오프라인에서 토큰까지 만료됐으면 auth-js 는 세션을 읽지 못해(갱신 실패) scope 와 상관없이
+ * {error} 만 돌려주고 저장된 세션을 그대로 둔다 → 다음 온라인 실행 때 이전 계정으로 자동 로그인된다.
+ * error 면 scope:'local' 로 한 번 더, 그래도 기기에 세션이 남아 있으면 저장 키를 직접 지운다.
+ */
+export async function signOutSupabase(db: SupabaseClient): Promise<void> {
+  let failed = false;
+  try {
+    const { error } = await db.auth.signOut();
+    if (error) {
+      failed = true;
+      console.warn('[session] Supabase 로그아웃 실패 — 이 기기 세션만 지워요', error);
+    }
+  } catch (e) {
+    failed = true;
+    console.warn('[session] Supabase 로그아웃 예외 — 이 기기 세션만 지워요', e);
+  }
+  if (!failed) return;
+  try {
+    await db.auth.signOut({ scope: 'local' });
+  } catch {
+    // 아래에서 직접 지운다
+  }
+  try {
+    if (await readStoredAuthSession(db)) await clearStoredAuthSession(db);
+  } catch (e) {
+    console.warn('[session] 저장된 로그인 세션 지우기 실패', e);
+  }
+}
+
 export const useSession = create<SessionState>((set, get) => {
   /** Supabase 세션을 스토어에 반영 (마이그레이션까지 끝낸 뒤 화면이 프로필을 읽도록) */
   const activate = async (db: SupabaseClient, s: SupabaseSession): Promise<Session> => {
@@ -98,6 +128,31 @@ export const useSession = create<SessionState>((set, get) => {
     await migrateOnce(db, s.user.id);
     const session = sessionFromSupabase(s);
     set({ session, status: 'ready' });
+    return session;
+  };
+
+  /**
+   * 오프라인 로그인 사용자: 세션 확인이 실패했지만(네트워크) 기기에 로그인 세션이 남아 있으면 게스트로 떨어뜨리지 않고
+   * 마지막 세션 정보로 계정 저장소를 계속 쓴다. 게스트로 떨어지면 옛 로컬 백업이 화면에 뜨고, 그때 쓴 기록은 옮김 플래그 때문에
+   * 다음 로그인 때 안 옮겨지고 로그아웃 때 지워졌다. 네트워크가 돌아오면 첫 서버 요청이 토큰을 갱신해 TOKEN_REFRESHED 로 이어진다.
+   * 마이그레이션은 오프라인이라 건너뛰고 다음 실행(activate) 때 한다.
+   * 반환: 세션 / 기기에 세션 없음(null) / 저장소를 못 읽음(undefined)
+   */
+  const restoreOffline = async (db: SupabaseClient): Promise<Session | null | undefined> => {
+    let stored: Awaited<ReturnType<typeof readStoredAuthSession>>;
+    try {
+      stored = await readStoredAuthSession(db);
+    } catch (e) {
+      console.warn('[session] 저장된 로그인 세션 확인 실패', e);
+      return undefined;
+    }
+    if (!stored) return null;
+    const prev = getAuthUserId();
+    setAuthUserId(stored.user.id);
+    if (prev !== stored.user.id) await emitAccountChange('signedIn');
+    const session = sessionFromSupabase(stored);
+    set({ session, status: 'ready' });
+    console.info('[session] 오프라인 — 이 기기에 남은 로그인으로 이어서 써요');
     return session;
   };
 
@@ -153,27 +208,34 @@ export const useSession = create<SessionState>((set, get) => {
         if (!listening) {
           listening = true;
           // 콜백 안에서 Supabase 호출을 await 하면 교착될 수 있어 상태만 동기로 반영
+          // INITIAL_SESSION 은 load 가 직접 처리한다 — 오프라인·만료면 null 로 오는데, 그걸로 지우면 오프라인 로그인 사용자가 게스트가 된다
           db.auth.onAuthStateChange((event, s) => {
-            if (event === 'SIGNED_OUT' || !s) {
+            if (event === 'SIGNED_OUT') {
               const had = getAuthUserId() !== null;
               setAuthUserId(null);
               set({ session: null });
               if (had) void emitAccountChange('signedOut');
-            } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+            } else if (s && (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
               setAuthUserId(s.user.id);
               set({ session: sessionFromSupabase(s) });
             }
           });
         }
 
+        let checked = false;
         try {
           const { data, error } = await db.auth.getSession();
           if (data.session) return await activate(db, data.session);
-          // 확실히 로그아웃 상태일 때만: 이미 옮긴 백업을 비워 게스트로 새로 시작 (서버에는 남아 있다)
-          if (!error) await discardMigratedLocalBackup();
+          if (error) console.warn('[session] Supabase 세션 확인 실패', error);
+          checked = !error;
         } catch (e) {
           console.warn('[session] Supabase 세션 확인 실패', e);
         }
+        // 확인이 실패해도 기기에 로그인 세션이 남아 있으면 오프라인 로그인 사용자
+        const offline = checked ? null : await restoreOffline(db);
+        if (offline) return offline;
+        // 확실히 로그아웃 상태일 때만(세션 확인 성공, 또는 기기에 세션이 없음): 이미 옮긴 백업을 비워 게스트로 새로 시작 (서버에는 남아 있다)
+        if (checked || offline === null) await discardMigratedLocalBackup();
         setAuthUserId(null);
         set({ session: null, status: 'ready' });
         return null;
@@ -223,11 +285,7 @@ export const useSession = create<SessionState>((set, get) => {
     signOut: async () => {
       const db = getSupabase();
       if (db && get().session?.backend === 'supabase') {
-        try {
-          await db.auth.signOut();
-        } catch (e) {
-          console.warn('[session] Supabase 로그아웃 실패 (로컬 세션은 정리)', e);
-        }
+        await signOutSupabase(db);
         await discardMigratedLocalBackup();
       }
       setAuthUserId(null);
