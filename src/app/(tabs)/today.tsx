@@ -7,7 +7,7 @@ import { Button, Card, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, RichTe
 import { RecommendCard, RecommendCardSkeleton } from '@/components/RecommendCard';
 import { getMenu, getMenusByBrand } from '@/data';
 import { REFERENCE_FOOD_SPECS, foodEquivalent, resolveReferenceFoods } from '@/domain/foodEquivalent';
-import { mealBudget } from '@/domain/mealBudget';
+import { eatenMealsFromLogs, mealBudget } from '@/domain/mealBudget';
 import { formatNumber } from '@/domain/summary';
 import { MEAL_LABEL, type DailyTargets, type DaySummary, type MenuCategory, type Profile } from '@/domain/types';
 import * as location from '@/services/location';
@@ -45,7 +45,7 @@ export default function Today() {
   const slot = useMealSlot();
   const equivalent = useMemo(() => {
     if (!summary || over) return null;
-    const budget = mealBudget(summary.remaining.kcal, new Date(), { eatenMeals: summary.logs.map((l) => l.mealType) });
+    const budget = mealBudget(summary.remaining.kcal, new Date(), { eatenMeals: eatenMealsFromLogs(summary.logs) });
     const eq = foodEquivalent(budget.kcal, refFoods);
     if (!eq) return null;
     return { ...eq, text: budget.isLast ? eq.text : `${budget.label}으로는 ${eq.text}` };

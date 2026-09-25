@@ -1,4 +1,4 @@
-import { BREAKFAST_UNTIL_MIN, DINNER_UNTIL_MIN, LUNCH_UNTIL_MIN, mealBudget, mealsLeftAt, mealTypeAt } from '../mealBudget';
+import { BREAKFAST_UNTIL_MIN, DINNER_UNTIL_MIN, eatenMealsFromLogs, LUNCH_UNTIL_MIN, MEAL_EATEN_MIN_KCAL, mealBudget, mealsLeftAt, mealTypeAt } from '../mealBudget';
 
 const at = (h: number, m = 0) => new Date(2026, 8, 15, h, m);
 
@@ -44,5 +44,16 @@ describe('mealBudget', () => {
   it('남은 양이 0 이하이거나 숫자가 아니면 0', () => {
     expect(mealBudget(-200, at(12)).kcal).toBe(0);
     expect(mealBudget(Number.NaN, at(12)).kcal).toBe(0);
+  });
+});
+
+describe('eatenMealsFromLogs', () => {
+  const l = (mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack', kcal: number) => ({ mealType, nutrients: { kcal } });
+  it('끼니별 합계가 기준(200kcal) 이상인 끼니만, 처음 나온 순서로', () => {
+    expect(MEAL_EATEN_MIN_KCAL).toBe(200);
+    expect(eatenMealsFromLogs([l('lunch', 150)])).toEqual([]);
+    expect(eatenMealsFromLogs([l('breakfast', 250), l('lunch', 100), l('lunch', 100)])).toEqual(['breakfast', 'lunch']);
+    expect(eatenMealsFromLogs([l('lunch', Number.NaN), l('lunch', 150)])).toEqual([]);
+    expect(eatenMealsFromLogs(null)).toEqual([]);
   });
 });

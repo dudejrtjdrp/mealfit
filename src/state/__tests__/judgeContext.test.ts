@@ -1,4 +1,6 @@
 import { judgeMenu } from '@/domain/judge';
+import { menu, TARGETS } from '@/domain/__tests__/fixtures';
+import { summarizeDay } from '@/domain/summary';
 import type { MealLog } from '@/domain/types';
 
 import { defaultMealType } from '../day';
@@ -9,14 +11,32 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'uuid-1', CryptoDigestAlgorithm: {}, digestStringAsync: jest.fn() }));
 
-const log = (mealType: MealLog['mealType']): MealLog =>
-  ({ id: mealType, date: '2026-09-25', mealType, time: '', name: 'x', nutrients: { kcal: 500 }, trust: 'user', createdAt: '' }) as MealLog;
+const log = (mealType: MealLog['mealType'], kcal = 500): MealLog =>
+  ({ id: mealType, date: '2026-09-25', mealType, time: '', name: 'x', nutrients: { kcal }, trust: 'user', createdAt: '' }) as MealLog;
 
 describe('judgeContext', () => {
   it('오늘 먹은 끼니를 중복 없이 넘긴다', () => {
     const ctx = judgeContext(null, [log('lunch'), log('lunch'), log('snack')]);
     expect(ctx.eatenMeals).toEqual(['lunch', 'snack']);
     expect(ctx.profile.primaryGoal).toBe('maintain');
+  });
+
+  it('끼니별 합계가 200kcal 이상일 때만 먹은 끼니로 친다 (음료 한 잔은 끼니가 아님)', () => {
+    expect(judgeContext(null, [log('lunch', 150)]).eatenMeals).toBeUndefined();
+    expect(judgeContext(null, [log('lunch', 150), log('lunch', 120)]).eatenMeals).toEqual(['lunch']);
+    expect(judgeContext(null, [log('breakfast', 199), log('lunch', 200)]).eatenMeals).toEqual(['lunch']);
+  });
+
+  it('12시에 라떼(150kcal)만 기록해도 1,000kcal 넘는 점심을 저녁 한 끼 기준으로 좋음 판정하지 않는다', () => {
+    const latte = { ...log('lunch', 150), nutrients: { kcal: 150 } };
+    const remaining = summarizeDay('2026-09-25', [latte], TARGETS).remaining;
+    const big = menu({ id: 'big', category: 'meal' as never, nutrients: { kcal: 1050, carbs: 120, protein: 40, fat: 40, sugar: 10, sodium: 1500 } });
+    const at1230 = new Date(2026, 8, 25, 12, 30);
+    const res = judgeMenu(big, remaining, { ...judgeContext(null, [latte]), now: at1230 });
+    expect(res.verdict).not.toBe('good');
+    // 점심을 제대로 먹었다면(700kcal) 저녁 기준으로 넘어간다
+    const lunch = log('lunch', 700);
+    expect(judgeContext(null, [latte, lunch]).eatenMeals).toEqual(['lunch']);
   });
 
   it('기록이 없으면 eatenMeals 를 비운다', () => {

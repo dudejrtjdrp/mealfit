@@ -4,7 +4,7 @@
  * 남은 끼니 수는 현재 시각이 정한다 — 점심 시간인데 아침을 안 먹었어도 남은 건 점심·저녁 2끼(시간 우선).
  * React 의존 없음 — 판정 엔진과 화면(오늘·주변·상세)이 같이 쓴다.
  */
-import { MEAL_LABEL, type MealType } from './types';
+import { MEAL_LABEL, type MealLog, type MealType } from './types';
 
 /** 이 시각(로컬, 자정부터 분) 전이면 아침 — 10:30 */
 export const BREAKFAST_UNTIL_MIN = 10 * 60 + 30;
@@ -33,6 +33,23 @@ export interface MealBudget {
   mealType: MealType;
   /** 오늘 마지막 끼니 — 적정량 = 남은 전부 */
   isLast: boolean;
+}
+
+/**
+ * 이 kcal 이상 기록한 끼니만 "먹은 끼니"로 친다 — 라떼 한 잔(150kcal)만 적어도 점심을 먹은 것으로 보고
+ * 남은 양 전부를 저녁 한 끼 기준으로 판정하던 문제를 막는다. 하루 목표 1,500~2,500kcal 의 한 끼(500~800)의
+ * 1/3 안팎이라 "끼니"와 "음료·간식"을 가르는 선으로 200kcal 을 쓴다 (효님 결정 전 기본값).
+ */
+export const MEAL_EATEN_MIN_KCAL = 200;
+
+/** 오늘 기록 → 먹은 끼니 목록 (끼니별 kcal 합계가 MEAL_EATEN_MIN_KCAL 이상인 것만, 처음 나온 순서) */
+export function eatenMealsFromLogs(logs: readonly Pick<MealLog, 'mealType' | 'nutrients'>[] | null | undefined, minKcal: number = MEAL_EATEN_MIN_KCAL): MealType[] {
+  const sum = new Map<MealType, number>();
+  for (const l of logs ?? []) {
+    const k = l.nutrients?.kcal;
+    sum.set(l.mealType, (sum.get(l.mealType) ?? 0) + (typeof k === 'number' && Number.isFinite(k) ? k : 0));
+  }
+  return [...sum].filter(([, kcal]) => kcal >= minKcal).map(([m]) => m);
 }
 
 /** 시각 → 지금 끼니 (~10:30 아침 · ~15:00 점심 · ~21:00 저녁 · 그 뒤 간식) */

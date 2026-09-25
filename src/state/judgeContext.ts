@@ -2,16 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 
 import type { JudgeContext } from '@/domain/judge';
-import { mealTypeAt } from '@/domain/mealBudget';
+import { eatenMealsFromLogs, mealTypeAt } from '@/domain/mealBudget';
 import type { MealLog, MealType, Profile } from '@/domain/types';
 
 import { judgeProfile } from './bootstrap';
 import { useDay } from './day';
 import { useProfile } from './profile';
 
-/** 판정 컨텍스트(프로필 + 오늘 먹은 끼니) — 순수 함수라 화면 밖에서도 쓴다 */
+/**
+ * 판정 컨텍스트(프로필 + 오늘 먹은 끼니) — 순수 함수라 화면 밖에서도 쓴다.
+ * 끼니별 합계가 MEAL_EATEN_MIN_KCAL(200) 이상일 때만 먹은 끼니 — 음료 한 잔으로 끼니를 넘기지 않게.
+ */
 export function judgeContext(profile: Profile | null, logs?: readonly MealLog[] | null): JudgeContext {
-  const eatenMeals = logs?.length ? Array.from(new Set(logs.map((l) => l.mealType))) : undefined;
+  const eaten = eatenMealsFromLogs(logs);
+  const eatenMeals = eaten.length ? eaten : undefined;
   return { profile: judgeProfile(profile), eatenMeals };
 }
 
