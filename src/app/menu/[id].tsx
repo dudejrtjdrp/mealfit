@@ -33,7 +33,7 @@ import { formatNumber, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, VERDICT_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients, type OptionGroup } from '@/domain/types';
 import { newId } from '@/services/id';
 import { getCachedRemoteProduct } from '@/services/products';
-import { judgeProfile } from '@/state/bootstrap';
+import { useJudgeContext } from '@/state/judgeContext';
 import { defaultMealType, useDay } from '@/state/day';
 import { ensureFavoritesLoaded, useFavorites, useIsFavorite } from '@/state/favorites';
 import { useProfile } from '@/state/profile';
@@ -73,7 +73,6 @@ export default function MenuDetail() {
   useEffect(ensureFavoritesLoaded, []);
   const brand = menu ? getBrand(menu.brandId) : undefined;
 
-  const profile = useProfile((s) => s.profile);
   const targets = useProfile((s) => s.targets);
   const summary = useDay((s) => s.summary);
   const addLog = useDay((s) => s.addLog);
@@ -90,7 +89,8 @@ export default function MenuDetail() {
   }, [menu]);
 
   const remaining: DailyTargets | null = summary?.remaining ?? targets;
-  const ctx = useMemo(() => ({ profile: judgeProfile(profile), selectedOptions: selected }), [profile, selected]);
+  const jctx = useJudgeContext();
+  const ctx = useMemo(() => ({ ...jctx, selectedOptions: selected }), [jctx, selected]);
   const nutrients = menu ? applyOptions(menu, selected) : null;
   const judgement = menu && remaining ? judgeMenu(menu, remaining, ctx) : null;
   const alternatives = useMemo(
@@ -255,6 +255,7 @@ export default function MenuDetail() {
 
         {unknown ? (
           <NoInfoState
+            requestTarget={{ name: storeName ? `${storeName} ${menu.name}` : menu.name }}
             onOtherStores={() => router.replace('/(tabs)/nearby')}
             onManualLog={() => router.push({ pathname: '/log/add', params: { name: menu.name, store: storeName ?? '' } })}
           />

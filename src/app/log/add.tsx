@@ -13,7 +13,7 @@ import { formatNumber, toDateKey } from '@/domain/summary';
 import { MEAL_LABEL, type DailyTargets, type MealLog, type MealType, type MenuItem, type Nutrients, type Profile } from '@/domain/types';
 import { newId } from '@/services/id';
 import { findSimilarMenu, getCachedRemoteProduct, searchProductsRemote } from '@/services/products';
-import { judgeProfile } from '@/state/bootstrap';
+import { judgeContext, useJudgeContext } from '@/state/judgeContext';
 import { defaultMealType, useDay } from '@/state/day';
 import { ensureFavoritesLoaded, logKey, rankFrequent, useFavorites, type FrequentItem } from '@/state/favorites';
 import { useProfile } from '@/state/profile';
@@ -48,7 +48,7 @@ function buildLog(s: Source, mealType: MealType, qty: number, remaining: DailyTa
   const n = baseNutrients(s);
   if (!n) return null;
   if (s.kind === 'menu') {
-    const j = remaining ? judgeMenu(s.menu, remaining, { profile: judgeProfile(profile) }) : null;
+    const j = remaining ? judgeMenu(s.menu, remaining, judgeContext(profile, useDay.getState().summary?.logs)) : null;
     return {
       ...base,
       name: s.menu.name,
@@ -139,14 +139,15 @@ export default function AddLog() {
   }, [query]);
   const remoteLoading = normalizeName(query) !== '' && remote?.q !== query;
 
+  const jctx = useJudgeContext();
   const results = useMemo(() => {
     const q = normalizeName(query);
     if (!q) return [];
     const local = searchMenus(q, 40);
     const seen = new Set(local.map((m) => m.id));
     const merged = [...local, ...(remote?.items ?? []).filter((m) => !seen.has(m.id))].slice(0, 60);
-    return merged.map((m) => ({ menu: m, judgement: remaining ? judgeMenu(m, remaining, { profile: judgeProfile(profile) }) : null }));
-  }, [query, remote, remaining, profile]);
+    return merged.map((m) => ({ menu: m, judgement: remaining ? judgeMenu(m, remaining, jctx) : null }));
+  }, [query, remote, remaining, jctx]);
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)/log'));
 

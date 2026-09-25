@@ -10,7 +10,7 @@ import { STORE_CATEGORY_LABEL, formatDistance } from '@/data/labels';
 import { applyOptions, judgeMenu } from '@/domain/judge';
 import { formatNumber } from '@/domain/summary';
 import type { Brand, DailyTargets, MenuItem } from '@/domain/types';
-import { judgeProfile } from '@/state/bootstrap';
+import { useJudgeContext } from '@/state/judgeContext';
 import { useDay } from '@/state/day';
 import { nearestOfBrand, searchBrands, searchStoreMenus, useNearby } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
@@ -156,7 +156,8 @@ function MenuResult({
   nearby: boolean;
   onPress: () => void;
 }) {
-  const judgement = useMemo(() => (remaining ? judgeMenu(menu, remaining, { profile: judgeProfile(profile) }) : null), [menu, remaining, profile]);
+  const jctx = useJudgeContext();
+  const judgement = useMemo(() => (remaining ? judgeMenu(menu, remaining, jctx) : null), [menu, remaining, jctx]);
   const kcal = applyOptions(menu)?.kcal;
   const brand = getBrand(menu.brandId);
   const meta = `${brand?.name ?? ''}${nearby ? ' · 주변에 있어요' : ''}${kcal != null ? ` · ${formatNumber(kcal)}kcal` : ''}`;

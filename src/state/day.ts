@@ -1,19 +1,16 @@
 import { AppState, type AppStateStatus } from 'react-native';
 import { create } from 'zustand';
 
+import { mealTypeAt } from '@/domain/mealBudget';
 import { summarizeDay, toDateKey } from '@/domain/summary';
 import type { DailyTargets, DaySummary, MealLog, MealType, Verdict } from '@/domain/types';
 import { getRepos } from '@/services/repo';
 
 import { useProfile } from './profile';
 
-/** 현재 시각 기준 기본 끼니: ~10시 아침 · ~15시 점심 · ~21시 저녁 · 그 외 간식 */
+/** 현재 시각 기준 기본 끼니 — 판정(이번 끼니 적정량)과 같은 경계: ~10:30 아침 · ~15시 점심 · ~21시 저녁 · 그 외 간식 */
 export function defaultMealType(d: Date = new Date()): MealType {
-  const h = d.getHours();
-  if (h < 10) return 'breakfast';
-  if (h < 15) return 'lunch';
-  if (h < 21) return 'dinner';
-  return 'snack';
+  return mealTypeAt(d);
 }
 
 interface DayState {

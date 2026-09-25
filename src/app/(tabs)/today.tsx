@@ -7,10 +7,11 @@ import { Button, Card, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, RichTe
 import { RecommendCard, RecommendCardSkeleton } from '@/components/RecommendCard';
 import { getMenu, getMenusByBrand } from '@/data';
 import { REFERENCE_FOOD_SPECS, foodEquivalent, resolveReferenceFoods } from '@/domain/foodEquivalent';
+import { mealBudget } from '@/domain/mealBudget';
 import { formatNumber } from '@/domain/summary';
 import { MEAL_LABEL, type DailyTargets, type DaySummary, type MenuCategory, type Profile } from '@/domain/types';
 import * as location from '@/services/location';
-import { judgeProfile } from '@/state/bootstrap';
+import { useJudgeContext, useMealSlot } from '@/state/judgeContext';
 import { useDay } from '@/state/day';
 import { useNearby } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
@@ -38,9 +39,17 @@ export default function Today() {
   const logs = summary?.logs ?? [];
   const over = !!summary && (summary.status === 'over' || summary.remaining.kcal <= 0);
 
-  // 남은 kcal 을 음식으로 번역 — 기준 음식 kcal 은 앱 메뉴 데이터에서만. 못 맞추면 줄을 숨긴다
+  // 이번 끼니 적정량을 음식으로 번역 ("점심으로는 샌드위치 하나에 라떼 한 잔 정도예요") — 판정과 같은 끼니 기준.
+  // 기준 음식 kcal 은 앱 메뉴 데이터에서만. 못 맞추면 줄을 숨긴다
   const refFoods = useMemo(() => resolveReferenceFoods(REFERENCE_FOOD_SPECS, getMenu), []);
-  const equivalent = useMemo(() => (summary && !over ? foodEquivalent(summary.remaining.kcal, refFoods) : null), [summary, over, refFoods]);
+  const slot = useMealSlot();
+  const equivalent = useMemo(() => {
+    if (!summary || over) return null;
+    const budget = mealBudget(summary.remaining.kcal, new Date(), { eatenMeals: summary.logs.map((l) => l.mealType) });
+    const eq = foodEquivalent(budget.kcal, refFoods);
+    if (!eq) return null;
+    return { ...eq, text: budget.isLast ? eq.text : `${budget.label}으로는 ${eq.text}` };
+  }, [summary, over, refFoods, slot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -185,9 +194,10 @@ function NearbyPicks({ remaining, profile }: { remaining: DailyTargets | null; p
     }, []),
   );
 
+  const jctx = useJudgeContext();
   const candidates = useMemo(
-    () => (remaining && stores.length > 0 ? collectCandidates(stores, getMenusByBrand, remaining, { profile: judgeProfile(profile) }) : []),
-    [stores, remaining, profile],
+    () => (remaining && stores.length > 0 ? collectCandidates(stores, getMenusByBrand, remaining, jctx) : []),
+    [stores, remaining, jctx],
   );
   const mode = useRecommendMode((s) => s.mode);
   const setMode = useRecommendMode((s) => s.setMode);

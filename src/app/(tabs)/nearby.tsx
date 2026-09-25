@@ -10,7 +10,7 @@ import { STORE_CATEGORY_LABEL, formatDistance } from '@/data/labels';
 import { applyOptions, rankMenus } from '@/domain/judge';
 import { formatNumber } from '@/domain/summary';
 import { VERDICT_LABEL, type Store, type StoreCategory } from '@/domain/types';
-import { judgeProfile } from '@/state/bootstrap';
+import { useJudgeContext } from '@/state/judgeContext';
 import { useDay } from '@/state/day';
 import type { Radius } from '@/services/kakao';
 import { filterStores, shortAreaName, splitByInfo, summarizeRanked, useNearby, type CategoryFilter, type StorePick } from '@/state/nearby';
@@ -48,15 +48,15 @@ export default function Nearby() {
   const visible = useMemo(() => filterStores(stores, category), [stores, category]);
 
   // 매장 카드 판정 요약 — 브랜드별로 한 번만 판정한다 (남은 양·프로필이 바뀌면 다시)
-  const profile = useProfile((s) => s.profile);
   const targets = useProfile((s) => s.targets);
   const remaining = useDay((s) => s.summary?.remaining) ?? targets;
-  const pickCache = useMemo(() => new Map<string, StorePick>(), [remaining, profile]);
+  const jctx = useJudgeContext();
+  const pickCache = useMemo(() => new Map<string, StorePick>(), [remaining, jctx]);
   const pickFor = (s: Store): StorePick | null => {
     if (!s.brandId || s.coverage === 'none' || !remaining) return null;
     let p = pickCache.get(s.brandId);
     if (!p) {
-      p = summarizeRanked(rankMenus(getMenusByBrand(s.brandId), remaining, { profile: judgeProfile(profile) }));
+      p = summarizeRanked(rankMenus(getMenusByBrand(s.brandId), remaining, jctx));
       pickCache.set(s.brandId, p);
     }
     return p;

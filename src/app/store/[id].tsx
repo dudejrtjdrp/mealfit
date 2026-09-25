@@ -30,7 +30,7 @@ import { YEOKSAM_CENTER } from '@/data/mockStores';
 import { applyOptions, rankMenus } from '@/domain/judge';
 import { formatNumber } from '@/domain/summary';
 import type { Judgement, MenuCategory, MenuItem, Store, Verdict } from '@/domain/types';
-import { judgeProfile } from '@/state/bootstrap';
+import { useJudgeContext } from '@/state/judgeContext';
 import { useDay } from '@/state/day';
 import { groupByVerdict, useNearby } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
@@ -64,7 +64,6 @@ export default function StoreMenu() {
   const brandId = store?.brandId ?? (params.brandId || undefined);
   const brand = brandId ? getBrand(brandId) : undefined;
 
-  const profile = useProfile((s) => s.profile);
   const targets = useProfile((s) => s.targets);
   const summary = useDay((s) => s.summary);
 
@@ -74,7 +73,8 @@ export default function StoreMenu() {
 
   const menus = useMemo(() => (brandId ? getMenusByBrand(brandId) : []), [brandId]);
   const remaining = summary?.remaining ?? targets;
-  const ranked = useMemo(() => (remaining ? rankMenus(menus, remaining, { profile: judgeProfile(profile) }) : null), [menus, remaining, profile]);
+  const jctx = useJudgeContext();
+  const ranked = useMemo(() => (remaining ? rankMenus(menus, remaining, jctx) : null), [menus, remaining, jctx]);
 
   const cats = CAT_ORDER.filter((c) => menus.some((m) => m.category === c));
   const groups = useMemo(() => {
