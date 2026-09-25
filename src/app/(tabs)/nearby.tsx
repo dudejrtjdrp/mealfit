@@ -1,14 +1,20 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandTile, ChevronRightIcon, Chip, CoverageBadge, EmptyState, PinIcon, Skeleton, Text, showToast } from '@/components';
-import { getBrand } from '@/data';
+import { getBrand, getMenusByBrand } from '@/data';
 import { STORE_CATEGORY_LABEL, formatDistance } from '@/data/labels';
-import type { Store, StoreCategory } from '@/domain/types';
-import { filterStores, useNearby, type CategoryFilter } from '@/state/nearby';
-import { colors, radius, size, spacing } from '@/theme';
+import { applyOptions, rankMenus } from '@/domain/judge';
+import { formatNumber } from '@/domain/summary';
+import { VERDICT_LABEL, type Store, type StoreCategory } from '@/domain/types';
+import { judgeProfile } from '@/state/bootstrap';
+import { useDay } from '@/state/day';
+import { filterStores, summarizeRanked, useNearby, type CategoryFilter, type StorePick } from '@/state/nearby';
+import { useProfile } from '@/state/profile';
+import { colors, fonts, radius, size, spacing } from '@/theme';
 
 const CATS: { id: CategoryFilter; label: string }[] = [
   { id: 'all', label: '전체' },
@@ -32,6 +38,21 @@ export default function Nearby() {
   );
 
   const visible = useMemo(() => filterStores(stores, category), [stores, category]);
+
+  // 매장 카드 판정 요약 — 브랜드별로 한 번만 판정한다 (남은 양·프로필이 바뀌면 다시)
+  const profile = useProfile((s) => s.profile);
+  const targets = useProfile((s) => s.targets);
+  const remaining = useDay((s) => s.summary?.remaining) ?? targets;
+  const pickCache = useMemo(() => new Map<string, StorePick>(), [remaining, profile]);
+  const pickFor = (s: Store): StorePick | null => {
+    if (!s.brandId || s.coverage === 'none' || !remaining) return null;
+    let p = pickCache.get(s.brandId);
+    if (!p) {
+      p = summarizeRanked(rankMenus(getMenusByBrand(s.brandId), remaining, { profile: judgeProfile(profile) }));
+      pickCache.set(s.brandId, p);
+    }
+    return p;
+  };
   const busy = status === 'locating' || status === 'loading';
 
   let body: ReactNode;
@@ -74,7 +95,7 @@ export default function Nearby() {
     body = (
       <View style={styles.list}>
         {visible.map((s) => (
-          <StoreCard key={s.id} store={s} onPress={() => router.push({ pathname: '/store/[id]', params: { id: s.id, brandId: s.brandId ?? '' } })} />
+          <StoreCard key={s.id} store={s} pick={pickFor(s)} onPress={() => router.push({ pathname: '/store/[id]', params: { id: s.id, brandId: s.brandId ?? '' } })} />
         ))}
         {source === 'mock' ? (
           <Text variant="caption" color="ink3" align="center" style={styles.sourceNote}>
@@ -127,12 +148,17 @@ export default function Nearby() {
   );
 }
 
-function StoreCard({ store, onPress }: { store: Store; onPress: () => void }) {
+function StoreCard({ store, pick, onPress }: { store: Store; pick: StorePick | null; onPress: () => void }) {
   const brand = store.brandId ? getBrand(store.brandId) : undefined;
+  const top = pick?.top;
+  const topKcal = top ? applyOptions(top.menu)?.kcal : undefined;
+  // 좋음이 있으면 좋음 수, 없으면 괜찮음 수 — 오늘은 패스뿐이면 요약 없이 조용히
+  const lead = pick && pick.good > 0 ? ({ verdict: 'good', n: pick.good } as const) : pick && pick.ok > 0 ? ({ verdict: 'ok', n: pick.ok } as const) : null;
+  const pickLabel = lead && top ? `${VERDICT_LABEL[lead.verdict]} ${lead.n}개, 추천 ${top.menu.name}${topKcal != null ? ` ${formatNumber(topKcal)}kcal` : ''}` : '';
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${store.name}, ${formatDistance(store.distanceM)}`}
+      accessibilityLabel={`${store.name}, ${formatDistance(store.distanceM)}${pickLabel ? `, ${pickLabel}` : ''}`}
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
@@ -145,7 +171,23 @@ function StoreCard({ store, onPress }: { store: Store; onPress: () => void }) {
           {formatDistance(store.distanceM)} · {STORE_CATEGORY_LABEL[store.category]}
           {brand?.blurb ? ` · ${brand.blurb}` : ''}
         </Text>
-        <CoverageBadge coverage={store.coverage} size="sm" style={styles.badge} />
+        {lead && top ? (
+          <View style={styles.pick}>
+            <Ionicons name={lead.verdict === 'good' ? 'checkmark-circle' : 'ellipse'} size={14} color={colors[lead.verdict]} />
+            <Text variant="captionMedium" style={[styles.pickLead, { color: colors[lead.verdict] }]}>
+              {VERDICT_LABEL[lead.verdict]} {lead.n}개
+            </Text>
+            <Text variant="caption" color="ink2" numberOfLines={1} style={styles.pickName}>
+              · 추천: {top.menu.name}
+            </Text>
+            {topKcal != null ? (
+              <Text variant="caption" color="ink3">
+                {formatNumber(topKcal)}kcal
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+        <CoverageBadge coverage={store.coverage} menuCount={pick?.known} size="sm" style={styles.badge} />
       </View>
       <ChevronRightIcon size={18} color={colors.ink3} />
     </Pressable>
@@ -166,6 +208,9 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.8 },
   cardBody: { flex: 1, minWidth: 0, gap: 4 },
   badge: { marginTop: 4, alignSelf: 'flex-start' },
+  pick: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  pickLead: { fontFamily: fonts.semibold },
+  pickName: { flexShrink: 1 },
   skelBody: { flex: 1, gap: spacing.sm },
   sourceNote: { marginTop: spacing.sm },
 });
