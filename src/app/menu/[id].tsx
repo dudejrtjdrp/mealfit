@@ -34,6 +34,7 @@ import { newId } from '@/services/id';
 import { getCachedRemoteProduct } from '@/services/products';
 import { judgeProfile } from '@/state/bootstrap';
 import { defaultMealType, useDay } from '@/state/day';
+import { ensureFavoritesLoaded, useFavorites, useIsFavorite } from '@/state/favorites';
 import { useProfile } from '@/state/profile';
 import { colors, fonts, radius, spacing } from '@/theme';
 
@@ -52,7 +53,11 @@ function defaultSelection(menu?: MenuItem): Record<string, string> {
 export default function MenuDetail() {
   const params = useLocalSearchParams<{ id: string; store?: string }>();
   // 서버 검색(E2)에서 고른 시판 제품은 로컬 카탈로그에 없을 수 있다 → 세션 캐시에서 찾는다
-  const menu = getMenu(params.id) ?? getCachedRemoteProduct(params.id);
+  // 즐겨찾기에 담아 둔 서버 제품은 다음 실행에도 열 수 있게 스냅샷으로 찾는다
+  const favSnapshot = useFavorites((s) => s.items.find((x) => x.menuId === params.id)?.menu);
+  const menu = getMenu(params.id) ?? getCachedRemoteProduct(params.id) ?? favSnapshot;
+  const favorite = useIsFavorite(menu?.id);
+  useEffect(ensureFavoritesLoaded, []);
   const brand = menu ? getBrand(menu.brandId) : undefined;
 
   const profile = useProfile((s) => s.profile);
@@ -105,6 +110,13 @@ export default function MenuDetail() {
   const categoryLabel = brand ? STORE_CATEGORY_LABEL[brand.category] : '';
   const storeName = params.store || menu.maker || brand?.name;
 
+  const toggleFavorite = async () => {
+    // 앱 번들에 없는 메뉴(서버 검색 제품)는 다음 실행에 다시 찾을 수 있게 통째로 적어 둔다
+    const snapshot = getMenu(menu.id) ? undefined : menu;
+    const on = await useFavorites.getState().toggle({ menuId: menu.id, name: menu.name, storeName, menu: snapshot });
+    showToast(on ? '자주 먹는 메뉴에 담았어요' : '자주 먹는 메뉴에서 뺐어요', on ? 'success' : 'info');
+  };
+
   const share = () => {
     const verdict = unknown ? '정보 없음' : judgement ? VERDICT_LABEL[judgement.verdict] : '';
     Share.share({ message: `${menu.name} — ${verdict}` }).catch(() => {});
@@ -152,7 +164,12 @@ export default function MenuDetail() {
         <StackHeader
           right={
             <>
-              <IconButton name="heart-outline" label="찜하기" onPress={() => showToast('곧 열려요', 'info')} />
+              <IconButton
+                name={favorite ? 'heart' : 'heart-outline'}
+                color={favorite ? colors.primary : undefined}
+                label={favorite ? '자주 먹는 메뉴에서 빼기' : '자주 먹는 메뉴에 담기'}
+                onPress={() => void toggleFavorite()}
+              />
               <IconButton name="share-outline" label="공유하기" onPress={share} />
             </>
           }
