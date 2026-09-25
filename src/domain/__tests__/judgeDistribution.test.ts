@@ -21,8 +21,11 @@ const targets = computeTargets(
   },
   today,
 );
+/** 시안 D3 상태바 시각 9:41 — 아침 끼니, 세 끼 남음 (판정은 이번 끼니 적정량 = 남은 kcal ÷ 남은 끼니 수 기준) */
+const AT_0941 = new Date(2026, 8, 15, 9, 41);
 const ctx: JudgeContext = {
   profile: { primaryGoal: 'maintain', secondaryGoals: [], diet: { type: 'balanced', evidence: [], source: 'rule' } },
+  now: AT_0941,
 };
 
 /** 시안 기준 남은 여유. 당·나트륨은 목표량의 2/3 남음으로 둔다(시안에 수치 없음) */
@@ -88,5 +91,32 @@ describe('구매 가이드 (시드)', () => {
       [250, 300, 350, 400, 450, 500].some((kcal) => judgeMenu(m, remaining(kcal), ctx).guide?.startsWith('시럽 빼면')),
     );
     expect(hit).toBe(true);
+  });
+});
+
+describe('끼니별 분포 — 아침·점심·저녁 모두 좋음/괜찮음/패스가 한쪽으로 쏠리지 않는다', () => {
+  // 하루 목표량의 몇 %가 남았는지 (아침 전부 · 점심 70% · 저녁 35%)
+  const scenarios = [
+    { label: '아침 8시', now: new Date(2026, 8, 15, 8), left: 1 },
+    { label: '점심 12시', now: new Date(2026, 8, 15, 12), left: 0.7 },
+    { label: '저녁 7시', now: new Date(2026, 8, 15, 19), left: 0.35 },
+  ];
+  const scaled = (f: number): DailyTargets => ({
+    kcal: Math.round(targets.kcal * f),
+    carbs: Math.round(targets.carbs * f),
+    protein: Math.round(targets.protein * f),
+    fat: Math.round(targets.fat * f),
+    sugar: Math.round(targets.sugar * f),
+    sodium: Math.round(targets.sodium * f),
+    emphasis: targets.emphasis,
+  });
+  const rows = scenarios.flatMap((s) => ['starbucks', 'gs25'].map((brand) => ({ brand, label: s.label, s })));
+  it.each(rows)('$brand · $label', ({ brand, s }) => {
+    const js = getMenusByBrand(brand).map((m) => judgeMenu(m, scaled(s.left), { ...ctx, now: s.now })).filter((j) => !j.unknown);
+    const share = (v: Verdict) => js.filter((j) => j.verdict === v).length / js.length;
+    for (const v of ['good', 'ok', 'pass'] as const) {
+      expect(share(v)).toBeGreaterThan(0);
+      expect(share(v)).toBeLessThanOrEqual(0.7);
+    }
   });
 });

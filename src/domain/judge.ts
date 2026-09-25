@@ -1,11 +1,25 @@
+import { mealBudget, type MealBudget } from './mealBudget';
 import { emphasisFor } from './targets';
-import type { DailyTargets, Judgement, MenuItem, Nutrients, Profile, Verdict } from './types';
+import type { DailyTargets, Judgement, MealType, MenuItem, Nutrients, Profile, Verdict } from './types';
 import { VERDICT_LABEL } from './types';
+
+export { mealBudget, mealTypeAt, type MealBudget, type MealBudgetOptions } from './mealBudget';
 
 export interface JudgeContext {
   profile: Pick<Profile, 'primaryGoal' | 'secondaryGoals' | 'diet'>;
   /** groupId → 선택한 choice.label */
   selectedOptions?: Record<string, string>;
+  /** 판정 기준 시각 — 이번 끼니(남은 끼니 수)를 정한다. 없으면 지금 */
+  now?: Date;
+  /** 남은 주 끼니 수를 직접 지정 (1 이상). 주면 now·eatenMeals 보다 우선 */
+  mealSlotsLeft?: number;
+  /** 오늘 이미 기록한 끼니 — 지금 끼니를 이미 먹었으면 다음 끼니 기준으로 본다 */
+  eatenMeals?: MealType[];
+}
+
+/** 판정에 쓰는 이번 끼니 적정량 (JudgeContext 의 now·mealSlotsLeft·eatenMeals 반영) */
+export function judgeBudget(remaining: DailyTargets, ctx: Pick<JudgeContext, 'now' | 'mealSlotsLeft' | 'eatenMeals'>): MealBudget {
+  return mealBudget(remaining.kcal, ctx.now ?? new Date(), { slotsLeft: ctx.mealSlotsLeft, eatenMeals: ctx.eatenMeals });
 }
 
 const NUTRIENT_KEYS = ['kcal', 'carbs', 'protein', 'fat', 'satFat', 'sugar', 'sodium', 'caffeine'] as const;
@@ -61,33 +75,33 @@ interface Scored {
   nutrients: Nutrients | null;
 }
 
-function ratio(value: number, remaining: number): number {
-  if (remaining <= 0) return value > 0 ? Infinity : 0;
-  return value / remaining;
-}
-
 /** 구간 선형 보간: x 가 [x0,x1] 일 때 y0→y1 */
 function lerp(x: number, x0: number, x1: number, y0: number, y1: number): number {
   return y0 + ((x - x0) / (x1 - x0)) * (y1 - y0);
 }
 
 /**
- * 칼로리 비중 점수 0~100. r = kcal / max(남은 kcal, 1)
- * r ≤ 0.30 → 100, 0.30~0.40 → 100→40, 0.40~0.60 → 40→0, 0.60 초과 → 0.
- * (조율 요청 원안은 0.7/1.0 지점이었으나 시드에서 거의 전부 good 이 되어 분포 회귀 테스트를 만족하는 최소 조정값으로 당김)
+ * 칼로리 점수 0~100. r = 메뉴 kcal ÷ 이번 끼니 적정량 (mealBudget)
+ * r ≤ 0.5 → 100, 0.5~0.8 → 100→70, 0.8~1.1 → 70→30, 1.1~1.5 → 30→0, 1.5 초과 → 0.
+ * 강조 영양소(보통 80~100점)와 섞으면 대략 적정량 80% 이하 좋음 · ~110% 괜찮음 · 그 위 패스 쪽이 된다.
  */
 export function kcalScore(r: number): number {
-  if (r <= 0.3) return 100;
-  if (r <= 0.4) return lerp(r, 0.3, 0.4, 100, 40);
-  if (r <= 0.6) return lerp(r, 0.4, 0.6, 40, 0);
+  if (r <= 0.5) return 100;
+  if (r <= 0.8) return lerp(r, 0.5, 0.8, 100, 70);
+  if (r <= 1.1) return lerp(r, 0.8, 1.1, 70, 30);
+  if (r <= 1.5) return lerp(r, 1.1, 1.5, 30, 0);
   return 0;
 }
 
-/** 영양소 비중 점수 0~100. 단백질은 많을수록 높다 */
+/**
+ * 영양소 점수 0~100. share = 메뉴 값 ÷ (하루 남은 값 ÷ 남은 끼니 수) — 이번 끼니 몫 대비.
+ * 단백질은 많을수록 높다(몫의 75% 이상 100). 나머지는 몫의 75% 이하 100 → 200% 에서 0.
+ * (세 끼 남았을 때 예전 하루 기준 곡선 0.25/0.8 과 거의 같다)
+ */
 export function nutrientShareScore(key: FactorKey, share: number): number {
-  if (key === 'protein') return share >= 0.25 ? 100 : lerp(Math.max(0, share), 0, 0.25, 40, 100);
-  if (share <= 0.25) return 100;
-  if (share <= 0.8) return lerp(share, 0.25, 0.8, 100, 0);
+  if (key === 'protein') return share >= 0.75 ? 100 : lerp(Math.max(0, share), 0, 0.75, 40, 100);
+  if (share <= 0.75) return 100;
+  if (share <= 2) return lerp(share, 0.75, 2, 100, 0);
   return 0;
 }
 
@@ -101,7 +115,13 @@ export const TINY_SCORE_CAP = 85;
 export const KCAL_WEIGHT = 0.7;
 export const NUTRIENT_WEIGHT = 0.3;
 
-function score(menu: MenuItem, remaining: DailyTargets, ctx: JudgeContext, selected?: Record<string, string>): Scored {
+function score(
+  menu: MenuItem,
+  remaining: DailyTargets,
+  ctx: JudgeContext,
+  selected: Record<string, string> | undefined,
+  budget: MealBudget,
+): Scored {
   const n = applyOptions(menu, selected);
   if (menu.trust === 'none' || !n || typeof n.kcal !== 'number' || !Number.isFinite(n.kcal)) {
     return { unknown: true, score: -1, verdict: 'pass', factors: [], overKcal: false, drinkCapped: false, nutrients: null };
@@ -109,8 +129,8 @@ function score(menu: MenuItem, remaining: DailyTargets, ctx: JudgeContext, selec
 
   const factors: Factor[] = [];
 
-  // ① 칼로리 비중 (가중치 0.7)
-  const r = n.kcal / Math.max(remaining.kcal, 1);
+  // ① 이번 끼니 적정량 대비 칼로리 (가중치 0.7)
+  const r = n.kcal / Math.max(budget.kcal, 1);
   const kScore = kcalScore(r);
   factors.push({ key: 'kcal', points: kScore - NEUTRAL });
 
@@ -121,7 +141,8 @@ function score(menu: MenuItem, remaining: DailyTargets, ctx: JudgeContext, selec
     if (key === 'kcal') continue;
     const v = n[key];
     if (typeof v !== 'number') continue;
-    const sc = nutrientShareScore(key, v / Math.max(remaining[key], 1));
+    const share = remaining[key] > 0 ? v / Math.max(remaining[key] / budget.slotsLeft, 1) : v > 0 ? Infinity : 0;
+    const sc = nutrientShareScore(key, share);
     nutrientScores.push(sc);
     factors.push({ key, points: sc - NEUTRAL });
   }
@@ -184,7 +205,7 @@ function byKey(factors: Factor[]): Map<FactorKey, number> {
 }
 
 const GOOD_TITLE: Record<FactorKey, string> = {
-  kcal: '여유분 안에서 가볍게 들어가요',
+  kcal: '이번 끼니로 가볍게 들어가요',
   protein: '단백질을 든든하게 챙길 수 있어요',
   sugar: '당이 적어 가볍게 즐기기 좋아요',
   sodium: '나트륨이 적어 담백하게 드실 수 있어요',
@@ -193,7 +214,7 @@ const GOOD_TITLE: Record<FactorKey, string> = {
 };
 
 const GOOD_SECOND: Record<FactorKey, string> = {
-  kcal: '여유분 안에서 부담 없이 들어가요',
+  kcal: '양도 부담 없이 들어가요',
   protein: '지금 드시기 좋은 메뉴예요',
   sugar: '당 부담도 적어요',
   sodium: '나트륨 부담도 적어요',
@@ -202,22 +223,25 @@ const GOOD_SECOND: Record<FactorKey, string> = {
 };
 
 const OK_TITLE: Record<FactorKey, string> = {
-  kcal: '전체 여유분 안에서 무난해요',
-  protein: '전체 여유분 안에서 무난해요',
-  sugar: '당이 조금 있지만 전체 여유분 안에서 무난해요',
-  sodium: '나트륨이 조금 있지만 전체 여유분 안에서 무난해요',
-  carbs: '탄수화물이 조금 있지만 전체 여유분 안에서 무난해요',
-  fat: '지방이 조금 있지만 전체 여유분 안에서 무난해요',
+  kcal: '오늘 남은 양 안에서 무난해요',
+  protein: '오늘 남은 양 안에서 무난해요',
+  sugar: '당이 조금 있지만 오늘 남은 양 안에서 무난해요',
+  sodium: '나트륨이 조금 있지만 오늘 남은 양 안에서 무난해요',
+  carbs: '탄수화물이 조금 있지만 오늘 남은 양 안에서 무난해요',
+  fat: '지방이 조금 있지만 오늘 남은 양 안에서 무난해요',
 };
 
 const PASS_TITLE: Record<FactorKey, string> = {
   kcal: '지금 한 번에 드시기엔 조금 커요',
   protein: '지금 한 번에 드시기엔 조금 커요',
-  sugar: '당이 오늘 남은 여유보다 많은 편이에요',
-  sodium: '나트륨이 오늘 남은 여유보다 많은 편이에요',
-  carbs: '탄수화물이 오늘 남은 여유보다 많은 편이에요',
-  fat: '지방이 오늘 남은 여유보다 많은 편이에요',
+  sugar: '당이 한 끼로는 많은 편이에요',
+  sodium: '나트륨이 한 끼로는 많은 편이에요',
+  carbs: '탄수화물이 한 끼로는 많은 편이에요',
+  fat: '지방이 한 끼로는 많은 편이에요',
 };
+
+export const MILK_DRINK_REASON = '우유가 들어가지만 오늘 남은 양 안에서 무난해요';
+export const SWEET_DRINK_REASON = '달콤한 음료는 한 잔 가볍게 즐겨요';
 
 function hasMilk(menu: MenuItem): boolean {
   return (
@@ -226,7 +250,26 @@ function hasMilk(menu: MenuItem): boolean {
   );
 }
 
-function buildReasons(menu: MenuItem, s: Scored, remaining: DailyTargets): string[] {
+/** 이 퍼센트를 넘으면 "이번 끼니엔 조금 커요" */
+export const BUDGET_BIG_PCT = 110;
+
+/**
+ * 근거 숫자 한 줄 — "점심 적정량의 60%예요" · 마지막 끼니면 "오늘 남은 양의 60%예요".
+ * 적정량을 넘으면 "…의 150%라 이번 끼니엔 조금 커요". 남은 양이 없으면 undefined.
+ */
+export function budgetReason(kcal: number, budget: MealBudget, remainingKcal: number): string | undefined {
+  if (!(remainingKcal > 0) || !(budget.kcal > 0) || !Number.isFinite(kcal)) return undefined;
+  const pctOf = (base: number) => Math.round((kcal / base) * 100);
+  if (kcal > remainingKcal) return `오늘 남은 양의 ${pctOf(remainingKcal)}%라 조금 커요`;
+  const who = budget.isLast ? '오늘 남은 양' : `${budget.label} 적정량`;
+  const pct = pctOf(budget.isLast ? remainingKcal : budget.kcal);
+  if (pct < 1) return `${who}의 1%도 안 돼요`;
+  if (pct > BUDGET_BIG_PCT) return `${who}의 ${pct}%라 이번 끼니엔 조금 커요`;
+  return `${who}의 ${pct}%예요`;
+}
+
+/** 규칙 문구 2줄 + 첫 줄이 칼로리 이야기인지 (근거 숫자 줄로 대신할 수 있는지) */
+function buildReasons(menu: MenuItem, s: Scored, remaining: DailyTargets): { lines: string[]; kcalTitle: boolean } {
   const sums = [...byKey(s.factors).entries()];
   const most = (pick: (a: number, b: number) => boolean) =>
     sums.reduce<[FactorKey, number] | undefined>((best, cur) => (!best || pick(cur[1], best[1]) ? cur : best), undefined);
@@ -245,32 +288,29 @@ function buildReasons(menu: MenuItem, s: Scored, remaining: DailyTargets): strin
       const next = positives.find(([k]) => k !== key && k !== 'protein');
       if (next) second = GOOD_SECOND[next[0]];
     }
-    return [GOOD_TITLE[key], second];
+    return { lines: [GOOD_TITLE[key], second], kcalTitle: key === 'kcal' };
   }
 
   if (s.verdict === 'ok') {
     if (s.drinkCapped) {
-      return [
-        hasMilk(menu) ? '우유가 들어가지만 전체 여유분 안에서 무난해요' : '달콤한 음료는 여유분 안에서 가볍게 즐겨요',
-        '평소처럼 드셔도 좋아요',
-      ];
+      return { lines: [hasMilk(menu) ? MILK_DRINK_REASON : SWEET_DRINK_REASON, '평소처럼 드셔도 좋아요'], kcalTitle: false };
     }
     const low = most((a, b) => a < b);
     if (low && low[1] < 0 && low[0] !== 'kcal' && low[0] !== 'protein') {
-      return [OK_TITLE[low[0]], '평소처럼 드셔도 좋아요'];
+      return { lines: [OK_TITLE[low[0]], '평소처럼 드셔도 좋아요'], kcalTitle: false };
     }
-    if (hasMilk(menu)) return ['우유가 들어가지만 전체 여유분 안에서 무난해요', '평소처럼 드셔도 좋아요'];
-    return [OK_TITLE.kcal, '평소처럼 드셔도 좋아요'];
+    if (hasMilk(menu)) return { lines: [MILK_DRINK_REASON, '평소처럼 드셔도 좋아요'], kcalTitle: false };
+    return { lines: [OK_TITLE.kcal, '평소처럼 드셔도 좋아요'], kcalTitle: true };
   }
 
   // pass
-  if (remaining.kcal <= 0) return ['오늘은 여기까지 채웠어요', '내일 다시 채워져요'];
-  if (s.overKcal) return ['오늘 남은 여유보다 조금 커요', '다른 메뉴가 더 잘 맞아요'];
+  if (remaining.kcal <= 0) return { lines: ['오늘은 여기까지 채웠어요', '내일 다시 채워져요'], kcalTitle: false };
+  if (s.overKcal) return { lines: ['오늘 남은 양보다 조금 커요', '다른 메뉴가 더 잘 맞아요'], kcalTitle: true };
   const low = sums
     .filter(([k]) => k !== 'protein')
     .reduce<[FactorKey, number] | undefined>((best, cur) => (!best || cur[1] < best[1] ? cur : best), undefined);
   const key = low && low[1] < 0 ? low[0] : 'kcal';
-  return [PASS_TITLE[key], '다른 메뉴가 더 잘 맞아요'];
+  return { lines: [PASS_TITLE[key], '다른 메뉴가 더 잘 맞아요'], kcalTitle: key === 'kcal' };
 }
 
 /** 한글 마지막 글자에 받침이 있는지 (ㄹ 받침은 '로'를 쓰므로 false) */
@@ -292,7 +332,7 @@ export function optionPhrase(label: string): string {
   return `${clean}${needsEuro(clean) ? '으로' : '로'} 하면`;
 }
 
-function buildGuide(menu: MenuItem, remaining: DailyTargets, ctx: JudgeContext, current: Scored): string | undefined {
+function buildGuide(menu: MenuItem, remaining: DailyTargets, ctx: JudgeContext, current: Scored, budget: MealBudget): string | undefined {
   if (current.unknown || !menu.options?.length) return undefined;
   const selected = ctx.selectedOptions ?? {};
   let best: { label: string; s: Scored } | undefined;
@@ -300,7 +340,7 @@ function buildGuide(menu: MenuItem, remaining: DailyTargets, ctx: JudgeContext, 
     const currentLabel = selected[group.id] ?? group.choices.find((c) => c.isDefault)?.label;
     for (const choice of group.choices) {
       if (choice.label === currentLabel) continue;
-      const s = score(menu, remaining, ctx, { ...selected, [group.id]: choice.label });
+      const s = score(menu, remaining, ctx, { ...selected, [group.id]: choice.label }, budget);
       if (s.unknown || VERDICT_RANK[s.verdict] <= VERDICT_RANK[current.verdict]) continue;
       if (
         !best ||
@@ -315,19 +355,28 @@ function buildGuide(menu: MenuItem, remaining: DailyTargets, ctx: JudgeContext, 
   return `${optionPhrase(best.label)} ${VERDICT_LABEL[best.s.verdict]}이 돼요`;
 }
 
-/** 메뉴 하나 판정 — 규칙·템플릿만, AI 없음 */
+/**
+ * 메뉴 하나 판정 — 규칙·템플릿만, AI 없음.
+ * 칼로리는 "이번 끼니 적정량"(하루 남은 kcal ÷ 남은 끼니 수, ctx.now 기준) 대비로 본다.
+ * reasons[0] 은 근거 숫자 한 줄("점심 적정량의 60%예요"), 이어서 규칙 문구.
+ */
 export function judgeMenu(menu: MenuItem, remaining: DailyTargets, ctx: JudgeContext): Judgement {
-  const s = score(menu, remaining, ctx, ctx.selectedOptions);
-  if (s.unknown) {
+  const budget = judgeBudget(remaining, ctx);
+  const s = score(menu, remaining, ctx, ctx.selectedOptions, budget);
+  if (s.unknown || !s.nutrients) {
     return { unknown: true, verdict: 'pass', score: -1, reasons: [...UNKNOWN_REASONS] };
   }
+  const { lines, kcalTitle } = buildReasons(menu, s, remaining);
+  const numberLine = budgetReason(s.nutrients.kcal, budget, remaining.kcal);
+  // 칼로리 이야기인 첫 줄은 숫자 줄로 대신하고, 나머지는 숫자 줄 뒤에 둔다 (최대 3줄)
+  const reasons = numberLine ? [numberLine, ...(kcalTitle ? lines.slice(1) : lines)] : lines;
   const judgement: Judgement = {
     unknown: false,
     verdict: s.verdict,
     score: s.score,
-    reasons: buildReasons(menu, s, remaining),
+    reasons,
   };
-  const guide = buildGuide(menu, remaining, ctx, s);
+  const guide = buildGuide(menu, remaining, ctx, s, budget);
   if (guide) judgement.guide = guide;
   return judgement;
 }
@@ -338,7 +387,9 @@ export function rankMenus(
   remaining: DailyTargets,
   ctx: JudgeContext,
 ): { menu: MenuItem; judgement: Judgement }[] {
-  const judged = menus.map((menu, i) => ({ menu, judgement: judgeMenu(menu, remaining, ctx), i }));
+  // 목록 전체를 같은 시각(같은 끼니)으로 판정
+  const c: JudgeContext = { ...ctx, now: ctx.now ?? new Date() };
+  const judged = menus.map((menu, i) => ({ menu, judgement: judgeMenu(menu, remaining, c), i }));
   judged.sort((a, b) => {
     if (a.judgement.unknown !== b.judgement.unknown) return a.judgement.unknown ? 1 : -1;
     if (a.judgement.unknown) return a.i - b.i;
@@ -358,9 +409,10 @@ export function suggestAlternatives(
   ctx: JudgeContext,
   n = 2,
 ): { menu: MenuItem; judgement: Judgement }[] {
-  const base = judgeMenu(menu, remaining, ctx).score;
-  // 대안은 기본 옵션 기준으로 판정 (대상 메뉴의 옵션 선택을 끌고 오지 않음)
-  const altCtx: JudgeContext = { profile: ctx.profile };
+  const now = ctx.now ?? new Date();
+  const base = judgeMenu(menu, remaining, { ...ctx, now }).score;
+  // 대안은 기본 옵션 기준으로 판정 (대상 메뉴의 옵션 선택을 끌고 오지 않음). 끼니 기준은 같게
+  const altCtx: JudgeContext = { profile: ctx.profile, now, mealSlotsLeft: ctx.mealSlotsLeft, eatenMeals: ctx.eatenMeals };
   const better = rankMenus(
     candidates.filter((c) => c.id !== menu.id),
     remaining,
