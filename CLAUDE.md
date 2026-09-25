@@ -49,10 +49,11 @@ docs/                    IA, 시안, 결정 기록
 ## 커밋
 - Angular 스타일 + 한글 제목: `feat(nearby): 주변 매장 목록 화면`, `fix(judge): 여유 0일 때 패스 처리`.
 - 작업 단위마다 커밋 (기능 하나 = 커밋 하나). 본문에는 결정과 이유를 1~3줄.
-- 커밋 작성자: `dudejrtjdrp <dudejrtjdrp@naver.com>` (GitHub 계정 이메일 — 2026-09-23 효님 확정, gmail 아님). 마지막 줄에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- 커밋 작성자: `dudejrtjdrp <dudejrtjdrp@naver.com>` (GitHub 계정 이메일 — 2026-09-23 효님 확정, gmail 아님). 마지막 줄에 `Co-Authored-By: Claude <모델> <noreply@anthropic.com>` (실제 작업한 모델, 세션 링크가 있으면 `Claude-Session:` 줄도).
 - `.env`, 토큰, `.local/` 은 절대 커밋하지 않는다.
 
 ## 릴리스·패치노트
 - 사용자에게 보이는 변화(feat/fix)가 쌓여 한 번 배포할 만하면 `npm run release` 로 버전업 + `CHANGELOG.md` 패치노트 + `release/whats-new.txt`(TestFlight "테스트할 내용") 를 만들고 `chore(release): vX.Y.Z` 로 커밋한다.
 - 버전 규칙: feat 포함 → minor, fix/기타만 → patch. 빌드 번호는 순번(app.json ios.buildNumber): `npm run testflight` 가 사용 후 +1 커밋. 릴리스 때도 초기화하지 않는다 (애플은 앱 전체에서 이전 업로드보다 큰 번호만 허용 — 2026-09-23 효님 확정).
 - 그래서 커밋 제목은 사용자가 읽을 수 있는 한국어 한 줄로 쓴다 — 그대로 패치노트가 된다.
+- **TestFlight 업로드마다 ASC "테스트할 내용" 갱신 (2026-09-25 효님 지시)**: 버전업한 빌드가 TestFlight에 올라가면(처리 완료 후) Claude가 브라우저(효님 맥 크롬)로 App Store Connect → 앱 "식사 개인화"(mealing) → TestFlight → 해당 빌드 → "테스트할 내용"(한국어)에 `release/whats-new.txt` 내용을 넣고 저장한다. 효님이 따로 말하지 않아도 매번. ASC 로그인이 풀려 있으면 효님에게 로그인만 부탁한다.
