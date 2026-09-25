@@ -1,4 +1,4 @@
-import { QTY_OPTIONS, qtyLabel, qtyUnit, scaleNutrients } from '../qty';
+import { QTY_OPTIONS, canStepQty, qtyLabel, qtyUnit, scaleNutrients, stepQty } from '../qty';
 
 describe('기록 수량', () => {
   it('0.5~2 를 0.25 단위 7단계로 고른다', () => {
@@ -18,5 +18,24 @@ describe('기록 수량', () => {
     expect(qtyUnit('1인분 (300 g)')).toBe('인분');
     expect(qtyUnit(undefined)).toBe('인분');
     expect(qtyLabel(1.25, '개')).toBe('1.25개');
+  });
+});
+
+describe('수량 스테퍼', () => {
+  it('7단계 사이를 한 칸씩 움직이고 끝에서 멈춘다', () => {
+    expect(stepQty(1, 1)).toBe(1.25);
+    expect(stepQty(1, -1)).toBe(0.75);
+    expect(stepQty(2, 1)).toBe(2);
+    expect(stepQty(0.5, -1)).toBe(0.5);
+    expect(canStepQty(2, 1)).toBe(false);
+    expect(canStepQty(0.5, -1)).toBe(false);
+    expect(canStepQty(1, 1)).toBe(true);
+  });
+
+  it('목록 밖 값은 가까운 단계로 들어온다', () => {
+    expect(stepQty(3, -1)).toBe(2);
+    expect(stepQty(0.3, 1)).toBe(0.5);
+    expect(stepQty(1.1, 1)).toBe(1.25);
+    expect(stepQty(1.1, -1)).toBe(1);
   });
 });

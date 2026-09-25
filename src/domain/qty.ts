@@ -27,3 +27,18 @@ export function qtyLabel(q: number, unit = '인분'): string {
 export function menuQtyUnit(menu: Pick<MenuItem, 'serving'> | undefined): string {
   return qtyUnit(menu?.serving);
 }
+
+/**
+ * 수량 스테퍼 한 칸 이동: QTY_OPTIONS 안에서 앞/뒤 단계로. 끝이면 그대로.
+ * 목록에 없는 값(예전 기록 3개 등)은 가장 가까운 단계 쪽으로 한 칸 움직인다.
+ */
+export function stepQty(q: number, dir: 1 | -1): number {
+  const opts = QTY_OPTIONS as readonly number[];
+  if (dir > 0) return opts.find((o) => o > q) ?? q;
+  for (let i = opts.length - 1; i >= 0; i--) if (opts[i] < q) return opts[i];
+  return q;
+}
+
+export function canStepQty(q: number, dir: 1 | -1): boolean {
+  return stepQty(q, dir) !== q;
+}
