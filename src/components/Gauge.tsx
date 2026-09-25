@@ -93,11 +93,20 @@ export interface RoomBarProps {
   progress: number;
   /** 목표보다 더 먹은 kcal (DaySummary.over.kcal) — 0 보다 크면 "오늘 목표보다 320kcal 더 드셨어요"(빨강) */
   over?: number;
+  /**
+   * 아직 기록하지 않은 '담은' kcal (D3 매장 담기). 0/없으면 예전과 똑같이 그린다.
+   * 있으면 바에 담은 양을 빨강(colors.over)으로 채우고 문구를 "담은 걸 먹으면 N kcal 남아요 / 목표보다 N kcal 넘어요"로 바꾼다.
+   * 담은 양 빨강 표시는 2026-09-25 효님 결정 (넘은 양 전용 빨강 규칙의 예외).
+   */
+  pending?: number;
+  /** 하루 목표 kcal — pending 폭 계산용 (없으면 remaining·progress 로 가늠) */
+  target?: number;
   style?: StyleProp<ViewStyle>;
 }
 
 /** 남은 양 미니카드 (D3) — 틴트 바탕 + "오늘 더 먹을 수 있는 양 540 kcal" + 흰 트랙 바. 넘었으면 연한 빨강 바탕 + 넘은 양 */
-export function RoomBar({ remaining, progress, over = 0, style }: RoomBarProps) {
+export function RoomBar({ remaining, progress, over = 0, pending = 0, target, style }: RoomBarProps) {
+  if (pending > 0) return <PendingRoomBar remaining={remaining} progress={progress} over={over} pending={pending} target={target} style={style} />;
   const isOver = over > 0;
   const done = !isOver && remaining <= 0;
   const a11y = isOver ? `오늘 목표보다 ${formatNumber(over)}kcal 더 드셨어요` : done ? '오늘은 여기까지, 내일 다시 채워져요' : `오늘 더 먹을 수 있는 양 ${formatNumber(remaining)} kcal`;
@@ -133,6 +142,51 @@ export function RoomBar({ remaining, progress, over = 0, style }: RoomBarProps) 
       <View style={[styles.roomTrack, isOver && styles.rowTrack]}>
         <View style={[styles.roomFill, isOver ? styles.flat : null, { width: `${(isOver ? 1 - overW : p) * 100}%` }]} />
         {isOver ? <View style={[styles.roomFill, styles.overFill, { width: `${overW * 100}%` }]} /> : null}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * 담은 메뉴가 있을 때의 RoomBar — 먹은 양(초록) + 담은 양(빨강, 2026-09-25 효님 결정) + 남는 흰 트랙.
+ * 담은 걸 먹으면 목표를 넘으면 바를 꽉 채우고 초록:빨강을 비율대로 나눈다.
+ */
+function PendingRoomBar({ remaining, progress, over, pending, target, style }: Required<Pick<RoomBarProps, 'remaining' | 'progress' | 'over' | 'pending'>> & Pick<RoomBarProps, 'target' | 'style'>) {
+  const left = (over > 0 ? -over : remaining) - pending; // 담은 걸 먹은 뒤 남는 kcal (음수 = 넘는 양)
+  const willOver = left < 0;
+  const eaten = Math.max(0, progress);
+  // 담은 양의 목표 대비 비율 — 목표를 알면 그대로, 모르면 남은 흰 칸(1-progress)이 remaining 이라는 점으로 가늠
+  const pf = target && target > 0 ? pending / target : remaining > 0 && eaten < 1 ? ((1 - eaten) * pending) / remaining : 0.3;
+  const total = eaten + pf;
+  const scale = total > 1 ? 1 / total : 1;
+  const pendW = Math.max(0.06, pf * scale);
+  const eatW = Math.max(0, Math.min(1 - pendW, eaten * scale));
+  const a11y = willOver ? `담은 걸 먹으면 목표보다 ${formatNumber(-left)}kcal 넘어요` : `담은 걸 먹으면 ${formatNumber(left)} kcal 남아요`;
+  return (
+    <View style={[styles.room, willOver && styles.roomOver, style]} accessibilityRole="summary" accessibilityLabel={a11y} accessibilityLiveRegion="polite">
+      {willOver ? (
+        <Text variant="caption" color="ink2" style={styles.roomText}>
+          담은 걸 먹으면 목표보다{' '}
+          <Text variant="h3" color="over">
+            {formatNumber(-left)}
+          </Text>
+          <Text variant="caption" color="over">
+            {' '}kcal
+          </Text>{' '}
+          넘어요
+        </Text>
+      ) : (
+        <Text variant="caption" color="ink2" style={styles.roomText}>
+          담은 걸 먹으면{' '}
+          <Text variant="h3" color="primaryText">
+            {formatNumber(left)}
+          </Text>{' '}
+          kcal 남아요
+        </Text>
+      )}
+      <View style={[styles.roomTrack, styles.rowTrack]}>
+        {eatW > 0 ? <View style={[styles.roomFill, styles.flat, { width: `${eatW * 100}%` }]} /> : null}
+        <View style={[styles.roomFill, styles.overFill, { width: `${pendW * 100}%` }]} />
       </View>
     </View>
   );
