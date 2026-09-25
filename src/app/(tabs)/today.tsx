@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BellIcon, Button, Card, EmptyState, IconButton, KcalRing, MenuTile, NutrientBar, RichText, Skeleton, Text, Wordmark, showToast, type NutrientKey } from '@/components';
+import { Button, Card, EmptyState, KcalRing, MenuTile, NutrientBar, RichText, Skeleton, Text, Wordmark, type NutrientKey } from '@/components';
 import { getMenu } from '@/data';
 import { formatNumber } from '@/domain/summary';
 import { MEAL_LABEL, type DaySummary, type MenuCategory } from '@/domain/types';
@@ -18,7 +18,7 @@ function headline(summary: DaySummary, nickname: string): string {
   return `${nickname}님, 오늘\n**${formatNumber(summary.remaining.kcal)}kcal** 더 먹을 수 있어요`;
 }
 
-/** C1 오늘 홈 — 2색 인사 헤드라인 + 칼로리 도넛 링·영양소 미니바 카드 + 오늘 기록 + 주변 찾기 CTA */
+/** C1 오늘 홈 — 2색 인사 헤드라인 + 칼로리 도넛 링·영양소 미니바 카드(누르면 기록 탭) + 오늘 기록 + 주변 메뉴 더 보기 CTA */
 export default function Today() {
   const profile = useProfile((s) => s.profile);
   const targets = useProfile((s) => s.targets);
@@ -34,7 +34,6 @@ export default function Today() {
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.topBar}>
         <Wordmark size={20} />
-        <IconButton icon={<BellIcon color={colors.ink2} />} label="알림" onPress={() => showToast('알림은 곧 열려요', 'info')} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -51,7 +50,11 @@ export default function Today() {
           </Text>
         )}
 
-        <Card style={styles.gaugeCard}>
+        <Card
+          style={styles.gaugeCard}
+          onPress={summary && targets ? () => router.navigate('/(tabs)/log') : undefined}
+          accessibilityLabel={summary ? `오늘 ${formatNumber(Math.max(0, summary.remaining.kcal))}kcal 더 먹을 수 있어요. 누르면 기록으로 가요` : undefined}
+        >
           {loading ? (
             <View style={styles.gaugeRow}>
               <Skeleton width={130} height={130} borderRadius={65} />
@@ -131,7 +134,7 @@ export default function Today() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button title="지금 주변에서 찾기" onPress={() => router.navigate('/(tabs)/nearby')} />
+        <Button title="주변 메뉴 더 보기" onPress={() => router.navigate('/(tabs)/nearby')} />
       </View>
     </SafeAreaView>
   );
