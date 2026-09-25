@@ -91,9 +91,13 @@ export default function AddLog() {
 
   useEffect(() => {
     let alive = true;
-    const day = useDay.getState();
-    Promise.all([day.recentLogs(FREQUENT_DAYS), day.recentLogs(RECENT_DAYS)])
-      .then(([frequent, recent]) => alive && setHistory({ frequent, recent }))
+    // 30일을 한 번만 읽고, "최근"은 그중 14일
+    const now = new Date();
+    const recentFrom = toDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - (RECENT_DAYS - 1)));
+    useDay
+      .getState()
+      .recentLogs(FREQUENT_DAYS)
+      .then((frequent) => alive && setHistory({ frequent, recent: frequent.filter((l) => l.date >= recentFrom) }))
       .catch(() => alive && setHistory({ frequent: [], recent: [] }));
     return () => {
       alive = false;
