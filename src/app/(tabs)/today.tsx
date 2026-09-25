@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -145,6 +146,7 @@ export default function Today() {
               </Text>
             </Pressable>
           </View>
+          <AIQuickRow />
           {loading ? (
             <View style={styles.rows}>
               <Skeleton height={44} borderRadius={radius.pill} />
@@ -188,6 +190,33 @@ export default function Today() {
         <Button title="주변 메뉴 더 보기" onPress={() => router.navigate('/(tabs)/nearby')} />
       </View>
     </SafeAreaView>
+  );
+}
+
+/** 먹은 걸 바로 알려주기 — 사진·말·글 (E4 AI로 기록) */
+function AIQuickRow() {
+  const items = [
+    { mode: 'photo', icon: 'camera-outline', label: '사진으로' },
+    { mode: 'voice', icon: 'mic-outline', label: '말로' },
+    { mode: 'text', icon: 'create-outline', label: '글로' },
+  ] as const;
+  return (
+    <View style={styles.aiRow}>
+      {items.map((it) => (
+        <Pressable
+          key={it.mode}
+          accessibilityRole="button"
+          accessibilityLabel={`${it.label} 기록하기`}
+          onPress={() => router.push({ pathname: '/log/ai', params: { mode: it.mode } })}
+          style={({ pressed }) => [styles.aiBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Ionicons name={it.icon} size={18} color={colors.primaryText} />
+          <Text variant="captionMedium" color="primaryText">
+            {it.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -327,6 +356,8 @@ const styles = StyleSheet.create({
   addBtn: { minHeight: size.touch, minWidth: size.touch, paddingLeft: spacing.md, alignItems: 'flex-end', justifyContent: 'center' },
   addText: { fontSize: 14, fontFamily: fonts.semibold },
   rows: { gap: 4 },
+  aiRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.sm },
+  aiBtn: { flex: 1, minHeight: size.touch, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.pill, backgroundColor: colors.primaryTint },
   logRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   logName: { flex: 1, fontSize: 14 },
   bold: { fontFamily: fonts.bold },

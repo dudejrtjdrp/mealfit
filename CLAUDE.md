@@ -14,7 +14,7 @@ Expo 57은 이전 버전과 다르다 — API가 불확실하면 https://docs.ex
 
 ## 폴더
 ```
-src/app/                 라우트 (A2 login, (onboarding)/step1~7, (tabs)/today|nearby|log|my, store/[id], menu/[id], log/add ...)
+src/app/                 라우트 (A2 login, (onboarding)/step1~7, (tabs)/today|nearby|log|my, store/[id], menu/[id], log/add, log/ai ...)
 src/components/          공통 컴포넌트 (Badge, Gauge, StoreCard, MenuCard, OptionChip, EmptyState, Button, ProgressSteps, BottomSheet ...)
 src/domain/              순수 로직 (타입, 목표량 계산, 판정 엔진, 성향 분류) — React 의존 금지, 전부 jest 테스트
 src/data/                시드 데이터 (brands.json, menus.json, options) + 로더
@@ -31,7 +31,9 @@ docs/                    IA, 시안, 결정 기록
 3. **판정 3단계**: 좋음(good) · 괜찮음(ok) · 오늘은 패스(pass). 색은 theme의 good/ok/pass — 판정 배지에는 빨강을 쓰지 않는다.
    - 색 규칙: 빨강(theme.over / overBg)은 **'하루 목표를 넘은 양'** 표시에만 쓴다(넘은 kcal·영양소 수치, 링·바의 넘은 부분). 단백질은 많을수록 좋은 영양소라 목표를 넘어도 빨강으로 표시하지 않는다(domain/summary OVER_KEYS).
 4. **숫자를 지어내지 않는다**: 영양 정보가 없으면 판정 배지 대신 "아직 추가되지 않은 정보입니다" + 이유 한 줄. 신뢰등급(official/estimated/none/user)을 항상 데이터에 싣는다. 시드 데이터에서 `official`은 공개 영양표 출처(sourceUrl)를 적을 수 있을 때만.
-5. **무료 구간에 AI 없음**: 판정·순위·이유 문구는 전부 규칙과 템플릿. AI는 온보딩 B6 성향 분류 1회뿐이고, 같은 서술은 캐시(정규화 텍스트 sha256 → 결과)로 재호출하지 않는다. 키가 없으면 규칙 기반으로 동작.
+5. **AI는 두 곳만**: 판정·순위·이유 문구는 전부 규칙과 템플릿. AI는 ① 온보딩 B6 성향 분류 1회, ② E4 AI로 기록(사진·말·글 → 음식+대략 양) 두 곳뿐. 같은 서술은 캐시(정규화 텍스트 sha256 → 결과)로 재호출하지 않는다. 키가 없으면 규칙 기반으로 동작.
+   - E4는 무료, 대신 기기별 하루 15회(domain/aiMeal AI_MEAL_DAILY_LIMIT)로 비용 상한 (2026-09-25 효님 결정). 횟수를 다 쓰거나 키가 없으면 글은 규칙으로 나누고, 사진은 말·글로 안내.
+   - AI는 "무엇을, 대략 얼마나"만 뽑는다. 칼로리는 앱 데이터에서 같은 이름 메뉴를 찾아 쓰고, 없을 때만 AI 1인분 추정값이나 비슷한 메뉴를 **추정(estimated)**으로 쓴다. 사용자가 확인 카드에서 고친 뒤 기록한다. 사진은 저장하지 않는다.
 6. **외부 키 없이도 전부 동작**: `.env`가 비어 있으면 Supabase 대신 로컬 저장소(AsyncStorage), 카카오 대신 목 매장 목록(역삼동 기준 시안과 같은 4곳 + α), AI 대신 규칙 분류. 목·자리표시가 아니라 실제로 도는 폴백이어야 한다.
 7. **포지셔닝은 "건강관리"**: 브랜드 문구에 다이어트·감량이라는 단어를 앞세우지 않는다. 목적 목록에서는 써도 된다.
 

@@ -98,6 +98,7 @@ export default function RootLayout() {
           <Stack.Screen name="store/[id]" />
           <Stack.Screen name="menu/[id]" />
           <Stack.Screen name="log/add" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="log/ai" options={{ presentation: 'modal' }} />
           {/* 지도 핀을 끌 때 시트가 같이 내려가지 않게 스와이프 닫기는 끈다 (닫기 버튼으로 닫는다) */}
           <Stack.Screen name="nearby/location" options={{ presentation: 'modal', gestureEnabled: false }} />
           <Stack.Screen name="nearby/search" />

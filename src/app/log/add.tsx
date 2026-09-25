@@ -64,7 +64,7 @@ function buildLog(s: Source, mealType: MealType, qty: number, remaining: DailyTa
   return { ...rest, ...base, nutrients: scaleNutrients(n, qty) };
 }
 
-/** E2 기록 추가 — 검색창 하나 · 자주 먹어요/최근(+ 한 번에 기록) · 검색 결과(판정 배지) · 맨 아래 직접 입력 */
+/** E2 기록 추가 — 검색창 하나 · 자주 먹어요/최근(+ 한 번에 기록) · 검색 결과(판정 배지) · 맨 아래 직접 입력 · 하단 AI 입력줄(사진·글·말 → E4) */
 export default function AddLog() {
   const params = useLocalSearchParams<{ name?: string; store?: string; tab?: string }>();
   const profile = useProfile((s) => s.profile);
@@ -427,8 +427,18 @@ export default function AddLog() {
                     ‘{query.trim()}’에 맞는 메뉴가 없어요
                   </Text>
                   <Text variant="caption" color="ink3" align="center">
-                    이름을 조금 다르게 적어 보거나 아래에서 직접 입력해 주세요.
+                    이름을 조금 다르게 적어 보거나 밀리에게 부탁해 보세요.
                   </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'text', text: query.trim() } })}
+                    style={({ pressed }) => [styles.askMilly, pressed && styles.pressed]}
+                  >
+                    <Ionicons name="sparkles-outline" size={16} color={colors.primaryText} />
+                    <Text variant="captionMedium" color="primaryText">
+                      ‘{query.trim()}’ 밀리한테 정리 부탁하기
+                    </Text>
+                  </Pressable>
                 </View>
               )
             ) : (
@@ -456,6 +466,21 @@ export default function AddLog() {
               <Ionicons name="chevron-forward" size={18} color={colors.ink3} />
             </Pressable>
           </ScrollView>
+
+          {/* E4 AI로 기록 — 사진·말·글로 한 번에 */}
+          <View style={styles.aiBar}>
+            <Pressable accessibilityRole="button" accessibilityLabel="사진으로 기록" hitSlop={4} onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'photo' } })} style={({ pressed }) => [styles.aiIcon, pressed && styles.pressed]}>
+              <Ionicons name="camera-outline" size={22} color={colors.ink} />
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="글로 여러 개 한 번에 기록" onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'text' } })} style={({ pressed }) => [styles.aiField, pressed && styles.pressed]}>
+              <Text variant="body" color="ink3" numberOfLines={1}>
+                김치찌개랑 밥 반 공기처럼 한 번에
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="말로 기록" hitSlop={4} onPress={() => router.push({ pathname: '/log/ai', params: { mode: 'voice' } })} style={({ pressed }) => [styles.aiMic, pressed && styles.pressed]}>
+              <Ionicons name="mic" size={20} color={colors.inkOnPrimary} />
+            </Pressable>
+          </View>
         </>
       )}
 
@@ -603,6 +628,11 @@ const styles = StyleSheet.create({
   dim: { opacity: 0.6 },
   manualLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 52, marginTop: spacing.lg, paddingHorizontal: spacing.lg, borderRadius: radius.button, borderWidth: 1, borderColor: colors.line },
   form: { gap: spacing.lg },
+  askMilly: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md, minHeight: 40, paddingHorizontal: spacing.lg, borderRadius: radius.pill, backgroundColor: colors.primaryTint },
+  aiBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.page, paddingTop: spacing.sm, paddingBottom: spacing.md, borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.bg },
+  aiIcon: { width: size.touch, height: size.touch, borderRadius: size.touch / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.section },
+  aiField: { flex: 1, height: size.touch, borderRadius: radius.pill, backgroundColor: colors.section, justifyContent: 'center', paddingHorizontal: spacing.lg },
+  aiMic: { width: size.touch, height: size.touch, borderRadius: size.touch / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
   guessBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 36, marginTop: spacing.xs },
   estimate: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   estimateNone: { marginTop: spacing.xs },
