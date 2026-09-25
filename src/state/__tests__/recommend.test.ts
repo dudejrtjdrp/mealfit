@@ -2,7 +2,7 @@ import { getMenusByBrand, getMockStores } from '../../data';
 import { YEOKSAM_CENTER } from '../../data/mockStores';
 import { PROFILE, TARGETS, menu } from '../../domain/__tests__/fixtures';
 import type { MenuItem, Store } from '../../domain/types';
-import { collectCandidates, nearestStoresWithData, pickRecommendations } from '../recommend';
+import { collectCandidates, modeSubLabel, nearestStoresWithData, pickRecommendations, useRecommendMode } from '../recommend';
 
 const ctx = { profile: PROFILE };
 
@@ -58,7 +58,7 @@ describe('collectCandidates + pickRecommendations', () => {
   });
 
   it('좋음이 괜찮음보다 먼저', () => {
-    const picks = pickRecommendations(collectCandidates(stores, menusFor, TARGETS, ctx), 10);
+    const picks = pickRecommendations(collectCandidates(stores, menusFor, TARGETS, ctx), 'all', 10);
     const firstOk = picks.findIndex((p) => p.judgement.verdict === 'ok');
     const lastGood = picks.map((p) => p.judgement.verdict).lastIndexOf('good');
     if (firstOk >= 0 && lastGood >= 0) expect(lastGood).toBeLessThan(firstOk);
@@ -76,6 +76,50 @@ describe('collectCandidates + pickRecommendations', () => {
   });
 });
 
+describe('상황 칩', () => {
+  const stores = [store({ id: 'a1', brandId: 'a' }), store({ id: 'b1', brandId: 'b' }), store({ id: 'd1', brandId: 'd' }), store({ id: 'e1', brandId: 'e' })];
+  const withE: Record<string, MenuItem[]> = {
+    ...MENUS,
+    // 단백질·당 정보가 없는 메뉴 — 칩 정렬에서 뒤로 간다
+    e: [menu({ id: 'e-toast', brandId: 'e', category: 'meal', nutrients: { kcal: 200 } })],
+  };
+  const cands = () => collectCandidates(stores, (id) => withE[id] ?? [], TARGETS, ctx);
+  // 판정 등급 차이를 없애고 칩 기준만 보기 위해 전부 좋음으로 맞춘다
+  const allGood = () => cands().map((c) => ({ ...c, judgement: { ...c.judgement, verdict: 'good' as const } }));
+
+  it('가볍게 = kcal 낮은 순', () => {
+    const picks = pickRecommendations(allGood(), 'light');
+    expect(picks.map((p) => p.kcal)).toEqual([...picks.map((p) => p.kcal)].sort((x, y) => x - y));
+    expect(picks[0].menu.id).toBe('e-toast');
+  });
+
+  it('단백질 든든 = kcal 당 단백질 높은 순, 정보 없는 메뉴는 뒤로', () => {
+    const picks = pickRecommendations(allGood(), 'protein', 4);
+    expect(picks.map((p) => p.menu.id)).toEqual(['a-salad', 'd-bowl', 'b-sandwich', 'e-toast']);
+    expect(modeSubLabel(picks[0], 'protein')).toBe('단백질 20g');
+    expect(modeSubLabel(picks[3], 'protein')).toBeUndefined();
+  });
+
+  it('달지 않게 = 당 낮은 순, 정보 없는 메뉴는 뒤로', () => {
+    const picks = pickRecommendations(allGood(), 'lowSugar', 4);
+    expect(picks.map((p) => p.menu.id)).toEqual(['a-salad', 'd-bowl', 'b-sandwich', 'e-toast']);
+    expect(modeSubLabel(picks[1], 'lowSugar')).toBe('당 5g');
+  });
+
+  it('전체·가볍게는 보조 수치를 붙이지 않는다', () => {
+    const [p] = pickRecommendations(allGood(), 'all');
+    expect(modeSubLabel(p, 'all')).toBeUndefined();
+    expect(modeSubLabel(p, 'light')).toBeUndefined();
+  });
+
+  it('칩 선택은 세션 메모리에 남는다', () => {
+    expect(useRecommendMode.getState().mode).toBe('all');
+    useRecommendMode.getState().setMode('protein');
+    expect(useRecommendMode.getState().mode).toBe('protein');
+    useRecommendMode.getState().setMode('all');
+  });
+});
+
 describe('실제 목 매장 (역삼동)', () => {
   it('3개, 서로 다른 매장, 전부 판정 있음', () => {
     const picks = pickRecommendations(collectCandidates(getMockStores(YEOKSAM_CENTER), getMenusByBrand, TARGETS, ctx));
@@ -86,5 +130,10 @@ describe('실제 목 매장 (역삼동)', () => {
       expect(p.judgement.verdict).not.toBe('pass');
       expect(p.kcal).toBeGreaterThanOrEqual(30);
     }
+  });
+
+  it('칩마다 3개씩 나온다', () => {
+    const cands = collectCandidates(getMockStores(YEOKSAM_CENTER), getMenusByBrand, TARGETS, ctx);
+    for (const mode of ['all', 'light', 'protein', 'lowSugar'] as const) expect(pickRecommendations(cands, mode)).toHaveLength(3);
   });
 });

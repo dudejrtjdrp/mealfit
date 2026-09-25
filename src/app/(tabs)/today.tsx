@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card, EmptyState, KcalRing, MenuTile, NutrientBar, RichText, Skeleton, Text, Wordmark, type NutrientKey } from '@/components';
+import { Button, Card, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, RichText, Skeleton, Text, Wordmark, type NutrientKey } from '@/components';
 import { RecommendCard, RecommendCardSkeleton } from '@/components/RecommendCard';
 import { getMenu, getMenusByBrand } from '@/data';
 import { REFERENCE_FOOD_SPECS, foodEquivalent, resolveReferenceFoods } from '@/domain/foodEquivalent';
@@ -14,7 +14,7 @@ import { judgeProfile } from '@/state/bootstrap';
 import { useDay } from '@/state/day';
 import { useNearby } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
-import { collectCandidates, pickRecommendations } from '@/state/recommend';
+import { RECOMMEND_MODES, collectCandidates, modeSubLabel, pickRecommendations, useRecommendMode } from '@/state/recommend';
 import { colors, fonts, radius, size, spacing } from '@/theme';
 
 const MAX_ROWS = 4;
@@ -189,7 +189,9 @@ function NearbyPicks({ remaining, profile }: { remaining: DailyTargets | null; p
     () => (remaining && stores.length > 0 ? collectCandidates(stores, getMenusByBrand, remaining, { profile: judgeProfile(profile) }) : []),
     [stores, remaining, profile],
   );
-  const picks = useMemo(() => pickRecommendations(candidates), [candidates]);
+  const mode = useRecommendMode((s) => s.mode);
+  const setMode = useRecommendMode((s) => s.setMode);
+  const picks = useMemo(() => pickRecommendations(candidates, mode), [candidates, mode]);
 
   const busy = status === 'idle' || status === 'locating' || status === 'loading';
 
@@ -238,19 +240,27 @@ function NearbyPicks({ remaining, profile }: { remaining: DailyTargets | null; p
     );
   } else {
     body = (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardsWrap} contentContainerStyle={styles.cards}>
-        {picks.map(({ menu, judgement, store, kcal }) => (
-          <RecommendCard
-            key={menu.id}
-            menu={menu}
-            storeName={store.name}
-            distanceM={store.distanceM}
-            kcal={kcal}
-            verdict={judgement.verdict}
-            onPress={() => router.push({ pathname: '/menu/[id]', params: { id: menu.id, store: store.name } })}
-          />
-        ))}
-      </ScrollView>
+      <>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardsWrap} contentContainerStyle={styles.chips} accessibilityRole="tablist">
+          {RECOMMEND_MODES.map((m) => (
+            <Chip key={m.id} label={m.label} size="sm" selected={mode === m.id} onPress={() => setMode(m.id)} />
+          ))}
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardsWrap} contentContainerStyle={styles.cards}>
+          {picks.map((c) => (
+            <RecommendCard
+              key={c.menu.id}
+              menu={c.menu}
+              storeName={c.store.name}
+              distanceM={c.store.distanceM}
+              kcal={c.kcal}
+              verdict={c.judgement.verdict}
+              sub={modeSubLabel(c, mode)}
+              onPress={() => router.push({ pathname: '/menu/[id]', params: { id: c.menu.id, store: c.store.name } })}
+            />
+          ))}
+        </ScrollView>
+      </>
     );
   }
 
@@ -273,6 +283,7 @@ const styles = StyleSheet.create({
   picks: { marginTop: spacing.xl, gap: spacing.md },
   cardsWrap: { marginHorizontal: -spacing.page },
   cards: { paddingHorizontal: spacing.page, gap: spacing.md },
+  chips: { paddingHorizontal: spacing.page, gap: spacing.sm },
   pickNote: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.section },
   pickNoteText: { flex: 1 },
   pickAction: { minHeight: 32, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
