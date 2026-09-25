@@ -13,7 +13,9 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "주변 매장의 메뉴를 판정해 보여드리기 위해 현재 위치가 필요해요.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "말로 먹은 음식을 기록하기 위해 마이크를 사용해요.",
+        "NSSpeechRecognitionUsageDescription": "말한 내용을 글자로 바꿔 먹은 음식을 기록하기 위해 음성 인식을 사용해요."
       },
       "appleTeamId": "AW9XRML8T7",
       "buildNumber": "6"
@@ -53,7 +55,7 @@
         {
           "photosPermission": "먹은 음식 사진을 골라 기록하기 위해 사진 보관함에 접근해요.",
           "cameraPermission": "먹은 음식을 사진으로 찍어 기록하기 위해 카메라를 사용해요.",
-          "microphonePermission": false
+          "microphonePermission": "말로 먹은 음식을 기록하기 위해 마이크를 사용해요."
         }
       ],
       [
