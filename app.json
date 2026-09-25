@@ -18,7 +18,7 @@
         "NSSpeechRecognitionUsageDescription": "말한 내용을 글자로 바꿔 먹은 음식을 기록하기 위해 음성 인식을 사용해요."
       },
       "appleTeamId": "AW9XRML8T7",
-      "buildNumber": "6"
+      "buildNumber": "7"
     },
     "android": {
       "adaptiveIcon": {
