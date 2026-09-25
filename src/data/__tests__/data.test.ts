@@ -1,5 +1,5 @@
 import { haversineM } from '../../domain/geo';
-import { judgeMenu } from '../../domain/judge';
+import { judgeMenu, nonMealKind, rankMenus } from '../../domain/judge';
 import { drinkKey, mergeSeedOptionsIntoOfficial } from '../dedupe';
 import {
   getBrand,
@@ -158,6 +158,44 @@ describe('같은 음료 중복 병합 (시드 옵션판 ↔ 공식 사이즈판)
     const profile = { primaryGoal: 'maintain' as const, secondaryGoals: [], diet: { type: 'balanced' as const, evidence: [], source: 'rule' as const } };
     const guides = [8, 12, 19].map((h) => judgeMenu(macchiato!, remaining, { profile, now: new Date(2026, 8, 15, h) }).guide);
     expect(guides.some((g) => g?.startsWith('시럽 빼면'))).toBe(true);
+  });
+});
+
+describe('조리용 식재료·대용량 (nonMealKind) — 추천·순위에서 빼고 검색·기록에선 찾아진다', () => {
+  const profile = { primaryGoal: 'maintain' as const, secondaryGoals: [], diet: { type: 'balanced' as const, evidence: [], source: 'rule' as const } };
+  const remaining = { kcal: 2579, carbs: 330, protein: 100, fat: 70, sugar: 50, sodium: 2000, emphasis: ['carbs', 'protein', 'fat'] as ('carbs' | 'protein' | 'fat')[] };
+
+  it('GS25 두부·우유 팩·밀가루가 식재료·대용량으로 표시된다', () => {
+    const flagged = new Map(getMenusByBrand('gs25').map((m) => [m.name, nonMealKind(m)]));
+    expect(flagged.get('유어스 국산콩두부 찌개/부침겸용')).toBe('ingredient');
+    expect(flagged.get('리얼프라이스 국산콩 왕두부')).toBe('ingredient');
+    expect(flagged.get('유기농 우리밀 밀가루')).toBe('ingredient');
+    expect(flagged.get('순백목장우유')).toBe('bulk');
+    expect(flagged.get('1974 우유')).toBe('bulk');
+    expect(flagged.get('리얼프라이스 김치볶음밥')).toBeNull();
+  });
+
+  it('식당·카페 메뉴는 거의 건드리지 않는다 (가공식품이 아닌 메뉴 중 표시된 것 1개 이하)', () => {
+    const others = getMenus().filter((m) => !m.sourceName?.includes('가공식품') && nonMealKind(m));
+    expect(others.length).toBeLessThanOrEqual(1);
+  });
+
+  it.each([
+    ['12시', new Date(2026, 8, 15, 12)],
+    ['21시 반', new Date(2026, 8, 15, 21, 30)],
+  ])('편의점 매장 순위(%s)에 식재료·대용량이 없다', (_label, now) => {
+    for (const b of ['gs25', 'cu', 'seven_eleven']) {
+      const ranked = rankMenus(getMenusByBrand(b), remaining, { profile, now });
+      expect(ranked.length).toBeGreaterThan(5);
+      expect(ranked.every((x) => nonMealKind(x.menu) === null)).toBe(true);
+    }
+  });
+
+  it('검색·목록·id 로는 그대로 찾아진다', () => {
+    expect(searchMenus('국산콩두부', 100).some((m) => m.name === '유어스 국산콩두부 찌개/부침겸용')).toBe(true);
+    expect(searchMenus('순백목장우유', 100).length).toBeGreaterThan(0);
+    const tofu = getMenusByBrand('gs25').find((m) => m.name === '유어스 국산콩두부 찌개/부침겸용');
+    expect(tofu && getMenu(tofu.id)).toBe(tofu);
   });
 });
 

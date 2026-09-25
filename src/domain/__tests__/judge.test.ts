@@ -248,6 +248,15 @@ describe('rankMenus / suggestAlternatives', () => {
     expect(ranked).toEqual(['light', 'mid', 'heavy', 'none1', 'none2']);
   });
 
+  it('조리용 식재료·대용량은 기본으로 순위에서 빠지고, includeNonMeal 이면 판정된 메뉴 뒤·정보 없음 앞', () => {
+    const tofu = menu({ id: 'tofu', category: 'meal', name: '국산콩두부 찌개/부침겸용', serving: '1인분 (600 g)', nutrients: { kcal: 300 } });
+    const milk = menu({ id: 'milk', name: '목장우유', serving: '1인분 (1800 ml)', nutrients: { kcal: 1260 }, sourceName: '식약처·전국통합식품영양성분정보(가공식품)' });
+    expect(rankMenus([tofu, milk, mid, none1, light], REMAINING, ctx).map((x) => x.menu.id)).toEqual(['light', 'mid', 'none1']);
+    expect(rankMenus([tofu, milk, mid, none1, light], REMAINING, ctx, { includeNonMeal: true }).map((x) => x.menu.id)).toEqual(['light', 'mid', 'tofu', 'milk', 'none1']);
+    // 대안 추천에도 나오지 않는다
+    expect(suggestAlternatives(mid, [mid, tofu, light], REMAINING, ctx, 3).map((x) => x.menu.id)).toEqual(['light']);
+  });
+
   it('같은 카테고리 우선, 점수가 더 높은 것만', () => {
     const alts = suggestAlternatives(mid, [mid, salad, light, heavy, none1], REMAINING, ctx, 2).map((x) => x.menu.id);
     expect(alts).toEqual(['light', 'salad']);

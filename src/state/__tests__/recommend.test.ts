@@ -50,6 +50,22 @@ describe('collectCandidates + pickRecommendations', () => {
     expect(cands.find((c) => c.menu.id === 'a-salad')?.store.id).toBe('a1');
   });
 
+  it('조리용 식재료·대용량 포장은 추천 후보가 아니다 (GS25 두부·우유 팩)', () => {
+    const now = new Date(2026, 8, 15, 12);
+    const withPantry = (id: string) =>
+      id === 'd'
+        ? [
+            ...menusFor('d'),
+            menu({ id: 'd-tofu', brandId: 'd', category: 'meal', name: '국산콩두부 찌개/부침겸용', serving: '1인분 (600 g)', nutrients: { kcal: 300, protein: 30 } }),
+            menu({ id: 'd-milk', brandId: 'd', name: '목장우유', serving: '1인분 (1800 ml)', nutrients: { kcal: 400 }, sourceName: '식약처·전국통합식품영양성분정보(가공식품)' }),
+          ]
+        : menusFor(id);
+    const ids = collectCandidates(stores, withPantry, TARGETS, { ...ctx, now }).map((c) => c.menu.id);
+    expect(ids).toContain('d-bowl');
+    expect(ids).not.toContain('d-tofu');
+    expect(ids).not.toContain('d-milk');
+  });
+
   it('같은 브랜드는 1개만, 최대 3개, 30kcal 미만은 맨 뒤에서만 채운다', () => {
     const picks = pickRecommendations(collectCandidates(stores, menusFor, TARGETS, ctx));
     expect(picks).toHaveLength(3);

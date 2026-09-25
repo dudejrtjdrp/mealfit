@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { normalizeName } from '@/data';
 import { YEOKSAM_CENTER } from '@/data/mockStores';
 import type { LatLng } from '@/domain/geo';
+import { isMealCandidate } from '@/domain/nonMeal';
 import type { Brand, Judgement, MenuItem, Store, StoreCategory, Verdict } from '@/domain/types';
 import { searchNearbyStores, type Radius } from '@/services/kakao';
 import * as location from '@/services/location';
@@ -197,6 +198,8 @@ export function summarizeRanked(ranked: RankedMenu[]): StorePick {
   let top: RankedMenu | null = null;
   for (const r of ranked) {
     if (r.judgement.unknown) continue;
+    // 조리용 식재료·대용량 포장은 "먹기 좋은 메뉴"로 세지도, 추천하지도 않는다 (rankMenus 기본값도 빼지만 한 번 더)
+    if (!isMealCandidate(r.menu)) continue;
     known++;
     if (r.judgement.verdict === 'good') good++;
     else if (r.judgement.verdict === 'ok') ok++;

@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand';
 
-import { TINY_KCAL, applyOptions, rankMenus, type JudgeContext } from '@/domain/judge';
+import { TINY_KCAL, applyOptions, isMealCandidate, rankMenus, type JudgeContext } from '@/domain/judge';
 import type { DailyTargets, Judgement, MenuItem, Nutrients, Store } from '@/domain/types';
 
 /** 상황 칩: 전체 · 가볍게 · 단백질 든든 · 달지 않게 */
@@ -47,7 +47,7 @@ export function nearestStoresWithData(stores: Store[]): Store[] {
 
 /**
  * 주변 메뉴 전체를 한 번에 rankMenus 한 결과 중 추천할 수 있는 것 (순위 순).
- * 정보 없음·오늘은 패스는 뺀다 — 추천은 "지금 먹기 좋은 것"만.
+ * 정보 없음·오늘은 패스·조리용 식재료·대용량은 뺀다 — 추천은 "지금 먹기 좋은 것"만.
  */
 export function collectCandidates(
   stores: Store[],
@@ -64,7 +64,7 @@ export function collectCandidates(
   if (menus.length === 0) return [];
   const out: RecommendCandidate[] = [];
   for (const { menu, judgement } of rankMenus(menus, remaining, ctx)) {
-    if (judgement.unknown || judgement.verdict === 'pass') continue;
+    if (judgement.unknown || judgement.verdict === 'pass' || !isMealCandidate(menu)) continue;
     const store = storeByBrand.get(menu.brandId);
     const nutrients = applyOptions(menu);
     if (!store || !nutrients || typeof nutrients.kcal !== 'number') continue;

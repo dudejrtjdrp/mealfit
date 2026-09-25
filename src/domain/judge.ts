@@ -1,9 +1,20 @@
 import { mealBudget, type MealBudget } from './mealBudget';
+import { isMealCandidate } from './nonMeal';
 import { emphasisFor } from './targets';
 import type { DailyTargets, Judgement, MealType, MenuItem, Nutrients, Profile, Verdict } from './types';
 import { VERDICT_LABEL } from './types';
 
 export { mealBudget, mealTypeAt, type MealBudget, type MealBudgetOptions } from './mealBudget';
+export { isMealCandidate, nonMealKind, type NonMealKind } from './nonMeal';
+
+export interface RankOptions {
+  /**
+   * 조리용 식재료·대용량 포장(nonMealKind)도 순위에 넣는다. 기본 false —
+   * 매장 순위·홈 추천·주변 카드·대안 추천은 "지금 한 끼로 먹을 메뉴"만 본다(검색·기록은 rankMenus 를 쓰지 않아 그대로 찾아진다).
+   * true 면 판정된 메뉴 뒤, 정보 없음 앞에 둔다.
+   */
+  includeNonMeal?: boolean;
+}
 
 export interface JudgeContext {
   profile: Pick<Profile, 'primaryGoal' | 'secondaryGoals' | 'diet'>;
@@ -386,17 +397,20 @@ export function judgeMenu(menu: MenuItem, remaining: DailyTargets, ctx: JudgeCon
   return judgement;
 }
 
-/** 매장 메뉴 순위 (score 내림차순, unknown은 맨 뒤) */
+/** 매장 메뉴 순위 (score 내림차순, unknown은 맨 뒤). 조리용 식재료·대용량은 기본으로 뺀다(RankOptions) */
 export function rankMenus(
   menus: MenuItem[],
   remaining: DailyTargets,
   ctx: JudgeContext,
+  opts: RankOptions = {},
 ): { menu: MenuItem; judgement: Judgement }[] {
   // 목록 전체를 같은 시각(같은 끼니)으로 판정
   const c: JudgeContext = { ...ctx, now: ctx.now ?? new Date() };
-  const judged = menus.map((menu, i) => ({ menu, judgement: judgeMenu(menu, remaining, c), i }));
+  const pool = opts.includeNonMeal ? menus : menus.filter(isMealCandidate);
+  const judged = pool.map((menu, i) => ({ menu, judgement: judgeMenu(menu, remaining, c), i, meal: !opts.includeNonMeal || isMealCandidate(menu) }));
   judged.sort((a, b) => {
     if (a.judgement.unknown !== b.judgement.unknown) return a.judgement.unknown ? 1 : -1;
+    if (a.meal !== b.meal) return a.meal ? -1 : 1;
     if (a.judgement.unknown) return a.i - b.i;
     // 동점(100점 포화가 흔함)이면 옵션 반영 kcal 이 낮은 순 → 원래 순서
     const ka = applyOptions(a.menu, ctx.selectedOptions)?.kcal ?? 0;

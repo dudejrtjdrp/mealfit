@@ -198,6 +198,9 @@ describe('주변 목록 도우미', () => {
     expect(pick).toMatchObject({ good: 2, ok: 1, known: 4 });
     expect(pick.top?.menu.id).toBe('o1');
     expect(summarizeRanked([{ menu: m('p'), judgement: j('pass') }]).top).toBeNull();
+    // 조리용 식재료·대용량은 세지도 추천하지도 않는다
+    const tofu = { ...m('tofu'), name: '국산콩두부 찌개/부침겸용' };
+    expect(summarizeRanked([{ menu: tofu, judgement: j('good') }, { menu: m('o1'), judgement: j('ok') }])).toMatchObject({ good: 0, ok: 1, known: 1, top: { menu: { id: 'o1' } } });
   });
 });
 
