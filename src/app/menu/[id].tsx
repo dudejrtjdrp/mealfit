@@ -94,8 +94,9 @@ export default function MenuDetail() {
   const nutrients = menu ? applyOptions(menu, selected) : null;
   const judgement = menu && remaining ? judgeMenu(menu, remaining, ctx) : null;
   const alternatives = useMemo(
-    () => (menu && remaining ? suggestAlternatives(menu, getMenusByBrand(menu.brandId), remaining, { profile: ctx.profile }, 2) : []),
-    [menu, remaining, ctx.profile],
+    // 본 판정과 같은 끼니 기준(먹은 끼니·시각). 옵션 선택은 빼고 기본 옵션끼리 비교
+    () => (menu && remaining ? suggestAlternatives(menu, getMenusByBrand(menu.brandId), remaining, jctx, 2) : []),
+    [menu, remaining, jctx],
   );
 
   // 판정이 바뀌면 배지를 살짝 튀게
