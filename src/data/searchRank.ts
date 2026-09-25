@@ -1,5 +1,5 @@
 import type { MenuItem } from '../domain/types';
-import { PACKAGED_BRAND_ID } from './ingest/nutrition';
+import { GENERIC_BRAND_ID, PACKAGED_BRAND_ID } from './ingest/nutrition';
 
 /**
  * 검색 순위 (기록 추가 E2 검색 · "잘 모르겠어요" 비슷한 메뉴) — 순수 함수.
@@ -8,6 +8,9 @@ import { PACKAGED_BRAND_ID } from './ingest/nutrition';
  * "라면왕김통깨"는 과자, "콜라겐 요거트스무디"는 스무디. 그래서 검색어가 이름의 머리(끝)에 있는 메뉴를
  * 앞머리·꾸밈말 자리에 있는 메뉴보다 앞에 둔다. 같은 단계 안에서는
  * 매장 메뉴 > 시판 제품, 그 음식을 주로 파는 브랜드(치킨 → BBQ·교촌·굽네) > 가끔 파는 브랜드(카페), 이름이 짧은 순.
+ *
+ * 일반 음식(대표 음식 — 돼지국밥·김치찌개)은 매장 메뉴와 같은 줄(시판 제품보다 앞)이고, 다른 이름(aliases)으로도 맞춘다:
+ * "돼지국밥" 은 "돼지고기 국밥" 의 다른 이름이라 이름이 같음(0단계) — 레토르트 "뚝배기 돼지국밥"(머리 2단계)보다 앞.
  */
 
 /** 이름 끝에 붙어도 무엇인지는 바꾸지 않는 양·사이즈·온도 말 ("황금올리브 치킨 반마리" 의 머리는 여전히 치킨) */
@@ -29,24 +32,36 @@ export interface RankKey {
   /** 브랜드 친화도를 셀 묶음: 매장 브랜드 id, 시판 제품은 제조사 */
   group: string;
   packaged: boolean;
+  /** 다른 이름(일반 음식 aliases)의 키 — 가장 잘 맞는 쪽으로 단계를 매긴다 */
+  alts?: RankKey[];
 }
 
-export function rankKey(m: Pick<MenuItem, 'name' | 'brandId' | 'maker'>, brandName = ''): RankKey {
-  const bare = m.name.replace(/\([^)]*\)|\[[^\]]*\]/g, ' ');
+function tokensOf(name: string): string[] {
+  const bare = name.replace(/\([^)]*\)|\[[^\]]*\]/g, ' ');
   const tokens = bare
     .split(/[\s+/&,·]+/)
     .map(norm)
     .filter(Boolean);
   while (tokens.length > 1 && TAIL_MODIFIERS.has(tokens[tokens.length - 1])) tokens.pop();
+  return tokens;
+}
+
+export function rankKey(m: Pick<MenuItem, 'name' | 'brandId' | 'maker' | 'aliases'>, brandName = ''): RankKey {
   const key = norm(m.name);
+  const tokens = tokensOf(m.name);
   const packaged = m.brandId === PACKAGED_BRAND_ID;
-  return {
-    key,
-    brandKey: norm(m.maker ?? brandName),
-    tokens: tokens.length ? tokens : [key],
-    group: packaged ? `pkg:${m.maker ?? ''}` : m.brandId,
-    packaged,
-  };
+  // 일반 음식의 가상 브랜드명("일반 식당")은 검색어로 맞추지 않는다 — "식당"으로 1.7천 개가 걸리지 않게
+  const brandKey = m.brandId === GENERIC_BRAND_ID ? '' : norm(m.maker ?? brandName);
+  const group = packaged ? `pkg:${m.maker ?? ''}` : m.brandId;
+  const k: RankKey = { key, brandKey, tokens: tokens.length ? tokens : [key], group, packaged };
+  if (m.aliases?.length) {
+    k.alts = m.aliases.map((a) => {
+      const t = tokensOf(a);
+      const ak = norm(a);
+      return { key: ak, brandKey, tokens: t.length ? t : [ak], group, packaged };
+    });
+  }
+  return k;
 }
 
 /**
@@ -57,6 +72,20 @@ export function rankKey(m: Pick<MenuItem, 'name' | 'brandId' | 'maker'>, brandNa
  *   또는 브랜드명 끝("교촌치킨") · 5 그 밖에 들어 있음
  */
 export function matchTier(q: string, k: RankKey): number {
+  return bestMatch(q, k).tier;
+}
+
+/** 이름과 다른 이름 중 가장 잘 맞는 쪽 (단계가 같으면 이름) */
+function bestMatch(q: string, k: RankKey): { tier: number; key: RankKey } {
+  let best = { tier: tierOf(q, k), key: k };
+  for (const a of k.alts ?? []) {
+    const t = tierOf(q, a);
+    if (t >= 0 && (best.tier < 0 || t < best.tier)) best = { tier: t, key: a };
+  }
+  return best;
+}
+
+function tierOf(q: string, k: RankKey): number {
   if (!q || !(k.key.includes(q) || k.brandKey.includes(q))) return -1;
   if (k.key === q) return 0;
   const core = k.tokens.join('');
@@ -91,16 +120,15 @@ export function compareRanked<T>(a: Ranked<T>, b: Ranked<T>): number {
  * 브랜드명에 검색어가 들어 있으면(교촌치킨·오뚜기라면) 친화도 최대.
  */
 export function rankMatches<T>(q: string, items: T[], keys: RankKey[], groupTotal: (group: string) => number): T[] {
-  const hits: { idx: number; tier: number }[] = [];
+  const hits: { idx: number; tier: number; key: RankKey }[] = [];
   const count = new Map<string, number>();
   for (let i = 0; i < items.length; i++) {
-    const tier = matchTier(q, keys[i]);
+    const { tier, key } = bestMatch(q, keys[i]);
     if (tier < 0) continue;
-    hits.push({ idx: i, tier });
+    hits.push({ idx: i, tier, key });
     count.set(keys[i].group, (count.get(keys[i].group) ?? 0) + 1);
   }
-  const ranked: Ranked<T>[] = hits.map(({ idx, tier }) => {
-    const k = keys[idx];
+  const ranked: Ranked<T>[] = hits.map(({ idx, tier, key: k }) => {
     const total = groupTotal(k.group);
     const n = count.get(k.group) ?? 0;
     const bucket = k.brandKey.includes(q) ? 0 : affinityBucket(total > 0 ? n / total : 0, n);

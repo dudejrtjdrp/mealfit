@@ -31,9 +31,28 @@ describe('matchFood', () => {
   });
 
   it('AI 추정도 없으면 비슷한 메뉴로 계산(추정)', async () => {
-    const r = await matchFood({ name: '라면', amount: 1 });
+    const r = await matchFood({ name: '엄마표 라면', amount: 1 });
     expect(r.kind).toBe('similar');
     expect(r.trust).toBe('estimated');
+  });
+
+  it('일반 음식의 다른 이름도 같은 이름 — "돼지국밥" 은 레토르트 팩이 아니라 식당 돼지고기 국밥 1인분 (공식)', async () => {
+    const r = await matchFood({ name: '돼지국밥', amount: 1 });
+    expect(r.kind).toBe('exact');
+    expect(r.menu).toMatchObject({ brandId: 'generic', name: '돼지고기 국밥', serving: '1인분 (1200 g)', trust: 'official' });
+    expect(r.base?.kcal).toBeGreaterThan(700);
+    expect(r.name).toBe('돼지고기 국밥');
+    // 띄어 써도 같다
+    expect((await matchFood({ name: '돼지 국밥', amount: 1 })).menu?.id).toBe(r.menu?.id);
+  });
+
+  it('짜장면·제육볶음·순대국밥도 식당·집밥 1인분으로 (시판 제품보다 먼저)', async () => {
+    const jj = await matchFood({ name: '짜장면', amount: 1 });
+    expect(jj).toMatchObject({ kind: 'exact', menu: { brandId: 'generic', name: '자장면' } });
+    const jy = await matchFood({ name: '제육볶음', amount: 1 });
+    expect(jy).toMatchObject({ kind: 'exact', menu: { brandId: 'generic', name: '돼지고기볶음 (제육볶음)' } });
+    const sd = await matchFood({ name: '순대국밥', amount: 1 });
+    expect(sd).toMatchObject({ kind: 'exact', menu: { brandId: 'generic', name: '순대국밥', serving: '1인분 (900 g)' } });
   });
 
   it('아무것도 못 찾으면 none', async () => {

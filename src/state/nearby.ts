@@ -138,11 +138,14 @@ export function filterStores(stores: Store[], category: CategoryFilter): Store[]
   return category === 'all' ? stores : stores.filter((s) => s.category === category);
 }
 
-/** 정보 있는 매장(위) · 정보 없는 매장(아래 한 줄로 접는다)으로 나눈다. 순서는 그대로 */
+/**
+ * 정보 있는 매장(위) · 정보 없는 매장(아래 한 줄로 접는다)으로 나눈다. 순서는 그대로.
+ * 브랜드 아닌 동네 식당도 대표 음식을 추정할 수 있으면(coverage partial — 일반 식당 기준) 위에 둔다.
+ */
 export function splitByInfo(stores: Store[]): { known: Store[]; noInfo: Store[] } {
   const known: Store[] = [];
   const noInfo: Store[] = [];
-  for (const s of stores) (s.coverage === 'none' || !s.brandId ? noInfo : known).push(s);
+  for (const s of stores) (s.coverage === 'none' ? noInfo : known).push(s);
   return { known, noInfo };
 }
 

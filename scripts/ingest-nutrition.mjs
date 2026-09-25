@@ -14,6 +14,15 @@
  *   가공식품  https://www.data.go.kr/data/15100066/standard.do
  * 인코딩(UTF-8/CP949)과 음식·가공식품 구분은 파일 헤더로 자동 판별한다.
  *
+ * 일반 음식(업체명 '해당없음' — 돼지국밥·김치찌개·짜장면 같은 대표 음식)은 음식 CSV 에서 따로 모아
+ * src/data/generated/mfds-dishes.json (지연 로드 번들) 로 쓴다 — rowToGenericDish / dedupeGenericDishes 참고.
+ *
+ * 무엇을 쓰나: 읽은 원본 종류에 맞는 파일만 쓴다 (없는 원본으로 기존 파일을 비우지 않게).
+ *   음식 CSV 있음        → mfds-dishes.json
+ *   가공식품 CSV 있음    → mfds-products.json
+ *   음식 + 가공식품 둘 다 → mfds.json (브랜드 메뉴는 두 원본을 합쳐 만든다 — 한쪽만이면 --allow-partial 일 때만)
+ *   --only dishes        → 일반 음식 번들만 (예: npm run ingest:nutrition -- .local/nutrition-raw/음식.csv --only dishes)
+ *
  * 재실행 안전: 매번 원본에서 mfds.json 을 통째로 다시 만든다. 손으로 고친 시드(menus.json·brands.json)는 건드리지 않고,
  * 합치기(official 20개 이상 브랜드의 옵션 없는 시드 estimated 제외 → 같은 브랜드+메뉴명 estimated → official 교체)는
  * 앱 로더(src/data/index.ts)가 mergeMenus 로 한다. 식품명의 분류 접두어("기타차_")는 여기서 뗀다(cleanMenuName).
@@ -26,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'src/data/generated/mfds.json');
 const OUT_PRODUCTS = join(ROOT, 'src/data/generated/mfds-products.json');
+const OUT_DISHES = join(ROOT, 'src/data/generated/mfds-dishes.json');
 const SEED_MENUS = join(ROOT, 'src/data/menus.json');
 const SEED_BRANDS = join(ROOT, 'src/data/brands.json');
 
@@ -46,7 +56,15 @@ const MAX_BYTES = Math.round(Number(opt('--max-mb', '5')) * 1024 * 1024);
 const MAX_PRODUCT_BYTES = Math.round(Number(opt('--max-products-mb', '10')) * 1024 * 1024);
 // --server-out <경로>: 정원 없이 전체 유일 제품을 Supabase products 테이블 업로드용 NDJSON 으로 쓴다 (0002_products.sql 참고)
 const SERVER_OUT = opt('--server-out', null);
-const OPT_FLAGS = ['--max-mb', '--max-products-mb', '--server-out'];
+// 일반 음식 번들(mfds-dishes.json) 상한 — 주변 식당 추정·검색에서 지연 로드
+const MAX_DISH_BYTES = Math.round(Number(opt('--max-dishes-mb', '1')) * 1024 * 1024);
+const ONLY = opt('--only', null);
+if (ONLY && ONLY !== 'dishes') {
+  console.error(`--only 는 dishes 만 알아요 (받은 값: ${ONLY})`);
+  process.exit(1);
+}
+const ALLOW_PARTIAL = flag('--allow-partial');
+const OPT_FLAGS = ['--max-mb', '--max-products-mb', '--server-out', '--max-dishes-mb', '--only'];
 const positional = args.filter((a, i) => !a.startsWith('--') && !OPT_FLAGS.includes(args[i - 1]));
 
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
@@ -123,6 +141,9 @@ if (files.length === 0) {
 const matcher = lib.buildBrandMatcher(BRAND_REGISTRY);
 const all = [];
 const allProducts = [];
+const allDishes = [];
+const dishSkips = { origin: 0, 'no-name': 0, 'no-kcal': 0 };
+const kindsRead = new Set();
 const sources = [];
 const skips = { 'no-brand': 0, 'no-name': 0, 'no-kcal': 0 };
 const productSkips = { 'not-consumer': 0, bulk: 0, 'no-name': 0, 'no-kcal': 0 };
@@ -150,6 +171,12 @@ for (const file of files) {
         const c = (cols.distributor != null && kind === 'processed' ? cells[cols.distributor] : cells[cols.company ?? cols.distributor]) ?? '';
         const k = c.trim();
         if (k && k !== '해당없음' && k !== '-') unmatched.set(k, (unmatched.get(k) ?? 0) + 1);
+        // 업체명 '해당없음' 음식 행 = 일반 음식(대표 음식) — 식당·집밥·급식 1인분
+        if (kind === 'food') {
+          const g = lib.rowToGenericDish({ kind, cells, cols });
+          if ('dish' in g) allDishes.push(g.dish);
+          else if (g.skip !== 'not-generic') dishSkips[g.skip] = (dishSkips[g.skip] ?? 0) + 1;
+        }
         // 매장 브랜드가 아닌 가공식품은 시판 제품 카탈로그(검색용)로 보낸다 — 라면·과자·음료가 여기서 산다
         if (kind === 'processed') {
           const p = lib.rowToProduct({ kind, cells, cols });
@@ -165,6 +192,7 @@ for (const file of files) {
     all.push(r.menu);
     matched++;
   }
+  kindsRead.add(kind);
   if (kind === 'processed') console.log(`[제품] ${basename(file)}: 시판 제품 후보 ${productCount}`);
   sources.push({
     file: basename(file),
@@ -323,12 +351,56 @@ console.log('제품 분류별:', Object.fromEntries(Object.entries(perCat).map((
 if (Object.keys(droppedProducts).length)
   console.log('용량 초과로 뺀 분류:', Object.fromEntries(Object.entries(droppedProducts).map(([k, v]) => [catName(k), v])));
 
+// ───────── 일반 음식 번들 ─────────
+// 출처·브랜드는 전 항목이 같아 메타에 한 번만 싣는다 — 로더(src/data/index.ts loadDishes)가 다시 채운다
+const dishes = lib.dedupeGenericDishes(allDishes);
+const dishOrigins = {};
+for (const d of dishes) dishOrigins[d._originRank] = (dishOrigins[d._originRank] ?? 0) + 1;
+const ORIGIN_NAMES = ['외식(분석)', '외식(재료량)', '가정식', '산업체급식', '중고등학교급식'];
+const dishMeta = {
+  generatedAt: new Date().toISOString(),
+  source: lib.DATASETS.food,
+  brandId: lib.GENERIC_BRAND_ID,
+  count: dishes.length,
+  byOrigin: Object.fromEntries(Object.entries(dishOrigins).map(([k, v]) => [ORIGIN_NAMES[k] ?? k, v])),
+  rows: allDishes.length,
+  sha256: sources.filter((x) => x.kind === 'food').map((x) => x.sha256),
+  note: '자동 생성 파일 — scripts/ingest-nutrition.mjs (음식 CSV 의 업체명 해당없음 행, 초등학교급식 제외)',
+};
+const serializeDishes = (ds) =>
+  '{\n' +
+  `"meta": ${JSON.stringify(dishMeta, null, 2)},\n` +
+  `"menus": [${ds.length ? '\n' + ds.map((d) => { const { _originRank, sourceUrl, sourceName, brandId, ...rest } = d; void _originRank; void sourceUrl; void sourceName; void brandId; return JSON.stringify(rest); }).join(',\n') + '\n' : ''}]\n` +
+  '}\n';
+const dishBytes = Buffer.byteLength(serializeDishes(dishes));
+if (kindsRead.has('food')) {
+  console.log(`\n일반 음식: 행 ${allDishes.length} → 같은 음식 정리 후 ${dishes.length}개 / ${(dishBytes / 1024).toFixed(0)} KB`, dishMeta.byOrigin, '| 건너뜀:', dishSkips);
+}
+
+const writeMain = !ONLY && (ALLOW_PARTIAL || (kindsRead.has('food') && kindsRead.has('processed')));
+const writeProducts = !ONLY && kindsRead.has('processed');
+const writeDishes = kindsRead.has('food');
+if (!ONLY && !writeMain) console.log(`\n[안 씀] ${OUT} — 음식·가공식품 원본이 둘 다 있어야 다시 만들어요 (한쪽만이면 --allow-partial)`);
+if (!ONLY && !writeProducts) console.log(`[안 씀] ${OUT_PRODUCTS} — 가공식품 원본이 없어요 (기존 파일 유지)`);
+if (dishBytes > MAX_DISH_BYTES) {
+  console.error(`일반 음식 번들 ${dishBytes} B 가 상한 ${MAX_DISH_BYTES} B 를 넘어요 — --max-dishes-mb 를 올리거나 규칙을 보세요`);
+  process.exit(1);
+}
+
 if (DRY) {
   console.log('\n--dry-run: 파일을 쓰지 않았어요.');
 } else {
   mkdirSync(dirname(OUT), { recursive: true });
-  writeFileSync(OUT, serialize(bundle));
-  writeFileSync(OUT_PRODUCTS, serializeProducts(products));
-  console.log(`\n썼어요: ${OUT}`);
-  console.log(`썼어요: ${OUT_PRODUCTS}`);
+  if (writeMain) {
+    writeFileSync(OUT, serialize(bundle));
+    console.log(`\n썼어요: ${OUT}`);
+  }
+  if (writeProducts) {
+    writeFileSync(OUT_PRODUCTS, serializeProducts(products));
+    console.log(`썼어요: ${OUT_PRODUCTS}`);
+  }
+  if (writeDishes) {
+    writeFileSync(OUT_DISHES, serializeDishes(dishes));
+    console.log(`썼어요: ${OUT_DISHES}`);
+  }
 }

@@ -1,4 +1,4 @@
-import { getMenusByBrand, getMockStores } from '../../data';
+import { getMenusByBrand, getMockStores, menusForStore } from '../../data';
 import { YEOKSAM_CENTER } from '../../data/mockStores';
 import { PROFILE, TARGETS } from '../../domain/__tests__/fixtures';
 import { buildMealPlan, candidateGroup, cyclePicks, daySeed, planSlots, tomorrowPreviewCount } from '../../domain/mealPlan';
@@ -50,6 +50,47 @@ describe('밀리 식단 — 목 매장 통합', () => {
     expect(ids(next)[0]).toBe(ids(base)[0]);
     expect(ids(next)[2]).toBe(ids(base)[2]);
     expect(ids(next)[1]).not.toBe(ids(base)[1]);
+  });
+});
+
+describe('밀리 식단 — 브랜드 아닌 동네 식당(국밥집·찌개집)의 대표 음식도 점심·저녁 후보', () => {
+  const stores = getMockStores(YEOKSAM_CENTER);
+  const at = (h: number, seed: number) => {
+    const now = new Date(2026, 8, 26, h, 0);
+    const { upcoming } = planSlots(TARGETS.kcal, now, []);
+    const candidates = collectCandidates(stores, getMenusByBrand, TARGETS, { profile: PROFILE, now, mealSlotsLeft: upcoming }, menusForStore);
+    return { candidates, plan: buildMealPlan({ candidates, remainingKcal: TARGETS.kcal, now, todayLogs: [], recentLogs: [], seed: daySeed(now) + seed }) };
+  };
+
+  it('후보에 일반 식당 기준 추정 메뉴가 그 가게로 들어오고, 여러 조합 중 점심·저녁에 국밥·찌개가 나온다', () => {
+    const { candidates } = at(13, 0);
+    const local = candidates.filter((c) => !c.store.brandId);
+    expect(local.length).toBeGreaterThan(3);
+    for (const c of local) {
+      expect(c.menu).toMatchObject({ brandId: 'generic', trust: 'estimated' });
+      expect(['역삼 돼지국밥', '역삼 찌개집']).toContain(c.store.name);
+    }
+    expect(local.find((c) => c.menu.name === '순대국밥')?.store.name).toBe('역삼 돼지국밥');
+    const mains: string[] = [];
+    const opts: string[] = [];
+    for (let k = 0; k < 6; k++) {
+      const { plan } = at(13, k);
+      for (const m of plan.meals.filter((x) => x.status === 'planned' && (x.mealType === 'lunch' || x.mealType === 'dinner'))) {
+        mains.push(`${m.main!.store.name}|${m.main!.menu.name}`);
+        opts.push(...(m.options ?? []).map((o) => o.menu.name));
+      }
+    }
+    expect(mains.some((x) => /^역삼 (돼지국밥|찌개집)\|/.test(x))).toBe(true);
+    expect(opts.some((n) => /국밥|찌개/.test(n) && !/라면/.test(n))).toBe(true);
+  });
+
+  it('두 동네 식당은 서로 다른 매장 — 점심 찌개집·저녁 국밥집처럼 같은 날 둘 다 나올 수 있다 (가상 브랜드 하나로 묶이지 않는다)', () => {
+    let both = false;
+    for (let k = 0; k < 12 && !both; k++) {
+      const names = at(13, k).plan.meals.filter((m) => m.status === 'planned').map((m) => m.main!.store.name);
+      both = names.includes('역삼 돼지국밥') && names.includes('역삼 찌개집');
+    }
+    expect(both).toBe(true);
   });
 });
 

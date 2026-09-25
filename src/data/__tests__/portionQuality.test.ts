@@ -5,7 +5,7 @@
 import { nonMealKind } from '../../domain/judge';
 import { menuQtyUnit } from '../../domain/qty';
 import type { MenuItem } from '../../domain/types';
-import { getMenu, getMenus, getMenusByBrand, getPackagedServingCounts, getPerServingCounts } from '../index';
+import { getGenericDishes, getMenu, getMenus, getMenusByBrand, getPackagedServingCounts, getPerServingCounts } from '../index';
 import { PACK_SERVING_ID_SUFFIX, packagedRef, toPackagedServing } from '../packagedServing';
 import { PORTION_ID_SUFFIX } from '../perPortion';
 import {
@@ -335,5 +335,30 @@ describe('대용량 가공식품 → 식약처 1회 섭취참고량 (packagedSer
     expect(toPackagedServing(mk('복음자리 생강차', '1개 (600 ml)', 1500, 'drink'))).toBeNull(); // 청
     expect(toPackagedServing(mk('신라면', '1개 (120 g)', 500))).toBeNull(); // bulk 아님
     expect(toPackagedServing(mk('감자탕', '1개 (2200 g)', 1782))).toMatchObject({ id: 'pkg-x-serving', serving: '1회 섭취참고량 (250 g)', nutrients: { kcal: 203 } });
+  });
+});
+
+describe('1인분 품질 — 일반 음식(대표 음식, mfds-dishes.json)', () => {
+  // 일반 음식 1인분은 데이터셋 식품중량 그대로다(외식·집밥·급식 1인 제공량). 가장 큰 것도 해물 소갈비찜 1,120 ml 1,534 kcal ·
+  // 안동찜닭 1,500 g 1,365 kcal 로 상한 안이라 나눠 먹는 음식 예외 표가 필요 없다 (부대찌개도 1인분 600 g 402 kcal).
+  it(`1인분이 ${KCAL_CAP.toLocaleString()} kcal 을 넘는 일반 음식이 없다`, () => {
+    const over = getGenericDishes().filter((m) => (m.nutrients?.kcal ?? 0) > KCAL_CAP);
+    expect(over.map((m) => `${m.name} ${m.serving} ${m.nutrients!.kcal}`)).toEqual([]);
+  });
+
+  it('한 그릇 음식(국밥·찌개·면)은 1인분 중량이 한 번 먹는 양다운 크기다 (100 g 초과, 2 kg 이하)', () => {
+    const bowls = getGenericDishes().filter((m) => /(국밥|찌개|국수|냉면|짜장면|자장면|짬뽕|칼국수|비빔밥)$/.test(m.name) && m.serving.startsWith('1인분'));
+    expect(bowls.length).toBeGreaterThan(50);
+    for (const m of bowls) {
+      const g = Number(m.serving.match(/\((\d+) /)![1]);
+      expect({ m: m.name, g }).toEqual({ m: m.name, g: Math.min(Math.max(g, 101), 2000) });
+    }
+  });
+
+  it('"100 g 기준" 으로 남은 일반 음식은 전부 이유 한 줄이 있고, 전체의 20% 이하다 (같은 음식의 1인분 행이 있으면 그쪽을 골랐다)', () => {
+    const list = getGenericDishes();
+    const per100 = list.filter((m) => / 기준$/.test(m.serving));
+    for (const m of per100) expect(m.servingNote).toMatch(/1인분 양 정보가 없어 100 (g|ml) 기준으로 보여줘요$/);
+    expect(per100.length / list.length).toBeLessThan(0.2);
   });
 });

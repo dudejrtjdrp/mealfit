@@ -108,16 +108,41 @@ function OutlinePill({ icon, label, size = 'md', accessibilityLabel, style, onPr
  * 신뢰등급 배지 — 브랜드 공개 수치 · 비슷한 메뉴로 계산 · 아직 정보 없음 · 직접 입력.
  * 기본으로 눌리며, 누르면 한 줄 설명을 토스트로 보여준다 (explain={false} 면 그냥 배지).
  */
-export function TrustBadge({ trust, size = 'md', style, explain = true }: { trust: Trust; size?: 'sm' | 'md'; style?: StyleProp<ViewStyle>; explain?: boolean }) {
-  const label = size === 'sm' ? TRUST_LABEL_SHORT[trust] : TRUST_LABEL[trust];
+/**
+ * 일반 음식(브랜드 없는 대표 음식 — 식약처 음식 데이터) 문구. 공식값이어도 "브랜드 공개"가 아니고,
+ * 동네 식당 추정은 "이 가게 대신 일반 식당 1인분"이다.
+ */
+const GENERIC_TRUST: Partial<Record<Trust, { label: string; short: string; explain: string }>> = {
+  official: { label: '식약처 대표 음식', short: '식약처', explain: '식약처 음식 데이터의 대표 음식 1인분이에요. 가게마다 양이 달라요' },
+  estimated: { label: '비슷한 메뉴로 계산', short: '계산값', explain: '이 가게 정보가 없어 일반 식당 1인분(식약처 대표 음식)으로 계산했어요' },
+};
+
+export function TrustBadge({
+  trust,
+  size = 'md',
+  style,
+  explain = true,
+  generic = false,
+}: {
+  trust: Trust;
+  size?: 'sm' | 'md';
+  style?: StyleProp<ViewStyle>;
+  explain?: boolean;
+  /** 일반 음식(대표 음식) 메뉴면 true — 출처 문구를 식약처 대표 음식으로 */
+  generic?: boolean;
+}) {
+  const g = generic ? GENERIC_TRUST[trust] : undefined;
+  const full = g?.label ?? TRUST_LABEL[trust];
+  const label = size === 'sm' ? (g?.short ?? TRUST_LABEL_SHORT[trust]) : full;
+  const why = g?.explain ?? TRUST_EXPLAIN[trust];
   return (
     <OutlinePill
       icon={<TrustIcon trust={trust} size={size === 'sm' ? 13 : 14} />}
       label={label}
       size={size}
-      accessibilityLabel={`영양 정보 출처: ${TRUST_LABEL[trust]}`}
+      accessibilityLabel={`영양 정보 출처: ${full}`}
       accessibilityHint={explain ? '누르면 무슨 뜻인지 알려드려요' : undefined}
-      onPress={explain ? () => showToast(TRUST_EXPLAIN[trust], 'info') : undefined}
+      onPress={explain ? () => showToast(why, 'info') : undefined}
       style={style}
     />
   );

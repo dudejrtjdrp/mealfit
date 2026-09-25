@@ -39,6 +39,29 @@ describe('nearestStoresWithData', () => {
   });
 });
 
+describe('collectCandidates — 브랜드 아닌 동네 식당 추정 메뉴 (estimatesFor)', () => {
+  const place = (id: string, distanceM: number, over: Partial<Store> = {}) => store({ id, brandId: undefined, coverage: 'partial', category: 'korean', distanceM, ...over });
+  const gukbap = menu({ id: 'gen-1-est', brandId: 'generic', name: '돼지고기 국밥', category: 'meal', trust: 'estimated', nutrients: { kcal: 520, protein: 30, sugar: 2 } });
+  const jjigae = menu({ id: 'gen-2-est', brandId: 'generic', name: '김치찌개', category: 'meal', trust: 'estimated', nutrients: { kcal: 244, protein: 15, sugar: 3 } });
+  const estimates = (s: Store) => (s.id.startsWith('guk') ? [gukbap, jjigae] : s.id.startsWith('jji') ? [jjigae] : []);
+
+  it('추정 메뉴는 그 가게로, 같은 음식이 두 가게에 있으면 가까운 가게로, 정보 없는 가게는 보지 않는다', () => {
+    const stores = [store({ id: 'a1', brandId: 'a' }), place('guk', 300), place('jji', 90), place('none', 10, { coverage: 'none' })];
+    const cands = collectCandidates(stores, menusFor, TARGETS, ctx, estimates);
+    expect(cands.find((c) => c.menu.id === 'gen-1-est')?.store.id).toBe('guk');
+    expect(cands.find((c) => c.menu.id === 'gen-2-est')?.store.id).toBe('jji');
+    expect(cands.find((c) => c.menu.id === 'a-salad')?.store.id).toBe('a1');
+    // estimatesFor 가 없으면 예전처럼 브랜드 매장만
+    expect(collectCandidates(stores, menusFor, TARGETS, ctx).some((c) => c.menu.brandId === 'generic')).toBe(false);
+  });
+
+  it('추천 상위는 가게마다 하나 — 두 동네 식당은 같은 가상 브랜드여도 따로 센다', () => {
+    const stores = [place('guk', 300), place('jji', 90)];
+    const picks = pickRecommendations(collectCandidates(stores, menusFor, TARGETS, ctx, estimates), 'all', 5);
+    expect(picks.map((p) => p.store.id).sort()).toEqual(['guk', 'jji']);
+  });
+});
+
 describe('collectCandidates + pickRecommendations', () => {
   const stores = [store({ id: 'a1', brandId: 'a' }), store({ id: 'b1', brandId: 'b' }), store({ id: 'c1', brandId: 'c' }), store({ id: 'd1', brandId: 'd' })];
 

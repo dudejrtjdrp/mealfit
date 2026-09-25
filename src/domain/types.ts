@@ -132,6 +132,8 @@ export interface MenuItem {
   maker?: string;
   /** 제공량 보충 설명 — 1인분량을 몰라 100 g 기준으로 표시할 때 그 사실을 밝힌다 */
   servingNote?: string;
+  /** 검색·이름 맞추기용 다른 이름 (일반 음식: "돼지고기 국밥" ↔ "돼지국밥"). 화면에는 name 만 보인다 */
+  aliases?: string[];
   /** 시안 카드 보조 표기용: "카페인 있음" 등 */
   tags?: string[];
   options?: OptionGroup[];
@@ -167,6 +169,8 @@ export interface Store {
   lng: number;
   phone?: string;
   placeUrl?: string;
+  /** 카카오 장소 분류 ("음식점 > 한식 > 국밥") — 브랜드가 아닌 식당의 대표 음식 추정에 쓴다 */
+  placeCategory?: string;
 }
 
 export type Verdict = 'good' | 'ok' | 'pass';

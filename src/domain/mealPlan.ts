@@ -326,6 +326,12 @@ function mainScore(c: PlanCandidate, g: FoodGroup, budget: number, mealType: Mea
   return s;
 }
 
+/**
+ * 같은 매장(브랜드) 판단 키 — 브랜드 매장은 브랜드, 브랜드 아닌 동네 식당(일반 식당 기준 추정 메뉴)은 그 가게.
+ * 추정 메뉴는 모두 가상 브랜드 'generic' 이라 menu.brandId 로 보면 국밥집·찌개집이 한 매장처럼 겹친다.
+ */
+const sellerOf = (c: PlanCandidate): string => c.store.brandId ?? `place:${c.store.id}`;
+
 /** 다른 끼니에 이미 놓인 것 (기록한 끼니는 갈래만) */
 interface Taken {
   group?: FoodGroup;
@@ -344,7 +350,7 @@ function rankSlot(scored: readonly Scored[], taken: readonly Taken[]): Scored[] 
   const brands = new Set(taken.map((t) => t.brandId).filter(Boolean));
   const stores = new Set(taken.map((t) => t.storeId).filter(Boolean));
   const groups = new Set(taken.map((t) => t.group).filter(countsForDay));
-  const free = scored.filter((x) => !brands.has(x.c.menu.brandId) && !stores.has(x.c.store.id));
+  const free = scored.filter((x) => !brands.has(sellerOf(x.c)) && !stores.has(x.c.store.id));
   const clash = (x: Scored) => countsForDay(x.g) && groups.has(x.g);
   const levels: ((x: Scored) => boolean)[] = [(x) => !clash(x), (x) => !(x.g === 'bread' && groups.has('bread')), () => true];
   for (const ok of levels) {
@@ -373,7 +379,7 @@ function optionList(ranked: readonly Scored[], main: PlanCandidate): PlanCandida
   const add = (x: Scored) => {
     out.push(x);
     names.add(coreName(x.c));
-    perBrand.set(x.c.menu.brandId, (perBrand.get(x.c.menu.brandId) ?? 0) + 1);
+    perBrand.set(sellerOf(x.c), (perBrand.get(sellerOf(x.c)) ?? 0) + 1);
     perGroup.set(x.g, (perGroup.get(x.g) ?? 0) + 1);
   };
   const mine = ranked.find((x) => x.c.menu.id === main.menu.id) ?? { c: main, s: -Infinity, g: candidateGroup(main), h: 0 };
@@ -382,7 +388,7 @@ function optionList(ranked: readonly Scored[], main: PlanCandidate): PlanCandida
     for (const x of ranked) {
       if (out.length >= PLAN_OPTIONS) break;
       if (out.includes(x) || x.c.menu.id === main.menu.id || names.has(coreName(x.c))) continue;
-      if ((perBrand.get(x.c.menu.brandId) ?? 0) >= PLAN_OPTIONS_PER_BRAND || (perGroup.get(x.g) ?? 0) >= groupCap) continue;
+      if ((perBrand.get(sellerOf(x.c)) ?? 0) >= PLAN_OPTIONS_PER_BRAND || (perGroup.get(x.g) ?? 0) >= groupCap) continue;
       add(x);
     }
   }
@@ -401,7 +407,7 @@ function pickExtra(main: PlanCandidate, pool: PlanCandidate[], budget: number, m
   const opts = pool
     .filter(
       (c) =>
-        c.menu.brandId === main.menu.brandId &&
+        sellerOf(c) === sellerOf(main) &&
         c.menu.id !== main.menu.id &&
         isDrinkish(c) &&
         c.kcal >= 30 &&
@@ -504,7 +510,7 @@ export function buildMealPlan(input: MealPlanInput): MealPlan {
   const placed = new Map<MealType, Scored>();
   const takenExcept = (mt: MealType): Taken[] => [
     ...doneTaken,
-    ...[...placed].filter(([k]) => k !== mt).map(([, x]) => ({ group: x.g, brandId: x.c.menu.brandId, storeId: x.c.store.id })),
+    ...[...placed].filter(([k]) => k !== mt).map(([, x]) => ({ group: x.g, brandId: sellerOf(x.c), storeId: x.c.store.id })),
   ];
 
   // 1) 사용자가 고른 끼니 먼저 — 아직 이 끼니 후보(다른 끼니와 안 겹치는 것)에 있으면 그대로

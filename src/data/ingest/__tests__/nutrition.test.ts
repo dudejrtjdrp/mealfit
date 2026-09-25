@@ -4,11 +4,15 @@ import { BRAND_REGISTRY } from '../brandRegistry';
 import {
   buildBrandMatcher,
   categoryPrefixes,
+  cleanGenericName,
   cleanMenuName,
   coverageOf,
   decodeKoreanText,
+  dedupeGenericDishes,
   dedupeMenus,
   detectDatasetKind,
+  genericDishKey,
+  genericOrigin,
   inferCategory,
   matchRowBrand,
   mergeBrands,
@@ -20,8 +24,10 @@ import {
   parseCsv,
   parseNumber,
   resolveColumns,
+  rowToGenericDish,
   rowToMenu,
   toServing,
+  type IngestedDish,
   type IngestedMenu,
 } from '../nutrition';
 
@@ -562,5 +568,137 @@ describe('시판 제품 — 업소용·묶음 처리', () => {
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ serving: '1개 (125 g)', trust: 'official' });
     expect('_weight' in out[0]).toBe(false);
+  });
+});
+
+// ───────── 일반 음식 (업체명 '해당없음' — 대표 음식) ─────────
+
+describe('일반 음식 이름 정리 (cleanGenericName)', () => {
+  it.each([
+    ['국밥_돼지고기', '돼지고기 국밥', ['돼지국밥', '국밥 돼지고기']],
+    ['국밥_순대국밥', '순대국밥', []],
+    ['국수_막국수', '막국수', []],
+    ['된장국_시래기', '시래기 된장국', []],
+    ['시래기 된장국', '시래기 된장국', []],
+    ['돼지고기볶음_돼지고기_배추김치', '배추김치 돼지고기볶음', []],
+    ['돼지고기볶음(제육볶음)', '돼지고기볶음 (제육볶음)', ['제육볶음', '돼지고기볶음']],
+    ['덮밥_돼지고기(제육)', '돼지고기 (제육) 덮밥', ['제육 덮밥']],
+    ['자장면', '자장면', ['짜장면']],
+    ['삼겹살구이', '삼겹살구이', ['삼겹살']],
+    ['김치찌개_김치만', '김치찌개 (김치만)', []],
+    ['라면_국물', '라면 (국물)', []],
+  ])('%s → %s', (raw, name, mustAlias) => {
+    const got = cleanGenericName(raw);
+    expect(got.name).toBe(name);
+    const keys = got.aliases.map(normalizeMenuName);
+    for (const a of mustAlias) expect(keys).toContain(normalizeMenuName(a));
+    // 자기 이름은 다른 이름에 없다, 부분(국물·김치만)은 다른 이름이 없다 ("라면 (국물)" 이 "라면" 으로 잡히면 안 된다)
+    expect(keys).not.toContain(normalizeMenuName(name));
+    if (/\((국물|김치만)\)$/.test(name)) expect(got.aliases).toEqual([]);
+  });
+
+  it('같은 음식 키는 표기 흔들림(짜장/자장·쇠고기/소고기·돈까스/돈가스)을 모은다', () => {
+    expect(genericDishKey('짜장면')).toBe(genericDishKey('자장면'));
+    expect(genericDishKey('쇠고기 국밥')).toBe(genericDishKey('소고기국밥'));
+    expect(genericDishKey('치즈 돈까스')).toBe(genericDishKey('치즈돈가스'));
+    expect(genericDishKey('순대국')).not.toBe(genericDishKey('순대국밥'));
+  });
+
+  it('식품기원명 → 출처 (초등학교급식·프랜차이즈는 null)', () => {
+    expect(genericOrigin('외식(분석함량)')?.key).toBe('dine-analyzed');
+    expect(genericOrigin('외식(재료량 기반 산출함량)')?.key).toBe('dine-recipe');
+    expect(genericOrigin('가정식(분석 함량)')?.key).toBe('home');
+    expect(genericOrigin('산업체급식(재료량 기반 산출 함량)')?.small).toBe(true);
+    expect(genericOrigin('중고등학교급식(재료량 기반 산출함량)')?.key).toBe('school');
+    expect(genericOrigin('초등학교급식(재료량 기반 산출 함량)')).toBeNull();
+    expect(genericOrigin('외식(프랜차이즈 등 업체 제공 영양정보)')).toBeNull();
+  });
+});
+
+describe('일반 음식 행 → 메뉴 (rowToGenericDish)', () => {
+  // 식약처 음식 CSV 실제 행 (값 그대로)
+  const gukbap = foodRow({
+    식품코드: 'D301-004140000-0001', 식품명: '국밥_돼지고기', 식품기원명: '외식(분석함량)', 식품대분류명: '밥류', 대표식품명: '국밥',
+    식품중분류명: '돼지고기', 영양성분함량기준량: '100g', '에너지(kcal)': '76', '단백질(g)': '5.53', '지방(g)': '3.22',
+    '탄수화물(g)': '6.23', '당류(g)': '0.00', '나트륨(mg)': '91', '포화지방산(g)': '0.70', 식품중량: '1200g', 업체명: '해당없음', 데이터기준일자: '2026-04-29',
+  });
+  const cols = resolveColumns(FOOD_HEADER);
+  const dish = (cells: string[]) => {
+    const r = rowToGenericDish({ kind: 'food', cells, cols });
+    if (!('dish' in r)) throw new Error(`skip ${r.skip}`);
+    return r.dish;
+  };
+
+  it('100 g 당 값 × 식품중량(1인분) — 돼지고기 국밥 1,200 g = 912 kcal, 공식·출처·일반 식당 브랜드', () => {
+    const d = dish(gukbap);
+    expect(d).toMatchObject({
+      id: 'gen-d301-004140000-0001',
+      brandId: 'generic',
+      name: '돼지고기 국밥',
+      category: 'meal',
+      serving: '1인분 (1200 g)',
+      trust: 'official',
+      sourceUrl: 'https://www.data.go.kr/data/15100070/standard.do',
+    });
+    expect(d.nutrients).toEqual({ kcal: 912, carbs: 74.8, protein: 66.4, fat: 38.6, satFat: 8.4, sugar: 0, sodium: 1092 });
+    expect(d.aliases?.map(normalizeMenuName)).toContain('돼지국밥');
+    expect(d.servingNote).toBe('식약처 외식 분석값 · 식당 1인분 기준이에요');
+  });
+
+  it('단위 없는 식품중량은 기준량 단위(ml), 잘린 "1100m" 은 ml 로 읽는다', () => {
+    const base = { 식품명: '칼국수_해물', 식품기원명: '외식(재료량 기반 산출함량)', 식품대분류명: '면 및 만두류', 영양성분함량기준량: '100ml', '에너지(kcal)': '78', 업체명: '해당없음' };
+    expect(dish(foodRow({ ...base, 식품중량: '1100m' }))).toMatchObject({ serving: '1인분 (1100 ml)', nutrients: { kcal: 858 } });
+    expect(dish(foodRow({ ...base, 식품중량: '351.6' }))).toMatchObject({ serving: '1인분 (352 ml)', nutrients: { kcal: 274 } });
+  });
+
+  it('식품중량이 없거나 기준량(100 g)과 같으면 1인분을 지어내지 않고 "100 g 기준" + 이유', () => {
+    const base = { 식품명: '비빔밥', 식품기원명: '외식(분석함량)', 식품대분류명: '밥류', 영양성분함량기준량: '100g', '에너지(kcal)': '142', 업체명: '해당없음' };
+    for (const w of ['100g', '']) {
+      const d = dish(foodRow({ ...base, 식품중량: w }));
+      expect(d.serving).toBe('100 g 기준');
+      expect(d.nutrients?.kcal).toBe(142);
+      expect(d.servingNote).toMatch(/1인분 양 정보가 없어 100 g 기준으로 보여줘요$/);
+    }
+  });
+
+  it('국·찌개는 밥이 빠진 값이라고 알려 주고, 반찬 분류는 side, 급식은 양이 적을 수 있다고', () => {
+    const jjigae = dish(foodRow({ 식품명: '김치찌개', 식품기원명: '외식(분석함량)', 식품대분류명: '찌개 및 전골류', 영양성분함량기준량: '100g', '에너지(kcal)': '61', 식품중량: '400g', 업체명: '해당없음' }));
+    expect(jjigae.servingNote).toMatch(/공기밥은 따로 더해요$/);
+    const namul = dish(foodRow({ 식품명: '무나물', 식품기원명: '산업체급식(재료량 기반 산출 함량)', 식품대분류명: '나물·숙채류', 영양성분함량기준량: '100ml', '에너지(kcal)': '28', 식품중량: '60ml', 업체명: '해당없음' }));
+    expect(namul.category).toBe('side');
+    expect(namul.servingNote).toMatch(/식당보다 적을 수 있어요$/);
+  });
+
+  it('브랜드 행·초등학교급식·kcal 없음은 건너뛴다', () => {
+    expect(rowToGenericDish({ kind: 'food', cells: foodRow({ 식품명: '와퍼', 식품기원명: '외식(분석함량)', '에너지(kcal)': '250', 업체명: '비케이알' }), cols })).toEqual({ skip: 'not-generic' });
+    expect(rowToGenericDish({ kind: 'food', cells: foodRow({ 식품명: '김치찌개', 식품기원명: '초등학교급식(재료량 기반 산출 함량)', '에너지(kcal)': '37', 업체명: '해당없음' }), cols })).toEqual({ skip: 'origin' });
+    expect(rowToGenericDish({ kind: 'food', cells: foodRow({ 식품명: '김치찌개', 식품기원명: '외식(분석함량)', '에너지(kcal)': '', 업체명: '해당없음' }), cols })).toEqual({ skip: 'no-kcal' });
+  });
+});
+
+describe('일반 음식 중복 정리 (dedupeGenericDishes)', () => {
+  const cols = resolveColumns(FOOD_HEADER);
+  const mk = (v: Record<string, string>): IngestedDish => {
+    const r = rowToGenericDish({ kind: 'food', cells: foodRow({ 업체명: '해당없음', 영양성분함량기준량: '100g', ...v }), cols });
+    if (!('dish' in r)) throw new Error('skip');
+    return r.dish;
+  };
+
+  it('1인분 있음 > 외식(분석) > 외식(재료량) > 가정식 > 급식, 진 행의 이름은 다른 이름으로 남는다', () => {
+    const out = dedupeGenericDishes([
+      mk({ 식품코드: 'A', 식품명: '비빔밥', 식품기원명: '외식(분석함량)', '에너지(kcal)': '142', 식품중량: '100g' }), // 1인분 없음
+      mk({ 식품코드: 'B', 식품명: '비빔밥', 식품기원명: '가정식(분석 함량)', '에너지(kcal)': '142', 식품중량: '450g' }),
+      mk({ 식품코드: 'C', 식품명: '비빔밥', 식품기원명: '외식(재료량 기반 산출함량)', 영양성분함량기준량: '100ml', '에너지(kcal)': '133', 식품중량: '530ml' }),
+      mk({ 식품코드: 'D', 식품명: '짜장면', 식품기원명: '외식(재료량 기반 산출함량)', '에너지(kcal)': '153', 식품중량: '600g' }),
+      mk({ 식품코드: 'E', 식품명: '자장면', 식품기원명: '외식(분석함량)', '에너지(kcal)': '123', 식품중량: '650g' }),
+      mk({ 식품코드: 'F', 식품명: '볶음밥', 식품기원명: '산업체급식(재료량 기반 산출 함량)', '에너지(kcal)': '180', 식품중량: '300g' }),
+    ]);
+    const by = Object.fromEntries(out.map((d) => [d.name, d]));
+    expect(Object.keys(by).sort()).toEqual(['볶음밥', '비빔밥', '자장면']);
+    expect(by['비빔밥']).toMatchObject({ id: 'gen-c', serving: '1인분 (530 ml)', nutrients: { kcal: 705 } });
+    expect(by['자장면']).toMatchObject({ serving: '1인분 (650 g)', nutrients: { kcal: 800 } });
+    expect(by['자장면'].aliases).toContain('짜장면');
+    // 출처 우선순위 → 이름 순 (검색 동점일 때 식당 값이 먼저)
+    expect(out.map((d) => d.name)).toEqual(['자장면', '비빔밥', '볶음밥']);
   });
 });

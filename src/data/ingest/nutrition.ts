@@ -101,7 +101,8 @@ type Field =
   | 'satFat'
   | 'sodium'
   | 'caffeine'
-  | 'refDate';
+  | 'refDate'
+  | 'origin';
 
 /** 앞에 있는 후보가 우선. 값은 headerKey() 한 필드명의 접두어 */
 const FIELD_ALIASES: Record<Field, string[]> = {
@@ -127,6 +128,7 @@ const FIELD_ALIASES: Record<Field, string[]> = {
   sodium: ['나트륨mg', '나트륨'],
   caffeine: ['카페인mg', '카페인'],
   refDate: ['데이터기준일자', '데이터생성일자'],
+  origin: ['식품기원명'],
 };
 
 export type ColumnMap = Partial<Record<Field, number>>;
@@ -843,4 +845,260 @@ export function registryToBrand(r: RegistryBrand): Brand {
   };
   if (r.blurb) b.blurb = r.blurb;
   return b;
+}
+
+// ───────────────────────── 일반 음식 (대표 음식 — 업체명 '해당없음') ─────────────────────────
+
+/**
+ * 브랜드가 아닌 "그냥 식당·집밥 음식"(돼지국밥·김치찌개·짜장면…)이 모두 속하는 가상 브랜드.
+ * 매장 매칭 키워드는 비워 둔다 — 장소 이름과 매칭되어 "일반 식당"이라는 매장처럼 보이면 안 된다.
+ */
+export const GENERIC_BRAND_ID = 'generic';
+/** 일반 음식 id 접두어 (getMenu 가 지연 번들에서 찾는 키) */
+export const GENERIC_ID_PREFIX = 'gen-';
+
+export interface GenericOrigin {
+  key: 'dine-analyzed' | 'dine-recipe' | 'home' | 'cafeteria' | 'school';
+  /** 작을수록 먼저 고른다 (같은 음식이 여러 출처로 있을 때) */
+  rank: number;
+  /** servingNote 앞머리 — 어떤 값인지 */
+  label: string;
+  /** 어느 1인분인지 */
+  portion: string;
+  /** 급식 1인분은 식당보다 적다 */
+  small: boolean;
+}
+
+/**
+ * 식품기원명 → 출처. 순서가 곧 우선순위: 외식(분석) > 외식(재료량) > 가정식 > 산업체급식 > 중고등학교급식.
+ * 초등학교급식은 어린이 1인분이라 싣지 않는다 (어른 기록의 "1인분"으로 쓰면 양이 크게 모자란다 — 그 음식만 있는 행 50개 정도).
+ */
+const GENERIC_ORIGINS: (GenericOrigin & { re: RegExp })[] = [
+  { key: 'dine-analyzed', rank: 0, re: /^외식\(분석/, label: '식약처 외식 분석값', portion: '식당 1인분 기준이에요', small: false },
+  { key: 'dine-recipe', rank: 1, re: /^외식\(재료량/, label: '식약처 외식 재료량 산출값', portion: '식당 1인분 기준이에요', small: false },
+  { key: 'home', rank: 2, re: /^가정식/, label: '식약처 가정식 분석값', portion: '집밥 1인분 기준이에요', small: false },
+  { key: 'cafeteria', rank: 3, re: /^산업체급식/, label: '식약처 단체급식 산출값', portion: '급식 1인분이라 식당보다 적을 수 있어요', small: true },
+  { key: 'school', rank: 4, re: /^중고등학교급식/, label: '식약처 중고등학교 급식 산출값', portion: '급식 1인분이라 식당보다 적을 수 있어요', small: true },
+];
+
+/** 식품기원명 → 출처 (싣지 않는 출처·프랜차이즈 행은 null) */
+export function genericOrigin(raw: string | undefined): GenericOrigin | null {
+  const s = (raw ?? '').replace(/\s+/g, '');
+  const o = GENERIC_ORIGINS.find((x) => x.re.test(s));
+  if (!o) return null;
+  const { re, ...rest } = o;
+  void re;
+  return rest;
+}
+
+const compactName = (s: string) => normalizeMenuName(s);
+
+/** 같은 음식의 다른 표기 — 검색어·AI 가 쓰는 말과 데이터셋 표기를 잇는다 */
+const SPELLING_SWAPS: [string, string][] = [
+  ['돼지고기', '돼지'],
+  ['닭고기', '닭'],
+  ['쇠고기', '소고기'],
+  ['소고기', '쇠고기'],
+  ['자장', '짜장'],
+  ['짜장', '자장'],
+  ['돈가스', '돈까스'],
+  ['돈까스', '돈가스'],
+  ['만두국', '만둣국'],
+  ['순대국', '순댓국'],
+];
+
+/** 같은 음식 판정 키 — 표기 흔들림(짜장/자장·쇠고기/소고기·돈까스/돈가스)은 한쪽으로 모은다 */
+export function genericDishKey(name: string): string {
+  return compactName(name).replace(/쇠고기/g, '소고기').replace(/자장/g, '짜장').replace(/돈까스/g, '돈가스');
+}
+
+/** 이름 뒤에 괄호로 붙이는 부분 표시 ("라면_국물" → "라면 (국물)", "김치찌개_김치만" → "김치찌개 (김치만)") */
+const PART_QUAL_RE = /^(국물|면|건더기|양념장|소스|.+만)$/;
+
+/**
+ * 데이터셋 식품명("대표식품명_세부1_세부2") → 화면 이름 + 검색용 다른 이름.
+ * - "국밥_돼지고기" → "돼지고기 국밥" (aliases: 국밥 돼지고기 · 돼지 국밥 …)
+ * - "국밥_순대국밥" · "국수_막국수" → "순대국밥" · "막국수" (세부 이름이 이미 대표 이름으로 끝나면 그것만)
+ * - "돼지고기볶음_돼지고기_배추김치" → "배추김치 돼지고기볶음" (대표 이름에 이미 있는 세부는 뺀다)
+ * - "돼지고기볶음(제육볶음)" → "돼지고기볶음 (제육볶음)" (aliases: 제육볶음 · 돼지고기볶음 …)
+ */
+export function cleanGenericName(raw: string): { name: string; aliases: string[] } {
+  const s = normalizeDisplayText(raw).replace(/\s+/g, ' ').trim();
+  const parts = s.split('_').map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return { name: '', aliases: [] };
+  const head = parts[0];
+  const headKey = compactName(head.replace(/\([^)]*\)/g, ''));
+  // "라면_국물" · "김치찌개_김치만" 같은 부분 표시는 괄호로 (대표 이름에 들어 있어도 — "라면_면" 은 라면이 아니라 면만)
+  const suffix = parts.slice(1).filter((q) => PART_QUAL_RE.test(q));
+  let quals = parts.slice(1).filter((q) => !PART_QUAL_RE.test(q) && !headKey.includes(compactName(q)));
+  // 세부 이름이 대표 이름으로 끝나면("순대국밥" ← 국밥) 그 세부가 머리가 된다
+  const headIdx = quals.findIndex((q) => headKey.length > 0 && compactName(q).endsWith(headKey));
+  let words: string[];
+  if (headIdx >= 0) words = [...quals.filter((_, i) => i !== headIdx), quals[headIdx]];
+  else words = [...quals, head];
+  let name = words.join(' ').replace(/\s*\(/g, ' (').replace(/\s+/g, ' ').trim();
+  // 부분(국물·면만)은 그 음식 자체가 아니라 다른 이름을 두지 않는다 — "라면 (국물)" 이 "라면" 으로 잡히면 안 된다
+  if (suffix.length) return { name: `${name} (${suffix.join(', ')})`, aliases: [] };
+
+  // ── 다른 이름 ──
+  const base = new Set<string>([name, parts.join(' ')]);
+  // 괄호 앞/속 이름 ("돼지고기볶음 (제육볶음)" → 돼지고기볶음 · 제육볶음, "돼지고기(제육) 덮밥" → 돼지고기 덮밥 · 제육 덮밥)
+  for (const v of [...base]) {
+    const m = v.match(/^(.*?)(\S+?)\s*\(([^)]+)\)(.*)$/);
+    if (!m) continue;
+    const [, pre, outer, inner, post] = m;
+    base.add(`${pre}${outer}${post}`.trim());
+    base.add(`${pre}${inner}${post}`.trim());
+  }
+  // "삼겹살구이" · "소갈비 구이" → 삼겹살 · 소갈비 (식당에서 "삼겹살"이라 부르는 그 음식)
+  for (const v of [...base]) {
+    const m = v.match(/^(.*\S{2,}?)\s*구이$/);
+    if (m && compactName(m[1]).length >= 2) base.add(m[1].trim());
+  }
+  const all = new Set<string>(base);
+  for (const v of base) for (const [from, to] of SPELLING_SWAPS) if (v.includes(from)) all.add(v.split(from).join(to));
+  const own = compactName(name);
+  const seen = new Set<string>([own]);
+  const aliases: string[] = [];
+  for (const a of all) {
+    const k = compactName(a);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    aliases.push(a.replace(/\s+/g, ' ').trim());
+  }
+  return { name, aliases: aliases.slice(0, 8) };
+}
+
+/** 식약처 대분류 → 반찬(한 끼의 주 메뉴가 아님) */
+const GENERIC_SIDE_MAJOR = /(김치류|나물|숙채|생채|무침|장아찌|절임|젓갈|장류|양념류)/;
+/** 국·찌개 대분류 — 밥이 빠진 값이라 밥은 따로라고 알려 준다 */
+const SOUP_MAJOR = /(국 및 탕류|찌개 및 전골류)/;
+
+export interface IngestedDish extends MenuItem {
+  _originRank: number;
+  _hasPortion: boolean;
+  _refDate?: string;
+  _code?: string;
+}
+
+/**
+ * 음식 데이터셋의 일반 음식 행(업체명 '해당없음') → 일반 음식 메뉴.
+ * 영양은 데이터셋의 100 g(ml) 당 값 × 식품중량(1인분 제공 중량) — 둘 다 식약처 값이라 official.
+ * 식품중량이 없거나 기준량과 같으면(외식 분석 시료 100 g 처럼 1인분이 아닌 값) 1인분을 지어내지 않고 "100 g 기준" + 이유 한 줄.
+ */
+export function rowToGenericDish(
+  row: IngestRow,
+): { dish: IngestedDish } | { skip: 'not-generic' | 'origin' | 'no-name' | 'no-kcal' } {
+  const cell = (f: Field) => (row.cols[f] == null ? undefined : row.cells[row.cols[f]!]?.trim());
+  if (row.kind !== 'food') return { skip: 'not-generic' };
+  if (!NO_CATEGORY.has(normalizeDisplayText(cell('company') ?? '').trim())) return { skip: 'not-generic' };
+  const origin = genericOrigin(cell('origin'));
+  if (!origin) return { skip: 'origin' };
+  const rawName = cell('name');
+  if (!rawName) return { skip: 'no-name' };
+  const { name, aliases } = cleanGenericName(rawName);
+  if (!name) return { skip: 'no-name' };
+
+  const basis = parseAmount(cell('basis')) ?? { value: 100, unit: 'g' as const };
+  // 식품중량은 단위 없이 숫자만("351.6")이거나 ml 가 잘린 "1100m" 로 오기도 한다 — 기준량 단위로 읽는다
+  const wRaw = (cell('weight') ?? '').replace(/,/g, '').trim();
+  const wm = wRaw.match(/^(\d+(?:\.\d+)?)\s*(g|ml|m)?$/i);
+  const weight: Amount | null =
+    wm && Number(wm[1]) > 0 ? { value: Number(wm[1]), unit: wm[2] ? (wm[2].toLowerCase() === 'g' ? 'g' : 'ml') : basis.unit } : null;
+  const hasPortion = !!weight && weight.unit === basis.unit && Math.abs(weight.value - basis.value) > 1e-9;
+  const num = (f: Field) => parseNumber(cell(f));
+  const fmt = (a: Amount) => `${Math.round(a.value)} ${a.unit}`;
+  const serving = toServing(
+    { kcal: num('kcal'), carbs: num('carbs'), sugar: num('sugar'), protein: num('protein'), fat: num('fat'), satFat: num('satFat'), sodium: num('sodium') },
+    cell('basis'),
+    hasPortion ? `${weight!.value}${weight!.unit}` : undefined,
+    undefined,
+  );
+  if (!serving) return { skip: 'no-kcal' };
+
+  const majorCat = cell('majorCat') ?? '';
+  const repName = cell('repName');
+  const hint = repName && !NO_CATEGORY.has(repName) ? `${normalizeDisplayText(repName)} ${name}` : name;
+  // 대분류가 곧 음식 성격이다 — 반찬 분류는 side, 음료·빵·빙과만 이름으로 가르고, 나머지 조리 음식(볶음·구이·국·밥…)은 식사
+  const category: MenuCategory = GENERIC_SIDE_MAJOR.test(majorCat)
+    ? 'side'
+    : /(음료|차류|빵|과자|유제품|빙과)/.test(majorCat)
+      ? inferCategory(hint, majorCat, cell('midCat'))
+      : SALAD_RE.test(name)
+        ? 'salad'
+        : 'meal';
+  const riceApart = SOUP_MAJOR.test(majorCat) && !/(밥|죽|면|국수|수제비|떡국|만두국|만둣국|우동|라면|짬뽕)/.test(name);
+  const note = hasPortion
+    ? `${origin.label} · ${origin.portion}${riceApart ? '. 국·찌개만의 값이라 공기밥은 따로 더해요' : ''}`
+    : `${origin.label} · 1인분 양 정보가 없어 ${fmt(basis)} 기준으로 보여줘요`;
+  const code = cell('code');
+  const ds = DATASETS.food;
+  const dish: IngestedDish = {
+    id: `${GENERIC_ID_PREFIX}${code ? slugifyCode(code) : slugifyCode(genericDishKey(name)) || 'item'}`,
+    brandId: GENERIC_BRAND_ID,
+    name,
+    category,
+    serving: hasPortion ? `1인분 (${fmt(weight!)})` : `${fmt(basis)} 기준`,
+    nutrients: serving.nutrients,
+    trust: 'official',
+    sourceUrl: ds.url,
+    sourceName: ds.sourceName,
+    servingNote: note,
+    imageKey: category,
+    _originRank: origin.rank,
+    _hasPortion: hasPortion,
+  };
+  if (aliases.length) dish.aliases = aliases;
+  const ref = cell('refDate');
+  if (ref) dish._refDate = ref;
+  if (code) dish._code = code;
+  return { dish };
+}
+
+/**
+ * 같은 음식(genericDishKey)은 하나만: 1인분 중량이 있는 행 > 출처 우선순위(외식 분석 > 외식 재료량 > 가정식 > 급식) > 기준일자 최신 > 코드 순.
+ * 결과는 출처 우선순위 → 이름 순 (검색 동점일 때 식당 값이 먼저 오게). 진 행의 이름은 이긴 행의 다른 이름으로 남긴다.
+ */
+export function dedupeGenericDishes(dishes: IngestedDish[]): (MenuItem & { _originRank: number })[] {
+  const better = (a: IngestedDish, b: IngestedDish) => {
+    if (a._hasPortion !== b._hasPortion) return a._hasPortion;
+    if (a._originRank !== b._originRank) return a._originRank < b._originRank;
+    const da = a._refDate ?? '';
+    const db = b._refDate ?? '';
+    if (da !== db) return da > db;
+    return (a._code ?? a.id) < (b._code ?? b.id);
+  };
+  const best = new Map<string, IngestedDish>();
+  const names = new Map<string, string[]>();
+  for (const d of dishes) {
+    const key = genericDishKey(d.name);
+    const prev = best.get(key);
+    if (!prev || better(d, prev)) best.set(key, d);
+    names.set(key, [...(names.get(key) ?? []), d.name, ...(d.aliases ?? [])]);
+  }
+  const out: (MenuItem & { _originRank: number })[] = [];
+  const ids = new Set<string>();
+  for (const [key, d] of best) {
+    const { _hasPortion, _refDate, _code, ...rest } = d;
+    void _hasPortion;
+    void _refDate;
+    void _code;
+    const own = compactName(d.name);
+    const seen = new Set<string>([own]);
+    const aliases: string[] = [];
+    for (const a of [...(d.aliases ?? []), ...(names.get(key) ?? [])]) {
+      const k = compactName(a);
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      aliases.push(a);
+    }
+    const item: MenuItem & { _originRank: number } = { ...rest };
+    if (aliases.length) item.aliases = aliases.slice(0, 8);
+    else delete item.aliases;
+    let id = item.id;
+    for (let n = 2; ids.has(id); n++) id = `${item.id}-${n}`;
+    ids.add(id);
+    out.push({ ...item, id });
+  }
+  return out.sort((a, b) => a._originRank - b._originRank || a.name.localeCompare(b.name, 'ko'));
 }

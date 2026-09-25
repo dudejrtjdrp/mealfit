@@ -47,27 +47,51 @@ export function nearestStoresWithData(stores: Store[]): Store[] {
   return [...byBrand.values()].sort((a, b) => a.distanceM - b.distanceM);
 }
 
+/** 추천 후보에 넣는 브랜드 아닌 동네 식당(일반 식당 기준 추정 메뉴) 수 — 가까운 순 */
+export const ESTIMATED_PLACES_FOR_CANDIDATES = 4;
+
+/** 브랜드 없는 식당 중 대표 음식을 추정할 수 있는 곳 (가까운 순) */
+export function nearestEstimatedPlaces(stores: Store[], limit = ESTIMATED_PLACES_FOR_CANDIDATES): Store[] {
+  return stores
+    .filter((s) => !s.brandId && s.coverage !== 'none')
+    .sort((a, b) => a.distanceM - b.distanceM)
+    .slice(0, limit);
+}
+
 /**
  * 주변 메뉴 전체를 한 번에 rankMenus 한 결과 중 추천할 수 있는 것 (순위 순).
  * 정보 없음·오늘은 패스·조리용 식재료·대용량은 뺀다 — 추천은 "지금 먹기 좋은 것"만.
+ * estimatesFor 를 주면 브랜드 아닌 동네 식당(국밥집·찌개집)의 대표 음식 추정(일반 식당 기준, estimated)도 후보에 넣는다 —
+ * 같은 음식이 여러 가게에 있으면 가까운 가게 하나로.
  */
 export function collectCandidates(
   stores: Store[],
   menusFor: (brandId: string) => MenuItem[],
   remaining: DailyTargets,
   ctx: JudgeContext,
+  estimatesFor?: (store: Store) => MenuItem[],
 ): RecommendCandidate[] {
   const storeByBrand = new Map<string, Store>();
+  const storeByMenuId = new Map<string, Store>();
   const menus: MenuItem[] = [];
   for (const s of nearestStoresWithData(stores)) {
     storeByBrand.set(s.brandId!, s);
     menus.push(...menusFor(s.brandId!));
   }
+  if (estimatesFor) {
+    for (const s of nearestEstimatedPlaces(stores)) {
+      for (const m of estimatesFor(s)) {
+        if (storeByMenuId.has(m.id)) continue;
+        storeByMenuId.set(m.id, s);
+        menus.push(m);
+      }
+    }
+  }
   if (menus.length === 0) return [];
   const out: RecommendCandidate[] = [];
   for (const { menu, judgement } of rankMenus(menus, remaining, ctx)) {
     if (judgement.unknown || judgement.verdict === 'pass' || !isMealCandidate(menu)) continue;
-    const store = storeByBrand.get(menu.brandId);
+    const store = storeByMenuId.get(menu.id) ?? storeByBrand.get(menu.brandId);
     const nutrients = applyOptions(menu);
     if (!store || !nutrients || typeof nutrients.kcal !== 'number') continue;
     out.push({ menu, judgement, store, kcal: nutrients.kcal, nutrients });
@@ -97,7 +121,7 @@ function modeKey(c: RecommendCandidate, mode: RecommendMode): number | undefined
 }
 
 /**
- * 상위 n개: 같은 브랜드(=매장)는 1개만.
+ * 상위 n개: 같은 브랜드(=매장)는 1개만 (브랜드 아닌 동네 식당은 가게마다 1개).
  * 앞에서부터: 칩 기준 값이 있는 것 → 없는 것, 그 안에서 좋음 → 괜찮음, 그 안에서 칩 기준 → 판정 순위.
  * 30kcal 미만(아메리카노·제로 음료)은 "먹을 것" 추천이 아니라 맨 뒤에서만 채운다.
  */
@@ -111,8 +135,10 @@ export function pickRecommendations(candidates: RecommendCandidate[], mode: Reco
   const seen = new Set<string>();
   const out: RecommendCandidate[] = [];
   for (const { c } of keyed) {
-    if (seen.has(c.menu.brandId)) continue;
-    seen.add(c.menu.brandId);
+    // 같은 매장(브랜드)은 하나 — 브랜드 아닌 동네 식당은 가게마다
+    const seller = c.store.brandId ?? `place:${c.store.id}`;
+    if (seen.has(seller)) continue;
+    seen.add(seller);
     out.push(c);
     if (out.length >= n) break;
   }

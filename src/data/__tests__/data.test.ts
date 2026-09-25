@@ -302,7 +302,7 @@ describe('searchMenus (기록 추가 E2)', () => {
     const norm = (s: string) => s.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
     const q = '라떼';
     const naive = getMenus().filter((m) => norm(m.name).includes(q) || norm(getBrand(m.brandId)?.name ?? '').includes(q));
-    const got = searchMenus(q, 100000).filter((m) => m.brandId !== 'packaged');
+    const got = searchMenus(q, 100000).filter((m) => m.brandId !== 'packaged' && m.brandId !== 'generic');
     expect(new Set(got.map((m) => m.id))).toEqual(new Set(naive.map((m) => m.id)));
     // 검색어가 이름 끝(머리)인 메뉴가 꾸밈말 자리("라떼쿠키" 같은)보다 먼저
     const tiers = searchMenus(q, 200).map((m) => matchTier(q, rankKey(m, getBrand(m.brandId)?.name ?? '')));
@@ -409,9 +409,14 @@ describe('matchBrand', () => {
 });
 
 describe('getMockStores', () => {
-  it('10곳, 거리순, 시안 4곳 포함, 거리는 haversine', () => {
+  it('12곳(브랜드 10 + 동네 식당 2), 거리순, 시안 4곳 포함, 거리는 haversine', () => {
     const stores = getMockStores(CENTER);
-    expect(stores).toHaveLength(10);
+    expect(stores).toHaveLength(12);
+    // 브랜드 아닌 동네 식당은 브랜드가 없고, 대표 음식을 추정할 수 있어 '일부'
+    expect(stores.filter((s) => !s.brandId).map((s) => [s.name, s.coverage, s.category, s.placeCategory])).toEqual([
+      ['역삼 돼지국밥', 'partial', 'korean', '음식점 > 한식 > 국밥'],
+      ['역삼 찌개집', 'partial', 'korean', '음식점 > 한식 > 찌개,전골'],
+    ]);
     const byName = Object.fromEntries(stores.map((s) => [s.name, s]));
     expect(byName['GS25 역삼센터점']).toMatchObject({ distanceM: 120, category: 'convenience', coverage: 'full' });
     expect(byName['스타벅스 역삼역점']).toMatchObject({ distanceM: 180, category: 'cafe', coverage: 'full' });

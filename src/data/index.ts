@@ -1,11 +1,12 @@
 import type { Brand, MenuItem, Store } from '../domain/types';
+import { PLACE_EST_ID_SUFFIX, placeDishQueries, toPlaceEstimate } from './placeDishes';
 import brandsJson from './brands.json';
 import { mergeSeedOptionsIntoOfficial } from './dedupe';
 import { applyPerPortion } from './perPortion';
 import { applyPackagedServing } from './packagedServing';
 import { applyPerServing, type ServingRule } from './perServing';
 import { applyPerSlice } from './perSlice';
-import { DATASETS, PACKAGED_BRAND_ID, mergeBrands, mergeMenus } from './ingest/nutrition';
+import { DATASETS, GENERIC_BRAND_ID, GENERIC_ID_PREFIX, PACKAGED_BRAND_ID, mergeBrands, mergeMenus } from './ingest/nutrition';
 import { getMockStores as buildMockStores } from './mockStores';
 import { rankKey, rankMatches, type RankKey } from './searchRank';
 
@@ -24,6 +25,25 @@ interface ProductsBundle {
 
 /** 시판 제품 전체가 속하는 가상 브랜드 — 매장 매칭 키워드는 비워 둔다(장소 이름과 매칭되면 안 됨) */
 const PACKAGED_BRAND: Brand = { id: PACKAGED_BRAND_ID, name: '가공식품', category: 'convenience', matchKeywords: [], coverage: 'full' };
+
+/** scripts/ingest-nutrition.mjs 가 만드는 일반 음식 번들 (돼지국밥·김치찌개처럼 브랜드 없는 대표 음식 — brandId·출처는 메타로 접어 둔다) */
+interface DishesBundle {
+  meta: { count: number };
+  menus: MenuItem[];
+}
+
+/**
+ * 일반 음식(대표 음식)이 속하는 가상 브랜드. 매장 매칭 키워드는 비워 둔다 —
+ * 장소 이름과 매칭돼 "일반 식당"이라는 매장처럼 보이지 않게(주변 매장·브랜드 검색에 나오지 않는다).
+ */
+const GENERIC_BRAND: Brand = {
+  id: GENERIC_BRAND_ID,
+  name: '일반 식당',
+  category: 'korean',
+  matchKeywords: [],
+  coverage: 'full',
+  blurb: '식약처 음식 데이터의 대표 음식 1인분이에요.',
+};
 
 interface Catalog {
   brands: Brand[];
@@ -71,7 +91,7 @@ function buildCatalog(): Catalog {
   // 매장 메뉴로 들어온 대용량 가공식품(편의점 우유 1.8 L·아메리카노 1 L)은 1회 섭취참고량으로 (packagedServing.ts — 시판 제품 번들·서버 제품과 같은 규칙)
   const packed = applyPackagedServing(served.menus);
   const menus = packed.menus;
-  const brands = [...mergeBrands(brandsJson as Brand[], mfds.brands, menus), PACKAGED_BRAND];
+  const brands = [...mergeBrands(brandsJson as Brand[], mfds.brands, menus), PACKAGED_BRAND, GENERIC_BRAND];
 
   const menusByBrand = new Map<string, MenuItem[]>();
   for (const m of menus) {
@@ -122,6 +142,77 @@ function loadProducts(): { list: MenuItem[]; byId: Map<string, MenuItem>; conver
   return products;
 }
 
+// ───────── 일반 음식 (돼지국밥·김치찌개 같은 대표 음식 1.7천 개, 0.6MB) ─────────
+// 검색·AI 기록 맞추기·주변 일반 식당 추정에서 처음 필요할 때만 로드한다.
+interface Dishes {
+  list: MenuItem[];
+  byId: Map<string, MenuItem>;
+  /** 정규화 이름·다른 이름 → 음식 (번들 순서 = 1인분 있음·식당 값 먼저) */
+  byName: Map<string, MenuItem[]>;
+}
+let dishes: Dishes | null = null;
+
+function loadDishes(): Dishes {
+  if (dishes) return dishes;
+  const bundle = require('./generated/mfds-dishes.json') as DishesBundle;
+  const ds = DATASETS.food;
+  const list = bundle.menus.map((m) => ({ ...m, brandId: GENERIC_BRAND_ID, sourceUrl: ds.url, sourceName: ds.sourceName }));
+  const byName = new Map<string, MenuItem[]>();
+  for (const m of list) {
+    for (const n of new Set([m.name, ...(m.aliases ?? [])].map(normalizeName))) {
+      if (!n) continue;
+      const arr = byName.get(n);
+      if (arr) arr.push(m);
+      else byName.set(n, [m]);
+    }
+  }
+  dishes = { list, byId: new Map(list.map((m) => [m.id, m])), byName };
+  return dishes;
+}
+
+/** 일반 음식 전체 (대표 음식 — 검증·디버그용) */
+export function getGenericDishes(): MenuItem[] {
+  return loadDishes().list;
+}
+
+/**
+ * 이름(또는 다른 이름)이 같은 일반 음식 하나. "돼지국밥" → 돼지고기 국밥 (식당 1인분 1,200 g).
+ * 같은 이름이 여러 개면 1인분 중량이 있는 것 > 식당 값 > 집밥 > 급식 (번들 순서).
+ */
+export function findGenericDish(name: string): MenuItem | undefined {
+  const hits = loadDishes().byName.get(normalizeName(name));
+  if (!hits) return undefined;
+  return hits.find((m) => m.serving.startsWith('1인분')) ?? hits[0];
+}
+
+const placeCache = new Map<string, MenuItem[]>();
+/**
+ * 브랜드가 아닌 식당(카카오 이름·분류)에서 "이런 메뉴가 있을 거예요" — 일반 음식 1인분을 추정(estimated)으로.
+ * 이름·분류에 단서가 없으면 빈 배열 (지어내지 않는다). 같은 이름·분류는 같은 배열(메모이제이션 안정).
+ */
+export function estimatedMenusForPlace(name: string, placeCategory?: string): MenuItem[] {
+  const key = `${name}|${placeCategory ?? ''}`;
+  const hit = placeCache.get(key);
+  if (hit) return hit;
+  const out: MenuItem[] = [];
+  const seen = new Set<string>();
+  for (const q of placeDishQueries(name, placeCategory)) {
+    const d = findGenericDish(q);
+    // 1인분 중량을 아는 음식만 — "100 g 기준" 은 가게 메뉴 한 그릇으로 보여줄 수 없다
+    if (!d || seen.has(d.id) || !d.serving.startsWith('1인분')) continue;
+    seen.add(d.id);
+    out.push(toPlaceEstimate(d));
+  }
+  placeCache.set(key, out);
+  return out;
+}
+
+/** 매장의 메뉴 — 브랜드 매장은 브랜드 메뉴, 브랜드가 아닌 식당은 일반 음식 추정 */
+export function menusForStore(store: Pick<Store, 'brandId' | 'name' | 'placeCategory'>): MenuItem[] {
+  if (store.brandId) return getMenusByBrand(store.brandId);
+  return estimatedMenusForPlace(store.name, store.placeCategory);
+}
+
 /** 카탈로그가 이미 만들어졌는지 (예열 확인·테스트용) */
 export function isCatalogReady(): boolean {
   return catalog !== null;
@@ -138,9 +229,10 @@ export function prewarmCatalog(delayMs = 600): void {
   const run = () => {
     try {
       data();
-      // 시판 제품(6MB)도 한가할 때 미리 — 첫 검색 입력이 파싱에 막히지 않게
+      // 시판 제품(6MB)·일반 음식도 한가할 때 미리 — 첫 검색 입력·주변 식당 추정이 파싱에 막히지 않게
       setTimeout(() => {
         try {
+          loadDishes();
           loadProducts();
         } catch (e) {
           console.warn('[data] 시판 제품 예열 실패', e);
@@ -163,6 +255,8 @@ export function prewarmCatalog(delayMs = 600): void {
 export function resetCatalogForTest(): void {
   catalog = null;
   products = null;
+  dishes = null;
+  placeCache.clear();
   prewarmScheduled = false;
   searchIndex = null;
 }
@@ -182,11 +276,20 @@ export function getMenus(): MenuItem[] {
   return data().menus;
 }
 export function getMenusByBrand(brandId: string): MenuItem[] {
+  if (brandId === GENERIC_BRAND_ID) return loadDishes().list;
   return data().menusByBrand.get(brandId) ?? [];
 }
 export function getMenu(id: string): MenuItem | undefined {
   // 시판 제품(pkg-…)은 필요한 그 순간에만 6MB 번들을 로드한다
   if (id.startsWith('pkg-')) return loadProducts().byId.get(id);
+  if (id.startsWith(GENERIC_ID_PREFIX)) {
+    // 주변 일반 식당 추정 메뉴(…-est)는 원래 일반 음식을 추정으로 바꿔 돌려준다 (기록·상세가 id 로 다시 찾는다)
+    if (id.endsWith(PLACE_EST_ID_SUFFIX)) {
+      const base = loadDishes().byId.get(id.slice(0, -PLACE_EST_ID_SUFFIX.length));
+      return base ? toPlaceEstimate(base) : undefined;
+    }
+    return loadDishes().byId.get(id);
+  }
   return data().menuById.get(id);
 }
 /** 검색에 포함되는 시판 제품(라면·과자·음료 등) 수 — 검색 안내 문구용 */
@@ -231,7 +334,8 @@ export function searchMenus(query: string, limit = 40): MenuItem[] {
   if (!searchIndex) {
     const { brands, menus } = data();
     const brandNames = new Map(brands.map((b) => [b.id, b.name]));
-    const all = [...menus, ...loadProducts().list];
+    // 매장 메뉴 → 일반 음식(대표 음식) → 시판 제품. 순위는 rankMatches 가 정하고, 동점이면 이 순서
+    const all = [...menus, ...loadDishes().list, ...loadProducts().list];
     const keys = all.map((m) => rankKey(m, brandNames.get(m.brandId) ?? ''));
     const groupTotals = new Map<string, number>();
     for (const k of keys) groupTotals.set(k.group, (groupTotals.get(k.group) ?? 0) + 1);

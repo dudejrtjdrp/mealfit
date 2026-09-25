@@ -25,6 +25,7 @@ import {
 } from '@/components';
 import { RecordSheet } from '@/components/RecordSheet';
 import { getBrand, getMenu, getMenusByBrand } from '@/data';
+import { GENERIC_BRAND_ID } from '@/data/ingest/nutrition';
 import { STORE_CATEGORY_LABEL, formatPrice } from '@/data/labels';
 import { applyOptions, judgeMenu, suggestAlternatives } from '@/domain/judge';
 import { clampLogDate } from '@/domain/logDate';
@@ -93,7 +94,8 @@ export default function MenuDetail() {
   const judgement = menu && remaining ? judgeMenu(menu, remaining, ctx) : null;
   const alternatives = useMemo(
     // 본 판정과 같은 끼니 기준(먹은 끼니·시각). 옵션 선택은 빼고 기본 옵션끼리 비교
-    () => (menu && remaining ? suggestAlternatives(menu, getMenusByBrand(menu.brandId), remaining, jctx, 2) : []),
+    // 일반 음식(대표 음식 1.7천 개)은 한 가게 메뉴판이 아니라 대안을 고르지 않는다 (반찬·국만 권하게 될 수 있어서)
+    () => (menu && remaining && menu.brandId !== GENERIC_BRAND_ID ? suggestAlternatives(menu, getMenusByBrand(menu.brandId), remaining, jctx, 2) : []),
     [menu, remaining, jctx],
   );
 
@@ -214,7 +216,7 @@ export default function MenuDetail() {
             ) : (
               <UnknownBadge />
             )}
-            <TrustBadge trust={menu.trust} />
+            <TrustBadge trust={menu.trust} generic={menu.brandId === GENERIC_BRAND_ID} />
           </View>
           {!unknown && judgement?.reasons[0] ? (
             <View style={styles.reason}>

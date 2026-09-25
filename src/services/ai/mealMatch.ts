@@ -64,7 +64,7 @@ async function candidatesFor(q: string): Promise<MenuItem[]> {
   return [...local, ...remote].filter(usable);
 }
 
-/** 같은 이름(브랜드 제품이면 브랜드까지) 메뉴 */
+/** 같은 이름(브랜드 제품이면 브랜드까지, 일반 음식은 다른 이름까지) 메뉴 */
 export async function findExactMenu(name: string): Promise<MenuItem | undefined> {
   const q = normalizeName(name);
   if (!q) return undefined;
@@ -78,7 +78,14 @@ export async function findExactMenu(name: string): Promise<MenuItem | undefined>
     if (within.length) return within.sort((a, b) => a.name.length - b.name.length)[0];
   }
   const list = await candidatesFor(name);
-  return list.find((m) => normalizeName(m.name) === q || normalizeName(`${brandName(m) ?? ''}${m.name}`) === q);
+  // 일반 음식의 다른 이름도 같은 이름으로 본다 ("돼지국밥" = 돼지고기 국밥 — 식당 1인분). 목록은 검색 순위라
+  // 이름이 같은 메뉴가 여럿이면 매장 메뉴·일반 음식이 시판 제품(레토르트)보다 먼저 잡힌다.
+  return list.find(
+    (m) =>
+      normalizeName(m.name) === q ||
+      (m.aliases ?? []).some((a) => normalizeName(a) === q) ||
+      normalizeName(`${brandName(m) ?? ''}${m.name}`) === q,
+  );
 }
 
 /** AI 추정은 말한 단위 그대로 (반 마리 → 0.5마리). 영양도 그 단위 1개 기준으로 받는다 */

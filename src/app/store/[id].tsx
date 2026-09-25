@@ -26,7 +26,7 @@ import { FavoriteButton } from '@/components/FavoriteButton';
 import { RecordSheet, type RecordSheetItem } from '@/components/RecordSheet';
 import { Segmented } from '@/components/Segmented';
 import { StoreCartBar } from '@/components/StoreCartBar';
-import { getBrand, getMenusByBrand, getMockStores, normalizeName } from '@/data';
+import { getBrand, getMenusByBrand, getMockStores, menusForStore, normalizeName } from '@/data';
 import { MENU_CATEGORY_LABEL } from '@/data/labels';
 import { YEOKSAM_CENTER } from '@/data/mockStores';
 import { cartKcal, cartQty, cartRemove, cartSetQty, cartStep, type Cart } from '@/domain/cart';
@@ -87,7 +87,9 @@ export default function StoreMenu() {
   const [date, setDate] = useState(() => toDateKey());
   const [saving, setSaving] = useState(false);
 
-  const menus = useMemo(() => (brandId ? getMenusByBrand(brandId) : []), [brandId]);
+  // 브랜드가 아닌 동네 식당은 이름·카카오 분류로 대표 음식을 추정한다 (일반 식당 기준, estimated) — 단서가 없으면 빈 목록
+  const menus = useMemo(() => (brandId ? getMenusByBrand(brandId) : store ? menusForStore(store) : []), [brandId, store]);
+  const estimatedPlace = !brandId && menus.length > 0;
   const remaining = summary?.remaining ?? targets;
   const jctx = useJudgeContext();
   const ranked = useMemo(() => (remaining ? rankMenus(menus, remaining, jctx) : null), [menus, remaining, jctx]);
@@ -113,7 +115,7 @@ export default function StoreMenu() {
   const stepCart = (menu: MenuItem, dir: 1 | -1) => setCart((c) => cartStep(c, menu.id, dir, menuQtyUnit(menu)));
 
   const title = store?.name ?? brand?.name ?? '매장';
-  const noInfo = !brand || brand.coverage === 'none' || menus.length === 0 || menus.every((m) => m.trust === 'none');
+  const noInfo = (!brand && !estimatedPlace) || (brand && brand.coverage === 'none') || menus.length === 0 || menus.every((m) => m.trust === 'none');
   const trust = summarizeTrust(menus.map((m) => m.trust));
   /** 메뉴 카드 보조 수치 — 내 목적의 첫 강조 영양소 (없으면 단백질) */
   const sub: NutrientKey = ((targets?.emphasis ?? []).find((k) => k !== 'kcal') as NutrientKey | undefined) ?? 'protein';
@@ -163,7 +165,7 @@ export default function StoreMenu() {
     <SafeAreaView edges={['top']} style={styles.root}>
       {/* 헤더 + 검색창은 스크롤 밖 — 늘 위에 붙어 있다 */}
       <View style={styles.pad}>
-        <StackHeader title={title} right={<TrustBadge trust={noInfo ? 'none' : trust} size="sm" />} />
+        <StackHeader title={title} right={<TrustBadge trust={noInfo ? 'none' : trust} size="sm" generic={estimatedPlace} />} />
         {noInfo ? null : (
           <View style={styles.search}>
             <Ionicons name="search" size={18} color={colors.ink3} />
@@ -194,6 +196,17 @@ export default function StoreMenu() {
           />
         ) : (
           <>
+            {estimatedPlace ? (
+              <View style={styles.estimateNote} accessibilityRole="summary">
+                <View style={styles.estimateHead}>
+                  <Ionicons name="restaurant-outline" size={16} color={colors.ink2} />
+                  <Text variant="h3">이런 메뉴가 있을 거예요</Text>
+                </View>
+                <Text variant="small" color="ink2">
+                  이 가게 영양 정보는 아직 없어서, 가게 이름·분류로 고른 대표 음식을 일반 식당 1인분 기준(식약처)으로 어림했어요. 실제 메뉴·양과 다를 수 있어요.
+                </Text>
+              </View>
+            ) : null}
             {cats.length > 1 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipsWrap} accessibilityRole="tablist">
                 {(['all', ...cats] as Cat[]).map((c) => (
@@ -410,6 +423,8 @@ function CartControl({ name, unit, qty, onStep }: { name: string; unit: string; 
 }
 
 const styles = StyleSheet.create({
+  estimateNote: { marginTop: spacing.md, padding: spacing.lg, gap: 6, borderRadius: radius.lg, backgroundColor: colors.section },
+  estimateHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   pad: { paddingHorizontal: spacing.page, paddingBottom: spacing.sm },

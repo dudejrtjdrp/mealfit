@@ -7,7 +7,7 @@ import { Button, Card, Chip, EmptyState, KcalRing, MenuTile, NutrientBar, RichTe
 import { AIQuickRow } from '@/components/AIQuickRow';
 import { LogEditSheet } from '@/components/LogEditSheet';
 import { RecommendCard, RecommendCardSkeleton } from '@/components/RecommendCard';
-import { getMenu, getMenusByBrand } from '@/data';
+import { getMenu, getMenusByBrand, menusForStore } from '@/data';
 import { REFERENCE_FOOD_SPECS, foodEquivalent, resolveReferenceFoods } from '@/domain/foodEquivalent';
 import { eatenMealsFromLogs, mealBudget } from '@/domain/mealBudget';
 import { formatNumber, toDateKey } from '@/domain/summary';
@@ -243,7 +243,7 @@ function NearbyPicks({ remaining, profile }: { remaining: DailyTargets | null; p
 
   const jctx = useJudgeContext();
   const candidates = useMemo(
-    () => (remaining && stores.length > 0 ? collectCandidates(stores, getMenusByBrand, remaining, jctx) : []),
+    () => (remaining && stores.length > 0 ? collectCandidates(stores, getMenusByBrand, remaining, jctx, menusForStore) : []),
     [stores, remaining, jctx],
   );
   const mode = useRecommendMode((s) => s.mode);

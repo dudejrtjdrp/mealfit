@@ -8,6 +8,12 @@ jest.mock('../generated/mfds.json', () => {
   return jest.requireActual('../generated/mfds.json');
 });
 
+let dishLoads = 0;
+jest.mock('../generated/mfds-dishes.json', () => {
+  dishLoads += 1;
+  return jest.requireActual('../generated/mfds-dishes.json');
+});
+
 import { getMenus, getSeedPolicy, isCatalogReady, prewarmCatalog, resetCatalogForTest, searchMenus } from '../index';
 
 beforeEach(() => {
@@ -15,8 +21,9 @@ beforeEach(() => {
   jest.useRealTimers();
 });
 
-it('import 만으로는 카탈로그를 만들지 않는다 (mfds.json 미로드)', () => {
+it('import 만으로는 카탈로그를 만들지 않는다 (mfds.json·일반 음식 번들 미로드)', () => {
   expect(mfdsLoads).toBe(0);
+  expect(dishLoads).toBe(0);
   expect(isCatalogReady()).toBe(false);
 });
 
@@ -26,6 +33,8 @@ it('첫 접근 때 한 번만 만들고 같은 결과를 재사용한다', () =>
   expect(mfdsLoads).toBe(1);
   expect(getMenus()).toBe(a);
   expect(a.length).toBeGreaterThan(1000);
+  // 매장 메뉴 목록만으로는 일반 음식 번들을 읽지 않는다 (검색·주변 식당 추정 때 처음 읽는다)
+  expect(dishLoads).toBe(0);
   expect(getSeedPolicy()).toBeDefined();
   expect(searchMenus('아메리카노', 3).length).toBeGreaterThan(0);
 });

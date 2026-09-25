@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { create } from 'zustand';
 
-import { getMenusByBrand } from '@/data';
+import { getMenusByBrand, menusForStore } from '@/data';
 import { buildMealPlan, cyclePicks, daySeed, planSlots, tomorrowMeals, tomorrowMorning, tomorrowPreviewCount, type MealPlan, type PlanMeal, type PlanPicks, type RecentEaten } from '@/domain/mealPlan';
 import type { MealType } from '@/domain/types';
 import { toDateKey } from '@/domain/summary';
@@ -93,7 +93,7 @@ export function useMealPlan(): MealPlanView {
     // 끼니별 적정량(남은 양 ÷ 남은 주 끼니 수)으로 판정 — 저녁 메뉴도 저녁 몫 기준으로 본다
     const { upcoming } = planSlots(remaining.kcal, now, todayLogs);
     const ctx = upcoming > 0 ? { ...jctx, now, mealSlotsLeft: upcoming } : { ...jctx, now };
-    const candidates = stores.length ? collectCandidates(stores, getMenusByBrand, remaining, ctx) : [];
+    const candidates = stores.length ? collectCandidates(stores, getMenusByBrand, remaining, ctx, menusForStore) : [];
     const today = toDateKey(now);
     const sameDay = reroll.date === today;
     const count = sameDay ? reroll.count : 0;
@@ -118,7 +118,7 @@ export function useMealPlan(): MealPlanView {
     if (!plan || !targets || !stores.length || recent === null || count === 0) return [];
     const now = new Date();
     const ctx = { profile: jctx.profile, now: tomorrowMorning(now), mealSlotsLeft: 3 };
-    const candidates = collectCandidates(stores, getMenusByBrand, targets, ctx);
+    const candidates = collectCandidates(stores, getMenusByBrand, targets, ctx, menusForStore);
     const todayLogs = summary?.logs ?? [];
     const today = toDateKey(now);
     const recentLogs: RecentEaten[] = [...recent.filter((r) => r.date !== today), ...todayLogs.map((l) => ({ name: l.name, date: l.date, menuId: l.menuId, brandId: l.brandId, storeName: l.storeName }))];

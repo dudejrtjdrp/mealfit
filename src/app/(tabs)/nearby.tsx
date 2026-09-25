@@ -4,8 +4,8 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomSheet, BrandTile, ChevronDownIcon, ChevronRightIcon, Chip, CoverageBadge, EmptyState, IconButton, PinIcon, Skeleton, Text, showToast } from '@/components';
-import { getBrand, getMenusByBrand } from '@/data';
+import { BottomSheet, BrandTile, ChevronDownIcon, ChevronRightIcon, Chip, CoverageBadge, EmptyState, IconButton, PinIcon, Skeleton, Text, TrustBadge, showToast } from '@/components';
+import { getBrand, menusForStore } from '@/data';
 import { STORE_CATEGORY_LABEL, formatDistance } from '@/data/labels';
 import { applyOptions, rankMenus } from '@/domain/judge';
 import { formatNumber } from '@/domain/summary';
@@ -53,11 +53,15 @@ export default function Nearby() {
   const jctx = useJudgeContext();
   const pickCache = useMemo(() => new Map<string, StorePick>(), [remaining, jctx]);
   const pickFor = (s: Store): StorePick | null => {
-    if (!s.brandId || s.coverage === 'none' || !remaining) return null;
-    let p = pickCache.get(s.brandId);
+    if (s.coverage === 'none' || !remaining) return null;
+    // 브랜드 매장은 브랜드별로, 브랜드 아닌 동네 식당(대표 음식 추정)은 이름·분류별로 한 번만 판정
+    const key = s.brandId ?? `place:${s.name}|${s.placeCategory ?? ''}`;
+    let p = pickCache.get(key);
     if (!p) {
-      p = summarizeRanked(rankMenus(getMenusByBrand(s.brandId), remaining, jctx));
-      pickCache.set(s.brandId, p);
+      const menus = menusForStore(s);
+      if (menus.length === 0) return null;
+      p = summarizeRanked(rankMenus(menus, remaining, jctx));
+      pickCache.set(key, p);
     }
     return p;
   };
@@ -243,7 +247,7 @@ function StoreCard({ store, pick, onPress }: { store: Store; pick: StorePick | n
         </Text>
         <Text variant="small" color="ink3" numberOfLines={1}>
           {formatDistance(store.distanceM)} · {STORE_CATEGORY_LABEL[store.category]}
-          {brand?.blurb ? ` · ${brand.blurb}` : ''}
+          {brand?.blurb ? ` · ${brand.blurb}` : !store.brandId && store.coverage !== 'none' ? ' · 일반 식당 기준 대표 음식' : ''}
         </Text>
         {lead && top ? (
           <View style={styles.pickWrap}>
@@ -259,7 +263,12 @@ function StoreCard({ store, pick, onPress }: { store: Store; pick: StorePick | n
             </Text>
           </View>
         ) : null}
-        <CoverageBadge coverage={store.coverage} menuCount={pick?.known} size="sm" style={styles.badge} />
+        {/* 브랜드 아닌 동네 식당은 "확인된" 메뉴가 아니라 일반 식당 기준 추정 — 추정 배지로 */}
+        {!store.brandId && store.coverage !== 'none' ? (
+          <TrustBadge trust="estimated" size="sm" generic explain={false} style={styles.badge} />
+        ) : (
+          <CoverageBadge coverage={store.coverage} menuCount={pick?.known} size="sm" style={styles.badge} />
+        )}
       </View>
       <ChevronRightIcon size={18} color={colors.ink3} />
     </Pressable>
