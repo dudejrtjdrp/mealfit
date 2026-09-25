@@ -2,7 +2,8 @@ import { getMenusByBrand, getMockStores } from '../../data';
 import { YEOKSAM_CENTER } from '../../data/mockStores';
 import { PROFILE, TARGETS, menu } from '../../domain/__tests__/fixtures';
 import type { MenuItem, Store } from '../../domain/types';
-import { collectCandidates, modeSubLabel, nearestStoresWithData, pickRecommendations, useRecommendMode } from '../recommend';
+import { parseRequestByRules } from '../../domain/preferences';
+import { applyRequests, collectCandidates, modeSubLabel, nearestStoresWithData, pickRecommendations, useRecommendMode } from '../recommend';
 
 const ctx = { profile: PROFILE };
 
@@ -151,5 +152,25 @@ describe('실제 목 매장 (역삼동)', () => {
   it('칩마다 3개씩 나온다', () => {
     const cands = collectCandidates(getMockStores(YEOKSAM_CENTER), getMenusByBrand, TARGETS, ctx);
     for (const mode of ['all', 'light', 'protein', 'lowSugar'] as const) expect(pickRecommendations(cands, mode)).toHaveLength(3);
+  });
+});
+
+describe('밀리에게 한 요청 반영 (applyRequests)', () => {
+  const mk = (id: string, brandId: string, name: string, kcal: number) => {
+    const m = menu({ id, brandId, name, category: 'meal', nutrients: { kcal } });
+    return { menu: m, judgement: { verdict: 'good' as const, score: 80, reasons: [], unknown: false }, store: store({ id: `${brandId}1`, brandId }), kcal, nutrients: { kcal } };
+  };
+  const list = [mk('x-spicy', 'x', '불닭 덮밥', 500), mk('y-bread', 'y', '에그 샌드위치', 400), mk('z-salad', 'z', '콥 샐러드', 350)];
+
+  it('요청이 없으면 그대로', () => {
+    expect(applyRequests(list, [], 'lunch')).toBe(list);
+  });
+  it('꼭 빼기는 빼고, 좋아요는 앞으로 — 칩·판정 순서 안에서만', () => {
+    const tags = [...parseRequestByRules('매운 건 빼 줘'), ...parseRequestByRules('점심엔 샐러드 위주로')];
+    const out = applyRequests(list, tags, 'lunch');
+    expect(out.map((c) => c.menu.id)).toEqual(['z-salad', 'y-bread']);
+    expect(pickRecommendations(out, 'all', 1)[0].menu.id).toBe('z-salad');
+    // 다른 끼니 요청은 이 끼니에 걸지 않는다
+    expect(applyRequests(list, parseRequestByRules('아침엔 샐러드'), 'lunch').map((c) => c.menu.id)).toEqual(['x-spicy', 'y-bread', 'z-salad']);
   });
 });

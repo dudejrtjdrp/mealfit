@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, Card, Screen, StackHeader, Text, showToast } from '@/components';
+import { PREMIUM_FEATURES } from '@/services/entitlements';
 import { colors, radius, spacing } from '@/theme';
 
 /** F5 유료 기능 미리보기 — 잠금 카드 2장, 결제 없음 */
@@ -18,6 +19,24 @@ export default function Premium() {
       <Text variant="caption" color="ink3" style={styles.sub}>
         지금은 무료 기능만 열려 있어요. 출시되면 알려드릴게요.
       </Text>
+
+      <Card tone="section" style={styles.card}>
+        <Text variant="h3">프리미엄에서 제공 예정</Text>
+        <Text variant="small" color="primaryText" style={styles.openNote}>
+          지금은 개발 중이라 무료로 열려 있어요
+        </Text>
+        {PREMIUM_FEATURES.map((f) => (
+          <View key={f.id} style={styles.openRow}>
+            <Ionicons name="lock-open-outline" size={16} color={colors.primaryText} style={styles.openIcon} />
+            <View style={styles.headText}>
+              <Text variant="captionMedium">{f.title}</Text>
+              <Text variant="small" color="ink3">
+                {f.desc}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </Card>
 
       <LockCard
         icon={<Ionicons name="sparkles-outline" size={20} color={colors.ink2} />}
@@ -87,4 +106,7 @@ const styles = StyleSheet.create({
   blur: {},
   lockOverlay: { position: 'absolute', right: spacing.md, top: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   cta: { marginTop: spacing.xl },
+  openNote: { marginTop: 2 },
+  openRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.md },
+  openIcon: { marginTop: 2 },
 });

@@ -18,6 +18,7 @@ import type { MealType, MenuItem } from '@/domain/types';
 import { aiMealQuotaLeft, analyzeMeal } from '@/services/ai/mealAnalyze';
 import { matchFoods, matchLabel, withMenu, type MatchedFood } from '@/services/ai/mealMatch';
 import { hasLLM } from '@/services/env';
+import { isPremiumFeatureEnabled } from '@/services/entitlements';
 import { pickMealPhoto } from '@/services/mealPhoto';
 import { searchProductsRemote } from '@/services/products';
 import { SPEECH_ERROR_TEXT, speechErrorNeedsSettings, useSpeechInput } from '@/services/speech';
@@ -93,6 +94,11 @@ export default function AILog() {
   const close = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)/today'));
 
   async function takePhoto(from: 'camera' | 'library') {
+    // 사진 AI 분석은 프리미엄 예정 기능 — 지금은 개발 중이라 늘 열려 있다 (services/entitlements)
+    if (!isPremiumFeatureEnabled('aiPhoto')) {
+      setNotice({ pose: 'sorry', text: '사진 정리는 프리미엄에서 열릴 예정이에요. 지금은 말이나 글로 알려 주세요.' });
+      return;
+    }
     if (!aiOn || left === 0) {
       setNotice({ pose: 'sorry', text: aiOn ? '오늘 사진 정리는 다 썼어요. 내일 다시 할 수 있고, 지금은 말이나 글로 알려 주세요.' : '사진 정리는 아직 준비 중이에요. 말이나 글로 알려 주세요.' });
       return;

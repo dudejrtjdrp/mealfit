@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,7 +17,8 @@ import { useJudgeContext, useMealSlot } from '@/state/judgeContext';
 import { useDay } from '@/state/day';
 import { useNearby } from '@/state/nearby';
 import { useProfile } from '@/state/profile';
-import { RECOMMEND_MODES, collectCandidates, modeSubLabel, pickRecommendations, useRecommendMode } from '@/state/recommend';
+import { ensurePreferencesLoaded, usePreferenceTags } from '@/state/preferences';
+import { RECOMMEND_MODES, applyRequests, collectCandidates, modeSubLabel, pickRecommendations, useRecommendMode } from '@/state/recommend';
 import { colors, fonts, radius, size, spacing } from '@/theme';
 
 const MAX_ROWS = 4;
@@ -247,7 +248,11 @@ function NearbyPicks({ remaining, profile }: { remaining: DailyTargets | null; p
   );
   const mode = useRecommendMode((s) => s.mode);
   const setMode = useRecommendMode((s) => s.setMode);
-  const picks = useMemo(() => pickRecommendations(candidates, mode), [candidates, mode]);
+  // 밀리에게 한 요청 — 꼭 빼기는 빼고, 좋아요는 같은 줄에서 앞으로
+  const requests = usePreferenceTags();
+  useEffect(ensurePreferencesLoaded, []);
+  const slot = useMealSlot();
+  const picks = useMemo(() => pickRecommendations(applyRequests(candidates, requests, slot), mode), [candidates, mode, requests, slot]);
 
   const busy = status === 'idle' || status === 'locating' || status === 'loading';
 

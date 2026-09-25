@@ -24,6 +24,7 @@ import { clearStoredAuthSession, getSupabase, readStoredAuthSession } from '@/se
 
 import { emitAccountChange } from './accountEvents';
 import { clearFavorites } from './favorites';
+import { clearPreferences } from './preferences';
 
 /**
  * 세션 스토어
@@ -297,6 +298,7 @@ export const useSession = create<SessionState>((set, get) => {
       set({ session: null });
       // 로그아웃·탈퇴·이 기기 데이터 지우기 모두 여기를 지난다: 다음 사람에게 이전 기록·즐겨찾기가 보이지 않게
       await clearFavorites();
+      await clearPreferences();
       await emitAccountChange('signedOut');
     },
   };

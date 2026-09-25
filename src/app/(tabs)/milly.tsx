@@ -1,18 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Linking, Platform, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, MenuTile, Skeleton, Text, VerdictBadge } from '@/components';
 import { MillyHero } from '@/components/MillyHero';
-import { PlanMealSheet } from '@/components/PlanMealSheet';
+import { MillyRequestEntry, MillyRequestSheet } from '@/components/MillyRequestSheet';
+import { OptionPager, PlanMealSheet } from '@/components/PlanMealSheet';
 import { RecordSheet, type RecordSheetItem } from '@/components/RecordSheet';
 import { formatDistance } from '@/data/labels';
-import type { PlanMeal } from '@/domain/mealPlan';
+import { planOutlook, type MealPlan, type PlanMeal, type PlanOutlook } from '@/domain/mealPlan';
 import { menuQtyUnit } from '@/domain/qty';
 import { formatNumber } from '@/domain/summary';
 import { VERDICT_LABEL, type MealType } from '@/domain/types';
+import { isPremiumFeatureEnabled } from '@/services/entitlements';
 import * as location from '@/services/location';
 import { useDay } from '@/state/day';
 import { useMealPlan, useMealPlanReroll } from '@/state/mealPlan';
@@ -62,11 +64,23 @@ export default function MillyScreen() {
   const nearbyStatus = useNearby((s) => s.status);
   const stores = useNearby((s) => s.stores);
   const reroll = useMealPlanReroll((s) => s.reroll);
-  const { plan, recentLoading } = useMealPlan();
+  const cycle = useMealPlanReroll((s) => s.cycle);
+  const { plan, recentLoading, tomorrow } = useMealPlan();
 
-  const [selected, setSelected] = useState<PlanMeal | null>(null);
+  /** 자세히 보는 끼니 — 넘겨 고르면 시트 내용도 따라 바뀌게 끼니 종류만 기억한다 */
+  const [selectedType, setSelectedType] = useState<MealType | null>(null);
+  const selected = (selectedType && plan?.meals.find((m) => m.mealType === selectedType && m.status === 'planned' && m.main)) || null;
+  const setSelected = (m: PlanMeal | null) => setSelectedType(m ? m.mealType : null);
+  const onCycle = (m: PlanMeal, dir: 1 | -1) => {
+    if (plan) cycle(plan, m.mealType, dir);
+  };
+  const remaining = summary?.remaining ?? targets;
   const [pending, setPending] = useState<Pending | null>(null);
   const [saving, setSaving] = useState(false);
+  /** 밀리에게 요청하기 시트 — 프리미엄 예정 기능(지금은 개발 중이라 열려 있음) */
+  const [requestOpen, setRequestOpen] = useState(false);
+  const canRequest = isPremiumFeatureEnabled('assistantRequests');
+  const requestEntry = canRequest ? <MillyRequestEntry onPress={() => setRequestOpen(true)} /> : null;
 
   // 들어올 때 아직 한 번도 안 찾았으면 주변 매장을 찾는다
   useFocusEffect(
@@ -148,14 +162,18 @@ export default function MillyScreen() {
             </Text>
           }
         />
+        {requestEntry}
         <MealList meals={plan.meals} />
+        {tomorrow.length ? <TomorrowCard meals={tomorrow} onStore={openStore} /> : null}
       </>
     );
   } else if (plan.status === 'none') {
     body = (
       <>
         <MillyHero pose="sleep" title="오늘 식사는 다 챙기셨어요" sub="내일 아침에 새 식단을 짜 드릴게요" />
+        {requestEntry}
         <MealList meals={plan.meals} />
+        {tomorrow.length ? <TomorrowCard meals={tomorrow} onStore={openStore} /> : null}
       </>
     );
   } else if (nearbyStatus === 'denied' && stores.length === 0) {
@@ -183,36 +201,37 @@ export default function MillyScreen() {
         <MillyHero pose="sorry" title="근처에서 맞는 메뉴를 찾지 못했어요" sub="주변 탭에서 반경을 넓히거나 위치를 바꿔 보시면 다시 짜 드릴게요.">
           <Button title="주변 보기" variant="tint" height={44} onPress={() => router.navigate('/(tabs)/nearby')} style={styles.heroBtn} />
         </MillyHero>
+        {requestEntry}
         <MealList meals={plan.meals.filter((m) => m.status === 'done')} />
       </>
     );
   } else {
     const planned = plan.meals.filter((m) => m.status === 'planned');
+    const outlook = remaining ? planOutlook(plan.meals, remaining) : null;
     body = (
       <>
         <MillyHero
           pose="cheer"
+          size={108}
           title={'오늘은 이렇게\n어때요?'}
-          sub={`오늘 남은 ${formatNumber(plan.remainingKcal)}kcal 기준 · 근처 ${plan.storeCount}곳`}
+          sub={`남은 ${formatNumber(plan.remainingKcal)}kcal로 ${planned.length === 1 ? '한 끼' : `${planned.length}끼`} · 근처 ${plan.storeCount}곳`}
         />
-        <View style={styles.listHead}>
-          <Text variant="h3">밀리가 고른 {planned.length === 1 ? '한 끼' : `${planned.length}끼`}</Text>
-          <Text variant="caption" color="ink3">
-            합계 <Text variant="captionMedium" color="ink2">{formatNumber(Math.round(plan.plannedKcal))}kcal</Text>
-          </Text>
-        </View>
-        <MealList meals={plan.meals} onOpen={setSelected} style={styles.listTight} />
+        {requestEntry}
+        <MealList meals={plan.meals} onOpen={setSelected} onCycle={onCycle} style={styles.listTight} />
+        {outlook ? <OutlookCard outlook={outlook} /> : null}
+        {tomorrow.length ? <TomorrowCard meals={tomorrow} onStore={openStore} /> : null}
+        <View style={styles.grow} />
         <Button
           title="다른 조합 보기"
           variant="tint"
-          height={48}
+          height={46}
           left={<Ionicons name="refresh" size={18} color={colors.primaryText} />}
-          onPress={reroll}
+          onPress={() => {
+            setSelected(null);
+            reroll();
+          }}
           style={styles.reroll}
         />
-        <Text variant="small" color="ink3" align="center" style={styles.footnote}>
-          어제·그저께 드신 메뉴는 빼고, 끼니마다 다른 매장으로 골랐어요
-        </Text>
       </>
     );
   }
@@ -223,7 +242,15 @@ export default function MillyScreen() {
         {body}
       </ScrollView>
 
-      <PlanMealSheet meal={selected} onClose={() => setSelected(null)} onStore={openStore} onRecord={openRecord} />
+      <PlanMealSheet
+        meal={selected}
+        onClose={() => setSelected(null)}
+        onStore={openStore}
+        onRecord={openRecord}
+        onCycle={selected ? (dir) => onCycle(selected, dir) : undefined}
+      />
+
+      {canRequest ? <MillyRequestSheet visible={requestOpen} onClose={() => setRequestOpen(false)} /> : null}
 
       <RecordSheet
         visible={!!pending}
@@ -241,7 +268,17 @@ export default function MillyScreen() {
   );
 }
 
-function MealList({ meals, onOpen, style }: { meals: PlanMeal[]; onOpen?: (m: PlanMeal) => void; style?: StyleProp<ViewStyle> }) {
+function MealList({
+  meals,
+  onOpen,
+  onCycle,
+  style,
+}: {
+  meals: PlanMeal[];
+  onOpen?: (m: PlanMeal) => void;
+  onCycle?: (m: PlanMeal, dir: 1 | -1) => void;
+  style?: StyleProp<ViewStyle>;
+}) {
   if (!meals.length) return null;
   const skipped = meals.filter((m) => m.status === 'skipped');
   const rest = meals.filter((m) => m.status !== 'skipped');
@@ -254,7 +291,7 @@ function MealList({ meals, onOpen, style }: { meals: PlanMeal[]; onOpen?: (m: Pl
       ) : null}
       {rest.map((m) =>
         m.status === 'planned' && m.main ? (
-          <PlanRow key={m.mealType} meal={m} onPress={onOpen ? () => onOpen(m) : undefined} />
+          <PlanRow key={m.mealType} meal={m} onPress={onOpen ? () => onOpen(m) : undefined} onCycle={onCycle ? (dir) => onCycle(m, dir) : undefined} />
         ) : (
           <MealRow key={m.mealType} meal={m} />
         ),
@@ -283,8 +320,8 @@ function MealRow({ meal }: { meal: PlanMeal }) {
   );
 }
 
-/** 짠 끼니 한 줄 — 누르면 자세히(매장 보기·이걸로 기록) */
-function PlanRow({ meal, onPress }: { meal: PlanMeal; onPress?: () => void }) {
+/** 짠 끼니 한 줄 — 누르면 자세히(매장 보기·이걸로 기록), ‹ › 로 이 끼니만 다른 후보 */
+function PlanRow({ meal, onPress, onCycle }: { meal: PlanMeal; onPress?: () => void; onCycle?: (dir: 1 | -1) => void }) {
   const main = meal.main!;
   const extra = meal.extra;
   const verdict = main.judgement.verdict;
@@ -292,49 +329,176 @@ function PlanRow({ meal, onPress }: { meal: PlanMeal; onPress?: () => void }) {
   const names = extra ? `${main.menu.name} + ${extra.menu.name}` : main.menu.name;
   return (
     <Card
-      padding={spacing.lg}
+      padding={spacing.md}
       onPress={onPress}
       style={styles.planCard}
-      accessibilityLabel={`${meal.label} 추천: ${names}, ${main.store.name}, ${formatNumber(Math.round(kcal))}kcal, ${VERDICT_LABEL[verdict]}. 누르면 자세히 볼 수 있어요`}
+      accessibilityLabel={`${meal.label} 추천: ${names}, ${main.store.name}, ${formatNumber(Math.round(kcal))}kcal, ${VERDICT_LABEL[verdict]}. ${meal.reason ?? ''}. 누르면 자세히 볼 수 있어요`}
     >
-      <MenuTile menu={main.menu} size={56} />
+      <MenuTile menu={main.menu} size={48} />
       <View style={styles.flex}>
         <View style={styles.headRow}>
-          <View style={styles.mealPill}>
-            <Text variant="label" color="primaryText">
+          <View style={styles.mealTag}>
+            <Text variant="label" color="ink2">
               {meal.label}
             </Text>
           </View>
-          <Text variant="small" color="ink3" numberOfLines={1} style={styles.flex}>
-            {meal.timeHint}
+          <VerdictBadge verdict={verdict} size="sm" style={styles.rowBadge} />
+          <View style={styles.flex} />
+          {onCycle ? <OptionPager meal={meal} onCycle={onCycle} /> : null}
+        </View>
+        <View style={styles.nameRow}>
+          <Text variant="h3" numberOfLines={1} style={styles.flex}>
+            {main.menu.name}
+          </Text>
+          <Text variant="small" color="ink3">
+            <Text variant="h3">{formatNumber(Math.round(kcal))}</Text> kcal
           </Text>
         </View>
-        <Text variant="h3" numberOfLines={2} style={styles.name}>
-          {main.menu.name}
-          {extra ? (
-            <Text variant="caption" color="ink2">
-              {'  '}+ {extra.menu.name}
-            </Text>
-          ) : null}
-        </Text>
-        <Text variant="small" color="ink3" numberOfLines={1}>
+        <Text variant="small" color="ink3" numberOfLines={1} style={styles.subRow}>
+          {extra ? `+ ${extra.menu.name} · ` : ''}
           {main.store.name} · {formatDistance(main.store.distanceM)}
         </Text>
-      </View>
-      <View style={styles.right}>
-        <Text variant="small" color="ink3">
-          <Text variant="h2">{formatNumber(Math.round(kcal))}</Text> kcal
-        </Text>
-        <VerdictBadge verdict={verdict} size="sm" />
+        {meal.reason ? (
+          <Text variant="small" color="primaryText" numberOfLines={1} style={styles.rowReason}>
+            {meal.reason}
+          </Text>
+        ) : null}
       </View>
     </Card>
   );
 }
 
+/** 막대 하나 — 남은 목표 대비 식단 양. 목표를 넘는 부분만 빨강(단백질은 넘어도 그린) */
+function OutlookBar({ planned, remaining, over }: { planned: number; remaining: number; over: number }) {
+  const total = Math.max(planned, remaining, 1);
+  const green = Math.min(planned, remaining) / total;
+  const red = over > 0 ? over / total : 0;
+  return (
+    <View style={styles.track}>
+      <View style={[styles.fill, { width: `${Math.round(green * 100)}%` }]} />
+      {red > 0 ? <View style={[styles.fillOver, { width: `${Math.round(red * 100)}%` }]} /> : null}
+    </View>
+  );
+}
+
+/** "이 식단이면 오늘은" — 짠 끼니 합계를 오늘 남은 목표량과 견준다 */
+function OutlookCard({ outlook }: { outlook: PlanOutlook }) {
+  const missing = outlook.rows.some((r) => r.missing > 0);
+  const kcalOver = outlook.overKcal;
+  return (
+    <Card tone="section" padding={spacing.md + 2} style={styles.outlook}>
+      <View style={styles.outlookHead}>
+        <Text variant="h3">이 식단이면 오늘은</Text>
+        <Text variant="small" color="ink3">
+          <Text variant="captionMedium" color={kcalOver > 0 ? 'over' : 'ink'}>
+            {formatNumber(outlook.plannedKcal)}
+          </Text>{' '}
+          / {formatNumber(outlook.remainingKcal)}kcal
+        </Text>
+      </View>
+      <OutlookBar planned={outlook.plannedKcal} remaining={outlook.remainingKcal} over={kcalOver} />
+      <View style={styles.macroRow}>
+        {outlook.rows.map((r) => (
+          <View
+            key={r.key}
+            style={styles.macroCol}
+            accessibilityLabel={
+              r.planned === null
+                ? `${r.label} 정보 없음`
+                : `${r.label} ${r.planned}g${r.missing ? ' 이상' : ''}, 오늘 남은 ${r.remaining}g${r.over ? `, ${r.over}g 더 돼요` : ''}`
+            }
+          >
+            <Text variant="small" color="ink3">
+              {r.label}
+            </Text>
+            {r.planned === null ? (
+              <Text variant="small" color="ink3">
+                정보 없음
+              </Text>
+            ) : (
+              <>
+                <OutlookBar planned={r.planned} remaining={r.remaining} over={r.over} />
+                <Text variant="small" color="ink3" numberOfLines={1}>
+                  <Text variant="captionMedium" color={r.over > 0 ? 'over' : 'ink'}>
+                    {formatNumber(r.planned)}
+                    {r.missing ? '+' : ''}
+                  </Text>{' '}
+                  / {formatNumber(r.remaining)}g
+                </Text>
+              </>
+            )}
+          </View>
+        ))}
+      </View>
+      <View style={styles.outlookLine}>
+        <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
+        <Text variant="caption" color="ink2" style={styles.flex}>
+          {outlook.line}
+        </Text>
+      </View>
+      {missing ? (
+        <Text variant="small" color="ink3">
+          + 표시는 영양 정보가 없는 메뉴를 빼고 더한 값이에요
+        </Text>
+      ) : null}
+    </Card>
+  );
+}
+
+/** 오늘 남은 끼니가 적을 때 — 내일 식단 미리 보기 (아침만, 또는 세 끼) */
+function TomorrowCard({ meals, onStore }: { meals: PlanMeal[]; onStore: (storeId: string) => void }) {
+  const one = meals.length === 1;
+  return (
+    <View style={styles.tomorrow}>
+      <View style={styles.listHeadInner}>
+        <Text variant="h3">{one ? '내일 아침은 이렇게' : '내일은 이렇게'}</Text>
+        <Text variant="small" color="ink3">
+          미리 보기 · 내일 다시 짜 드려요
+        </Text>
+      </View>
+      <Card padding={0} style={styles.tomorrowCard}>
+        {meals.map((meal, i) => {
+          const main = meal.main!;
+          const kcal = meal.totalKcal ?? main.kcal;
+          return (
+            <Pressable
+              key={meal.mealType}
+              accessibilityRole="button"
+              accessibilityLabel={`내일 ${meal.label} 미리 보기: ${main.menu.name}, ${main.store.name}, ${formatNumber(Math.round(kcal))}kcal. 누르면 매장을 볼 수 있어요`}
+              onPress={() => onStore(main.store.id)}
+              style={({ pressed }) => [styles.tomorrowRow, i > 0 && styles.tomorrowLine, pressed && styles.pressed]}
+            >
+              <MenuTile menu={main.menu} size={36} />
+              <View style={styles.flex}>
+                <Text variant="captionMedium" numberOfLines={1}>
+                  {one ? null : (
+                    <Text variant="label" color="primaryText">
+                      {meal.label}
+                      {'  '}
+                    </Text>
+                  )}
+                  {main.menu.name}
+                </Text>
+                <Text variant="small" color="ink3" numberOfLines={1}>
+                  {meal.extra ? `+ ${meal.extra.menu.name} · ` : ''}
+                  {main.store.name} · {formatDistance(main.store.distanceM)}
+                </Text>
+              </View>
+              <Text variant="small" color="ink3">
+                <Text variant="captionMedium">{formatNumber(Math.round(kcal))}</Text> kcal
+              </Text>
+            </Pressable>
+          );
+        })}
+      </Card>
+    </View>
+  );
+}
+
 function PlanRowSkeleton() {
   return (
-    <Card padding={spacing.lg} style={styles.planCard}>
-      <Skeleton width={56} height={56} borderRadius={28} />
+    <Card padding={spacing.md + 2} style={styles.planCard}>
+      <Skeleton width={48} height={48} borderRadius={24} />
       <View style={[styles.flex, styles.skelLines]}>
         <Skeleton width={44} height={20} borderRadius={radius.pill} />
         <Skeleton width="75%" height={16} />
@@ -350,20 +514,36 @@ function PlanRowSkeleton() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  scroll: { paddingHorizontal: spacing.page, paddingTop: spacing.xl, paddingBottom: spacing.xxl },
+  scroll: { flexGrow: 1, paddingHorizontal: spacing.page, paddingTop: spacing.md, paddingBottom: spacing.md },
   flex: { flex: 1, minWidth: 0 },
+  grow: { flexGrow: 1, minHeight: spacing.sm },
   heroBtn: { alignSelf: 'flex-start', paddingHorizontal: spacing.xl },
-  list: { marginTop: spacing.xl, gap: spacing.md },
-  listHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: spacing.xl, paddingHorizontal: spacing.xs },
-  listTight: { marginTop: spacing.md },
+  list: { marginTop: spacing.md, gap: spacing.sm },
+  listHeadInner: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.xs },
+  listTight: { marginTop: spacing.sm + 2 },
   skipped: { marginLeft: spacing.xs },
   planCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  mealPill: { height: 20, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' },
-  name: { marginTop: 4 },
+  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, marginTop: 2 },
+  subRow: { marginTop: 1 },
+  rowReason: { marginTop: 3 },
+  rowBadge: { height: 20 },
+  mealTag: { height: 20, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.section, alignItems: 'center', justifyContent: 'center' },
   right: { alignItems: 'flex-end', gap: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingHorizontal: spacing.md + 2, borderRadius: radius.lg, backgroundColor: colors.section },
-  reroll: { marginTop: spacing.xl },
-  footnote: { marginTop: spacing.sm },
+  outlook: { marginTop: spacing.sm, gap: 6, borderRadius: radius.lg },
+  outlookHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm },
+  track: { flexDirection: 'row', height: 6, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: colors.primary },
+  fillOver: { height: '100%', backgroundColor: colors.over },
+  macroRow: { flexDirection: 'row', gap: spacing.md, marginTop: 2 },
+  macroCol: { flex: 1, minWidth: 0, gap: 3 },
+  outlookLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  tomorrow: { marginTop: spacing.lg, gap: spacing.sm },
+  tomorrowCard: { borderRadius: radius.lg, overflow: 'hidden' },
+  tomorrowRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md + 2, paddingVertical: spacing.sm + 2 },
+  tomorrowLine: { borderTopWidth: 1, borderTopColor: colors.line },
+  pressed: { opacity: 0.6 },
+  reroll: { marginTop: spacing.sm },
   skelLines: { gap: 6 },
 });

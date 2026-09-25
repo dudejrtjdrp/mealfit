@@ -5,7 +5,9 @@
 import { create } from 'zustand';
 
 import { TINY_KCAL, applyOptions, isMealCandidate, rankMenus, type JudgeContext } from '@/domain/judge';
-import type { DailyTargets, Judgement, MenuItem, Nutrients, Store } from '@/domain/types';
+import { foodGroup } from '@/domain/foodGroup';
+import { prefEffect, type PrefTag } from '@/domain/preferences';
+import type { DailyTargets, Judgement, MealType, MenuItem, Nutrients, Store } from '@/domain/types';
 
 /** 상황 칩: 전체 · 가볍게 · 단백질 든든 · 달지 않게 */
 export type RecommendMode = 'all' | 'light' | 'protein' | 'lowSugar';
@@ -123,4 +125,19 @@ export function modeSubLabel(c: RecommendCandidate, mode: RecommendMode): string
   if (mode === 'protein' && typeof c.nutrients.protein === 'number') return `단백질 ${fmt(c.nutrients.protein)}g`;
   if (mode === 'lowSugar' && typeof c.nutrients.sugar === 'number') return `당 ${fmt(c.nutrients.sugar)}g`;
   return undefined;
+}
+
+/**
+ * 밀리에게 한 요청을 "지금 근처 추천"에 가볍게 반영 — 꼭 빼 달라는 메뉴는 빼고, 좋아요/덜 점수로 순서만 안정적으로 바꾼다.
+ * (칩 기준·판정 순서는 pickRecommendations 가 그대로 정하고, 같은 줄 안에서 요청에 맞는 게 앞으로 온다.) 요청이 없으면 그대로.
+ */
+export function applyRequests(candidates: RecommendCandidate[], tags: readonly PrefTag[], slot: MealType): RecommendCandidate[] {
+  if (!tags.length) return candidates;
+  const scored: { c: RecommendCandidate; d: number; i: number }[] = [];
+  candidates.forEach((c, i) => {
+    const group = foodGroup({ name: c.menu.name, category: c.menu.category, storeName: c.store.name, storeCategory: c.store.category });
+    const e = prefEffect(tags, slot, { name: c.menu.name, storeName: c.store.name, group, kcal: c.kcal, nutrients: c.nutrients });
+    if (!e.excluded) scored.push({ c, d: e.delta, i });
+  });
+  return scored.sort((a, b) => b.d - a.d || a.i - b.i).map((x) => x.c);
 }

@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { formatDistance } from '@/data/labels';
+import { FOOD_GROUP_LABEL } from '@/domain/foodGroup';
 import type { PlanCandidate, PlanMeal } from '@/domain/mealPlan';
 import { formatNumber } from '@/domain/summary';
 import type { Nutrients } from '@/domain/types';
-import { colors, radius, spacing } from '@/theme';
+import { colors, hit, radius, spacing } from '@/theme';
 
 import { summarizeTrust, TrustBadge, VerdictBadge } from './Badge';
 import { MenuTile } from './BrandTile';
@@ -31,15 +32,37 @@ const MACROS: { key: MacroKey; label: string; unit: string }[] = [
   { key: 'sodium', label: '나트륨', unit: 'mg' },
 ];
 
+/** ‹ 2/5 › — 이 끼니만 다른 후보로 넘긴다 */
+export function OptionPager({ meal, onCycle }: { meal: PlanMeal; onCycle: (dir: 1 | -1) => void }) {
+  const n = meal.options?.length ?? 0;
+  if (n < 2) return null;
+  const i = (meal.optionIndex ?? 0) + 1;
+  return (
+    <View style={styles.pager}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${meal.label} 이전 후보`} hitSlop={hit} onPress={() => onCycle(-1)} style={({ pressed }) => [styles.pagerBtn, pressed && styles.pressed]}>
+        <Ionicons name="chevron-back" size={16} color={colors.ink2} />
+      </Pressable>
+      <Text variant="small" color="ink3" style={styles.pagerText} accessibilityLabel={`후보 ${n}개 중 ${i}번째`}>
+        {i}/{n}
+      </Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${meal.label} 다음 후보`} hitSlop={hit} onPress={() => onCycle(1)} style={({ pressed }) => [styles.pagerBtn, pressed && styles.pressed]}>
+        <Ionicons name="chevron-forward" size={16} color={colors.ink2} />
+      </Pressable>
+    </View>
+  );
+}
+
 export interface PlanMealSheetProps {
   meal: PlanMeal | null;
   onClose: () => void;
   onStore: (storeId: string) => void;
   onRecord: (meal: PlanMeal) => void;
+  /** 이 끼니만 다른 후보로 (없으면 넘기기 버튼을 숨긴다) */
+  onCycle?: (dir: 1 | -1) => void;
 }
 
-/** 밀리 식단 한 끼 자세히 — 메뉴·매장·이유·영양 요약 + 매장 보기 / 이걸로 기록 */
-export function PlanMealSheet({ meal, onClose, onStore, onRecord }: PlanMealSheetProps) {
+/** 밀리 식단 한 끼 자세히 — 메뉴·매장·이유·영양 요약 + 다른 후보 넘기기 + 매장 보기 / 이걸로 기록 */
+export function PlanMealSheet({ meal, onClose, onStore, onRecord, onCycle }: PlanMealSheetProps) {
   const main = meal?.main;
   const parts = main ? [main, ...(meal?.extra ? [meal.extra] : [])] : [];
   const total = parts.length ? sumNutrients(parts) : null;
@@ -64,6 +87,14 @@ export function PlanMealSheet({ meal, onClose, onStore, onRecord }: PlanMealShee
     >
       {main && meal && total ? (
         <View style={styles.body}>
+          {onCycle && (meal.options?.length ?? 0) > 1 ? (
+            <View style={styles.cycleRow}>
+              <Text variant="small" color="ink3" style={styles.flex}>
+                {meal.group ? `${FOOD_GROUP_LABEL[meal.group]} · ` : ''}다른 끼니와 겹치지 않는 후보예요
+              </Text>
+              <OptionPager meal={meal} onCycle={onCycle} />
+            </View>
+          ) : null}
           <View style={styles.menus}>
             {parts.map((p, i) => (
               <View key={p.menu.id} style={[styles.menuRow, i > 0 && styles.menuLine]}>
@@ -102,9 +133,16 @@ export function PlanMealSheet({ meal, onClose, onStore, onRecord }: PlanMealShee
           {meal.reason ? (
             <View style={styles.reason}>
               <Ionicons name="sparkles-outline" size={15} color={colors.primaryText} style={styles.reasonIcon} />
-              <Text variant="caption" color="ink2" style={styles.flex}>
-                {meal.reason}
-              </Text>
+              <View style={styles.flex}>
+                <Text variant="caption" color="ink2">
+                  {meal.reason}
+                </Text>
+                {meal.detail ? (
+                  <Text variant="small" color="ink3" style={styles.detail}>
+                    {meal.detail}
+                  </Text>
+                ) : null}
+              </View>
             </View>
           ) : null}
 
@@ -165,4 +203,10 @@ const styles = StyleSheet.create({
   macro: { flex: 1, gap: 2 },
   badges: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   buttons: { flexDirection: 'row', gap: spacing.sm },
+  cycleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  detail: { marginTop: 2 },
+  pager: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  pagerBtn: { width: 26, height: 22, borderRadius: radius.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.section },
+  pagerText: { minWidth: 26, textAlign: 'center' },
+  pressed: { opacity: 0.6 },
 });
