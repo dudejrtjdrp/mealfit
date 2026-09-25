@@ -9,6 +9,7 @@ import { ChatHistory, useHistory, useNickname } from '@/onboarding/common';
 import { SAY } from '@/onboarding/script';
 import { useOnboarding } from '@/state/onboarding';
 import { useProfile } from '@/state/profile';
+import { useSession } from '@/state/session';
 import { spacing } from '@/theme';
 
 type Perm = 'idle' | 'asking' | 'granted' | 'denied' | 'later';
@@ -47,9 +48,11 @@ export default function Step7() {
     }
   };
 
+  /** 로그인은 온보딩 뒤로: 게스트면 로그인 권유 화면("나중에 할게요" 가능), 이미 로그인했으면 바로 오늘 탭 */
   const start = () => {
     useOnboarding.getState().reset();
-    router.replace('/(tabs)/today');
+    if (useSession.getState().session) router.replace('/(tabs)/today');
+    else router.replace({ pathname: '/login', params: { from: 'onboarding' } });
   };
 
   // 강조 영양소 순서대로 바 3개 (emphasis 에 kcal 이 있으면 링이 대신하므로 제외)
