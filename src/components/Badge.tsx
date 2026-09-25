@@ -1,12 +1,13 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { VERDICT_LABEL, type Coverage, type Trust, type Verdict } from '@/domain/types';
 import { colors, fonts, radius } from '@/theme';
 
 import { FileCheckIcon } from './icons';
 import { Text } from './Text';
+import { showToast } from './Toast';
 
 type Size = 'sm' | 'md' | 'lg';
 
@@ -30,11 +31,25 @@ export function VerdictBadge({ verdict, size = 'md', style }: { verdict: Verdict
   );
 }
 
-const TRUST_LABEL: Record<Trust, string> = {
-  official: '공식 영양표',
-  estimated: '추정치',
+/** 신뢰등급 배지 문구 — 내부 용어(공식 영양표·추정치) 대신 "어디서 온 숫자인지"를 말한다. sm 은 좁은 자리용 짧은 말 */
+export const TRUST_LABEL: Record<Trust, string> = {
+  official: '브랜드 공개 수치',
+  estimated: '비슷한 메뉴로 계산',
+  none: '아직 정보 없음',
+  user: '직접 입력',
+};
+const TRUST_LABEL_SHORT: Record<Trust, string> = {
+  official: '브랜드 공개',
+  estimated: '계산값',
   none: '정보 없음',
-  user: '내가 입력',
+  user: '직접 입력',
+};
+/** 배지를 누르면 보여주는 한 줄 설명 */
+export const TRUST_EXPLAIN: Record<Trust, string> = {
+  official: '브랜드가 공개한 영양 정보를 그대로 옮겼어요',
+  estimated: '공개된 비슷한 메뉴로 사이즈·옵션을 계산했어요',
+  none: '아직 확인된 영양 정보가 없어서 판정하지 않아요',
+  user: '직접 입력하신 값이에요',
 };
 
 function TrustIcon({ trust, size }: { trust: Trust; size: number }) {
@@ -44,40 +59,81 @@ function TrustIcon({ trust, size }: { trust: Trust; size: number }) {
   return <Ionicons name="help-circle-outline" size={size} color={colors.ink2} />;
 }
 
+interface OutlinePillProps {
+  icon?: ReactNode;
+  label: string;
+  size?: 'sm' | 'md';
+  accessibilityLabel: string;
+  style?: StyleProp<ViewStyle>;
+  /** 있으면 눌리는 배지 — 끝에 작은 ⓘ 를 붙여 눌린다는 걸 보여준다 */
+  onPress?: () => void;
+  accessibilityHint?: string;
+}
+
 /** 아웃라인 배지 틀 — 색 채움 없이 1px 회색 테두리 + 아이콘 + 회색 글자 (판정 색과 분리) */
-function OutlinePill({ icon, label, size = 'md', accessibilityLabel, style }: { icon?: ReactNode; label: string; size?: 'sm' | 'md'; accessibilityLabel: string; style?: StyleProp<ViewStyle> }) {
+function OutlinePill({ icon, label, size = 'md', accessibilityLabel, style, onPress, accessibilityHint }: OutlinePillProps) {
   const h = size === 'sm' ? 24 : 28;
-  return (
-    <View style={[styles.pill, styles.outline, { height: h, paddingLeft: icon ? 8 : 10, paddingRight: 10, gap: 4 }, style]} accessibilityLabel={accessibilityLabel}>
+  const pill = [styles.pill, styles.outline, { height: h, paddingLeft: icon ? 8 : 10, paddingRight: onPress ? 7 : 10, gap: 4 }];
+  const body = (
+    <>
       {icon}
-      <Text variant="small" color="ink2" style={styles.medium}>
+      <Text variant="small" color="ink2" style={styles.medium} numberOfLines={1}>
         {label}
       </Text>
-    </View>
+      {onPress ? <Ionicons name="information-circle-outline" size={size === 'sm' ? 12 : 13} color={colors.ink3} /> : null}
+    </>
+  );
+  if (!onPress) {
+    return (
+      <View style={[...pill, style]} accessibilityLabel={accessibilityLabel}>
+        {body}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      hitSlop={8}
+      onPress={onPress}
+      style={({ pressed }) => [...pill, pressed && styles.pressed, style]}
+    >
+      {body}
+    </Pressable>
   );
 }
 
-/** 신뢰등급 배지 — 공식 영양표 · 추정치 · 정보 없음 · 내가 입력 */
-export function TrustBadge({ trust, size = 'md', style }: { trust: Trust; size?: 'sm' | 'md'; style?: StyleProp<ViewStyle> }) {
+/**
+ * 신뢰등급 배지 — 브랜드 공개 수치 · 비슷한 메뉴로 계산 · 아직 정보 없음 · 직접 입력.
+ * 기본으로 눌리며, 누르면 한 줄 설명을 토스트로 보여준다 (explain={false} 면 그냥 배지).
+ */
+export function TrustBadge({ trust, size = 'md', style, explain = true }: { trust: Trust; size?: 'sm' | 'md'; style?: StyleProp<ViewStyle>; explain?: boolean }) {
+  const label = size === 'sm' ? TRUST_LABEL_SHORT[trust] : TRUST_LABEL[trust];
   return (
     <OutlinePill
       icon={<TrustIcon trust={trust} size={size === 'sm' ? 13 : 14} />}
-      label={TRUST_LABEL[trust]}
+      label={label}
       size={size}
-      accessibilityLabel={`신뢰등급 ${TRUST_LABEL[trust]}`}
+      accessibilityLabel={`영양 정보 출처: ${TRUST_LABEL[trust]}`}
+      accessibilityHint={explain ? '누르면 무슨 뜻인지 알려드려요' : undefined}
+      onPress={explain ? () => showToast(TRUST_EXPLAIN[trust], 'info') : undefined}
       style={style}
     />
   );
 }
 
 const COVERAGE_LABEL: Record<Coverage, string> = {
-  full: '영양표 있음',
-  partial: '일부 있음',
-  none: '정보 없음',
+  full: '메뉴 정보 있음',
+  partial: '일부 메뉴만',
+  none: '아직 정보 없음',
 };
 
-/** 매장 커버리지 배지 (D1) — 신뢰등급과 같은 아웃라인 계열 */
-export function CoverageBadge({ coverage, size = 'md', style }: { coverage: Coverage; size?: 'sm' | 'md'; style?: StyleProp<ViewStyle> }) {
+/**
+ * 매장 커버리지 배지 (D1) — 신뢰등급과 같은 아웃라인 계열.
+ * menuCount 를 주면 "메뉴 32개 확인됨" 처럼 결과로 말한다 (없으면 짧은 기본 문구).
+ */
+export function CoverageBadge({ coverage, menuCount, size = 'md', style }: { coverage: Coverage; menuCount?: number; size?: 'sm' | 'md'; style?: StyleProp<ViewStyle> }) {
   const icon =
     coverage === 'full' ? (
       <FileCheckIcon size={14} color={colors.ink2} />
@@ -86,12 +142,15 @@ export function CoverageBadge({ coverage, size = 'md', style }: { coverage: Cove
     ) : (
       <Ionicons name="help-circle-outline" size={14} color={colors.ink3} />
     );
-  return <OutlinePill icon={icon} label={COVERAGE_LABEL[coverage]} size={size} accessibilityLabel={`영양 정보 ${COVERAGE_LABEL[coverage]}`} style={style} />;
+  const label = coverage !== 'none' && typeof menuCount === 'number' && menuCount > 0 ? `메뉴 ${formatCount(menuCount)}개 확인됨` : COVERAGE_LABEL[coverage];
+  return <OutlinePill icon={icon} label={label} size={size} accessibilityLabel={`영양 정보 ${label}`} style={style} />;
 }
+
+const formatCount = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
 /** 정보 없는 메뉴 자리 배지 (판정 배지 대신) */
 export function UnknownBadge({ style }: { style?: StyleProp<ViewStyle> }) {
-  return <OutlinePill label="정보 없음" size="sm" accessibilityLabel="영양 정보 없음" style={style} />;
+  return <OutlinePill label="정보 없음" size="sm" accessibilityLabel="아직 영양 정보 없음" style={style} />;
 }
 
 /** 매장 메뉴들의 신뢰등급을 하나로 요약 (D3 헤더) — 정보 있는 메뉴 중 가장 많은 등급 (같으면 보수적으로 추정치) */
@@ -107,4 +166,5 @@ const styles = StyleSheet.create({
   outline: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   bold: { fontFamily: fonts.bold },
   medium: { fontFamily: fonts.medium },
+  pressed: { opacity: 0.6 },
 });
