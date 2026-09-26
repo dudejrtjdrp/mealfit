@@ -11,6 +11,7 @@ import {
   EmptyState,
   IconButton,
   MenuTile,
+  hasMenuImage,
   NUTRIENT_META,
   NoInfoState,
   SproutIcon,
@@ -197,6 +198,11 @@ export default function MenuDetail() {
         {/* 1. 메뉴명·가격 */}
         <View style={styles.top}>
           <MenuTile menu={menu} size={64} />
+          {hasMenuImage(menu) ? (
+            <Text variant="small" color="ink3" style={styles.aiPhoto}>
+              AI로 만든 예시 사진이에요
+            </Text>
+          ) : null}
           <Text variant="caption" color="ink3" style={styles.category}>
             {[storeName, categoryLabel].filter(Boolean).join(' · ')}
           </Text>
@@ -528,6 +534,7 @@ function CompareRow({ nutrient, nutrients, remaining, over }: { nutrient: Nutrie
 }
 
 const styles = StyleSheet.create({
+  aiPhoto: { marginTop: 4 },
   servingNote: { marginTop: 8 },
   root: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: spacing.page },

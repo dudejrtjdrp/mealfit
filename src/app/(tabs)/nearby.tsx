@@ -240,7 +240,7 @@ function StoreCard({ store, pick, onPress }: { store: Store; pick: StorePick | n
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-      <BrandTile brandId={store.brandId} category={store.category} size={48} />
+      <BrandTile brandId={store.brandId} category={store.category} name={store.name} placeCategory={store.placeCategory} size={48} />
       <View style={styles.cardBody}>
         <Text variant="h3" numberOfLines={1}>
           {store.name}

@@ -1,7 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { getBrand } from '@/data';
+import { foodImageKey, storeImageKey } from '@/data/foodImageRules';
+import { FOOD_IMAGES } from '@/data/generated/foodImages';
 import type { MenuCategory, MenuItem, StoreCategory } from '@/domain/types';
 import { colors, fonts } from '@/theme';
 
@@ -40,20 +43,27 @@ export interface BrandTileProps {
   brandId?: string;
   /** 브랜드를 모를 때 쓰는 카테고리 아이콘 */
   category?: StoreCategory;
+  /** 매장 이름·카카오 분류 — 더 알맞은 매장 이미지(치킨집·국밥집 등)를 고르는 단서 */
+  name?: string;
+  placeCategory?: string;
   size?: number;
   style?: StyleProp<ViewStyle>;
 }
 
-/** 매장 사진 자리 — 회색 원 + 브랜드 이니셜(없으면 카테고리 아이콘) */
-export function BrandTile({ brandId, category = 'other', size = 48, style }: BrandTileProps) {
-  const initial = brandId ? (INITIAL[brandId] ?? getBrand(brandId)?.name.slice(0, 2)) : undefined;
+/** 매장 사진 — 매장 종류별 AI 대표 이미지(실제 매장 사진 아님). 이미지가 없으면 회색 원 + 브랜드 이니셜/카테고리 아이콘 */
+export function BrandTile({ brandId, category = 'other', name, placeCategory, size = 48, style }: BrandTileProps) {
+  const brand = brandId ? getBrand(brandId) : undefined;
+  const image = FOOD_IMAGES[storeImageKey({ category: brand?.category ?? category, brandName: brand?.name, name, placeCategory })];
+  const initial = brandId ? (INITIAL[brandId] ?? brand?.name.slice(0, 2)) : undefined;
   const fontSize = initial && initial.length >= 2 ? size * 0.3 : size * 0.38;
   return (
     <View
-      accessibilityLabel={brandId ? `${getBrand(brandId)?.name ?? ''} 타일` : '매장 타일'}
+      accessibilityLabel={brandId ? `${brand?.name ?? ''} 타일` : '매장 타일'}
       style={[styles.tile, { width: size, height: size, borderRadius: size / 2 }, style]}
     >
-      {initial ? (
+      {image ? (
+        <Image source={image} style={{ width: size, height: size }} contentFit="cover" transition={120} />
+      ) : initial ? (
         <Text style={{ fontFamily: fonts.bold, fontSize, lineHeight: Math.round(fontSize * 1.2), color: colors.ink2 }} numberOfLines={1}>
           {initial}
         </Text>
@@ -93,19 +103,31 @@ export function menuIconName(menu: Pick<MenuItem, 'name' | 'category'>): MciName
   return byCat[menu.category];
 }
 
+/** 이 메뉴에 AI 대표 이미지가 있는지 (상세 화면의 'AI 예시' 안내용) */
+export function hasMenuImage(menu: Pick<MenuItem, 'name' | 'category'>): boolean {
+  return FOOD_IMAGES[foodImageKey(menu)] != null;
+}
+
 export interface MenuTileProps {
   menu: Pick<MenuItem, 'name' | 'category'>;
   size?: number;
   style?: StyleProp<ViewStyle>;
 }
 
-/** 메뉴 사진 자리 — 회색 원 + 스트로크 아이콘 (시안 D3) */
+/** 메뉴 사진 — 음식 종류별 AI 대표 이미지(그 메뉴의 실제 사진 아님). 이미지가 없으면 회색 원 + 스트로크 아이콘 (시안 D3) */
 export function MenuTile({ menu, size = 48, style }: MenuTileProps) {
+  const image = FOOD_IMAGES[foodImageKey(menu)];
   const name = menuIconName(menu);
   const iconSize = Math.round(size * 0.46);
   return (
     <View style={[styles.tile, { width: size, height: size, borderRadius: size / 2 }, style]}>
-      {name === 'cup' ? <CupIcon size={iconSize} color={colors.ink2} /> : <MaterialCommunityIcons name={name} size={iconSize} color={colors.ink2} />}
+      {image ? (
+        <Image source={image} style={{ width: size, height: size }} contentFit="cover" transition={120} />
+      ) : name === 'cup' ? (
+        <CupIcon size={iconSize} color={colors.ink2} />
+      ) : (
+        <MaterialCommunityIcons name={name} size={iconSize} color={colors.ink2} />
+      )}
     </View>
   );
 }
