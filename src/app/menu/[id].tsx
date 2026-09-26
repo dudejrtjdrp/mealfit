@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { Animated, LayoutAnimation, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,7 +31,7 @@ import { STORE_CATEGORY_LABEL, formatPrice } from '@/data/labels';
 import { applyOptions, judgeMenu, suggestAlternatives } from '@/domain/judge';
 import { clampLogDate } from '@/domain/logDate';
 import { menuQtyUnit } from '@/domain/qty';
-import { afterEating, formatNumber } from '@/domain/summary';
+import { formatNumber } from '@/domain/summary';
 import { VERDICT_LABEL, type DailyTargets, type DaySummary, type MealType, type MenuItem, type Nutrients, type OptionGroup } from '@/domain/types';
 import { getCachedRemoteProduct } from '@/services/products';
 import { useJudgeContext } from '@/state/judgeContext';
@@ -39,7 +39,7 @@ import { defaultMealType, useDay } from '@/state/day';
 import { ensureFavoritesLoaded, useFavorites, useIsFavorite } from '@/state/favorites';
 import { useProfile } from '@/state/profile';
 import { recordItems } from '@/state/recordItems';
-import { colors, fonts, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing, type ColorKey } from '@/theme';
 
 function defaultSelection(menu?: MenuItem): Record<string, string> {
   const out: Record<string, string> = {};
@@ -176,6 +176,8 @@ export default function MenuDetail() {
   };
 
   const rows: NutrientKey[] = ['kcal', ...((targets?.emphasis ?? ['carbs', 'protein', 'fat']).filter((k) => k !== 'kcal') as NutrientKey[])];
+  /** 펼치면 강조 영양소 뒤로 나머지 영양소까지 (값이 없는 영양소는 '정보 없음') */
+  const allRows: NutrientKey[] = [...rows, ...ALL_NUTRIENTS.filter((k) => !rows.includes(k))];
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
@@ -195,55 +197,46 @@ export default function MenuDetail() {
         />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* 1. 메뉴명·가격 */}
-        <View style={styles.top}>
-          <MenuTile menu={menu} size={64} />
-          {hasMenuImage(menu) ? (
-            <Text variant="small" color="ink3" style={styles.aiPhoto}>
-              AI로 만든 예시 사진이에요
-            </Text>
-          ) : null}
-          <Text variant="caption" color="ink3" style={styles.category}>
-            {[storeName, categoryLabel].filter(Boolean).join(' · ')}
-          </Text>
-          <Text style={styles.name}>{menu.name}</Text>
-          {price != null ? (
-            <Text variant="bodyMedium" color="ink2" style={styles.price}>
-              {formatPrice(price)}
-            </Text>
-          ) : null}
-
-          {/* 2. 판정 배지 + 이유 한 줄 */}
-          <View style={styles.badges}>
-            {!unknown && judgement ? (
-              <Animated.View style={{ transform: [{ scale: pop }] }}>
-                <VerdictBadge verdict={judgement.verdict} size="lg" />
-              </Animated.View>
-            ) : (
-              <UnknownBadge />
-            )}
-            <TrustBadge trust={menu.trust} generic={menu.brandId === GENERIC_BRAND_ID} />
+        {/* 1. 사진 + 메뉴명·가격·판정 (시안 D4: 왼쪽 큰 사진, 오른쪽 정보) */}
+        <View style={styles.hero}>
+          <View style={styles.heroMedia}>
+            <MenuTile menu={menu} size={HERO_PHOTO} style={styles.heroPhoto} />
+            {hasMenuImage(menu) ? (
+              <Text variant="small" color="ink3" style={styles.aiPhoto}>
+                AI로 만든 예시 사진
+              </Text>
+            ) : null}
           </View>
-          {!unknown && judgement?.reasons[0] ? (
-            <View style={styles.reason}>
-              <SproutIcon size={16} color={colors.primaryText} />
-              <View style={styles.reasonText}>
-                <Text variant="bodyMedium" color="ink">
-                  {judgement.reasons[0]}
-                </Text>
-                {judgement.reasons[1] ? (
-                  <Text variant="caption" color="ink3" style={styles.reasonSub}>
-                    {judgement.reasons[1]}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
-          {menu.blurb ? (
-            <Text variant="caption" color="ink2" style={styles.blurb}>
-              {menu.blurb}
+          <View style={styles.heroBody}>
+            {storeName || categoryLabel ? (
+              <Text variant="small" color="ink3" numberOfLines={1}>
+                {[storeName, categoryLabel].filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
+            <Text style={styles.name} numberOfLines={3}>
+              {menu.name}
             </Text>
-          ) : null}
+            {price != null ? (
+              <Text variant="bodyMedium" color="ink2" style={styles.price}>
+                {formatPrice(price)}
+              </Text>
+            ) : null}
+            <View style={styles.badges}>
+              {!unknown && judgement ? (
+                <Animated.View style={{ transform: [{ scale: pop }] }}>
+                  <VerdictBadge verdict={judgement.verdict} size="md" />
+                </Animated.View>
+              ) : (
+                <UnknownBadge />
+              )}
+              <TrustBadge trust={menu.trust} generic={menu.brandId === GENERIC_BRAND_ID} />
+            </View>
+            {menu.blurb ? (
+              <Text variant="small" color="ink2" numberOfLines={3} style={styles.blurb}>
+                {menu.blurb}
+              </Text>
+            ) : null}
+          </View>
         </View>
 
         {unknown ? (
@@ -254,45 +247,65 @@ export default function MenuDetail() {
           />
         ) : (
           <>
-            {/* 3. 먹으면 얼마 남는지 — 막대 하나 + 영양 자세히(접힘) */}
+            {/* 2. 영양 vs 여유 — 영양소마다 이 메뉴 값 · 하루 막대(먹은 양 + 이 메뉴) · 먹은 양/목표 · 먹으면 남는 양 */}
             <Card style={styles.card}>
-              <View style={styles.cardHead}>
-                <Text variant="h3">이 메뉴를 먹으면</Text>
-                <Text variant="small" color="ink3">
-                  {servingLabel(menu, selected)}
-                </Text>
-              </View>
-              {remaining && targets && nutrients ? <AfterBar menuKcal={nutrients.kcal} consumed={summary?.consumed.kcal ?? 0} target={targets.kcal} /> : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: detail }}
+                accessibilityLabel={detail ? '영양소 접기' : '영양소 모두 보기'}
+                onPress={toggleDetail}
+                style={({ pressed }) => [styles.cardHead, pressed && styles.pressed]}
+                hitSlop={6}
+              >
+                <View style={styles.cardHeadLeft}>
+                  <Text variant="h2">영양 vs 여유</Text>
+                  <Text variant="small" color="ink3">
+                    {servingLabel(menu, selected)}
+                  </Text>
+                </View>
+                <Ionicons name={detail ? 'chevron-up' : 'chevron-down'} size={18} color={colors.ink3} />
+              </Pressable>
+              {targets && nutrients
+                ? (detail ? allRows : rows.slice(0, 2)).map((k) => (
+                    <NutrientRow
+                      key={k}
+                      nutrient={k}
+                      nutrients={nutrients}
+                      consumed={summary?.consumed[k] ?? 0}
+                      target={targets[k]}
+                      remaining={remaining?.[k] ?? targets[k]}
+                      overNow={k === 'protein' ? 0 : (summary?.over?.[k as keyof DaySummary['over']] ?? 0)}
+                    />
+                  ))
+                : null}
               {menu.servingNote ? (
                 <Text variant="small" color="ink3" style={styles.servingNote}>
                   {menu.servingNote}
                 </Text>
               ) : null}
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ expanded: detail }}
-                onPress={toggleDetail}
-                style={({ pressed }) => [styles.detailToggle, pressed && styles.pressed]}
-              >
-                <Text variant="captionMedium" color="ink2">
-                  영양 정보 자세히
-                </Text>
-                <Ionicons name={detail ? 'chevron-up' : 'chevron-down'} size={16} color={colors.ink3} />
-              </Pressable>
-              {detail && remaining && nutrients ? (
-                <View>
-                  {rows.map((k) => (
-                    <CompareRow key={k} nutrient={k} nutrients={nutrients} remaining={remaining} over={summary?.over} />
-                  ))}
+              {judgement?.reasons[0] ? (
+                <View style={styles.reason}>
+                  <View style={styles.reasonIcon}>
+                    <SproutIcon size={16} color={colors.primaryText} />
+                  </View>
+                  <View style={styles.reasonText}>
+                    <Text variant="captionMedium" color="ink">
+                      {judgement.reasons[0]}
+                    </Text>
+                    {judgement.reasons[1] ? (
+                      <Text variant="small" color="ink3" style={styles.reasonSub}>
+                        {judgement.reasons[1]}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
               ) : null}
             </Card>
 
-            {/* 4. 옵션 — 칩마다 kcal 변화 */}
+            {/* 3. 옵션 — 칩마다 kcal 변화 */}
             {menu.options?.length ? (
               <Card style={styles.card}>
-                <Text variant="h3">옵션 선택</Text>
+                <Text variant="h2">옵션 선택</Text>
                 {judgement?.guide ? (
                   <View style={styles.guide}>
                     <Ionicons name="bulb-outline" size={14} color={colors.primaryText} />
@@ -323,37 +336,47 @@ export default function MenuDetail() {
               </Card>
             ) : null}
 
-            {/* 5. 대안 */}
+            {/* 4. 대안 추천 — 가로 카드 2개 (사진 · 이름 · 가격 · 판정) */}
             {alternatives.length > 0 ? (
               <Card style={styles.card}>
                 <View style={styles.cardHead}>
-                  <Text variant="h3">이런 메뉴는 어때요?</Text>
-                  <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/nearby'))} style={styles.more} hitSlop={8}>
+                  <Text variant="h2">대안 추천</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/nearby'))}
+                    style={styles.more}
+                    hitSlop={8}
+                  >
                     <Text variant="caption" color="ink3">
                       다른 메뉴 보기
                     </Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.ink3} />
                   </Pressable>
                 </View>
                 <View style={styles.alts}>
                   {alternatives.map(({ menu: alt, judgement: aj }) => {
                     const an = applyOptions(alt);
+                    const sub = alt.price != null ? formatPrice(alt.price) : an ? `${formatNumber(an.kcal)} kcal` : undefined;
                     return (
                       <Pressable
                         key={alt.id}
                         accessibilityRole="button"
+                        accessibilityLabel={`${alt.name} 보기`}
                         onPress={() => router.replace({ pathname: '/menu/[id]', params: { id: alt.id, store: params.store ?? '' } })}
                         style={({ pressed }) => [styles.alt, pressed && styles.pressed]}
                       >
-                        <MenuTile menu={alt} size={40} />
+                        <MenuTile menu={alt} size={44} style={styles.altPhoto} />
                         <View style={styles.altBody}>
-                          <Text variant="captionMedium" color="ink" numberOfLines={1}>
+                          <Text variant="captionMedium" color="ink" numberOfLines={2}>
                             {alt.name}
                           </Text>
-                          <Text variant="small" color="ink3" numberOfLines={1}>
-                            {[an ? `${formatNumber(an.kcal)} kcal` : undefined, alt.price != null ? formatPrice(alt.price) : undefined].filter(Boolean).join(' · ')}
-                          </Text>
+                          {sub ? (
+                            <Text variant="small" color="ink3" numberOfLines={1}>
+                              {sub}
+                            </Text>
+                          ) : null}
+                          <VerdictBadge verdict={aj.verdict} size="sm" style={styles.altBadge} />
                         </View>
-                        <VerdictBadge verdict={aj.verdict} size="sm" />
                       </Pressable>
                     );
                   })}
@@ -367,7 +390,7 @@ export default function MenuDetail() {
       {/* 6. 하단 CTA — 양·날짜·끼니를 고르는 기록 시트 (매장 담기·기록 추가와 같은 모양) */}
       {!unknown ? (
         <View style={styles.footer}>
-          <Button title="기록하기" onPress={openSheet} accessibilityLabel={`${menu.name} 양·끼니 정해서 기록`} />
+          <Button title="이걸로 기록" onPress={openSheet} accessibilityLabel={`${menu.name} 양·끼니 정해서 기록`} />
         </View>
       ) : null}
 
@@ -398,194 +421,173 @@ function servingLabel(menu: MenuItem, selected: Record<string, string>): string 
 }
 
 /**
- * "먹으면 358kcal 남아요" + 하루 막대(먹은 양 · 이 메뉴 · 남는 양).
- * 목표를 넘기면 "먹으면 목표보다 120kcal 넘어요"(빨강) + 막대의 목표 밖 부분 빨강,
- * 이미 넘었으면 "이미 목표보다 N kcal 더 드셨어요 · 먹으면 +M kcal" (2026-09-25 효님 결정)
+ * 영양소 한 줄 (시안 D4 '영양 vs 여유'): 아이콘 · 이 메뉴 값 · 하루 막대 · "먹은 양 / 목표" + 먹으면 남는 양.
+ * 막대 = 오늘 먹은 양(회색) + 이 메뉴(그린). 목표를 넘는 부분은 빨강(theme.over, 2026-09-25 효님 결정).
+ * 단백질은 많을수록 좋은 쪽이라 넘어도 빨강이 아니다
  */
-function AfterBar({ menuKcal, consumed, target }: { menuKcal: number; consumed: number; target: number }) {
-  const a = afterEating(consumed, target, menuKcal);
-  const total = Math.max(target, consumed + menuKcal, 1);
-  const eatenIn = Math.min(consumed, target);
-  const eatenOver = Math.max(0, consumed - target);
-  const menuIn = Math.max(0, Math.min(menuKcal, target - consumed));
-  const menuOver = Math.max(0, menuKcal - menuIn);
-  const menuW = menuKcal / total;
+function afterCopy(k: NutrientKey, value: number, left: number, overNow: number): { text: string; over: boolean } {
+  const unit = NUTRIENT_META[k].unit;
+  if (k === 'protein') return { text: value >= left ? '오늘 필요한 만큼 채워요' : `먹고 나서 ${formatNutrient(k, left - value)}${unit} 더 채워요`, over: false };
+  const after = left - overNow - value;
+  if (after >= 0) return { text: `먹으면 ${formatNutrient(k, after)}${unit} 남아요`, over: false };
+  return { text: `먹으면 ${formatNutrient(k, -after)}${unit} 넘어요`, over: true };
+}
+
+function NutrientRow({
+  nutrient,
+  nutrients,
+  consumed,
+  target,
+  remaining,
+  overNow,
+}: {
+  nutrient: NutrientKey;
+  nutrients: Nutrients;
+  consumed: number;
+  target: number;
+  remaining: number;
+  overNow: number;
+}) {
+  const meta = NUTRIENT_META[nutrient];
+  const icon = NUTRIENT_ICON[nutrient];
+  const value = nutrients[nutrient];
+  const has = typeof value === 'number';
+  const left = Math.max(0, remaining);
+  const copy = has ? afterCopy(nutrient, value, left, overNow) : null;
+
+  // 막대: 전체 = max(목표, 먹은 양 + 이 메뉴). 목표 안쪽/바깥쪽을 나눠 바깥은 빨강(단백질 제외)
+  const v = has ? value : 0;
+  const total = Math.max(target, consumed + v, 1);
+  const canOver = nutrient !== 'protein';
+  const eatenIn = canOver ? Math.min(consumed, target) : consumed;
+  const eatenOver = canOver ? Math.max(0, consumed - target) : 0;
+  const menuIn = canOver ? Math.max(0, Math.min(v, target - consumed)) : v;
+  const menuOver = Math.max(0, v - menuIn);
+  const menuW = v / total;
   const anim = useRef(new Animated.Value(menuW)).current;
   useEffect(() => {
     Animated.timing(anim, { toValue: menuW, duration: 260, useNativeDriver: false }).start();
   }, [menuW, anim]);
-  const isOver = a.kind !== 'left';
 
   return (
-    <View style={styles.after} accessibilityLabel={a.text}>
-      {a.kind === 'left' ? (
-        <Text style={styles.afterTitle}>
-          먹으면 <Text style={[styles.afterTitle, styles.afterNum]}>{formatNumber(a.left)}kcal</Text> 남아요
-        </Text>
-      ) : a.kind === 'crosses' ? (
-        <Text style={styles.afterTitle}>
-          먹으면 목표보다 <Text style={[styles.afterTitle, styles.afterOverNum]}>{formatNumber(a.overBy)}kcal</Text> 넘어요
-        </Text>
-      ) : (
-        <View>
-          <Text style={styles.afterTitle}>
-            이미 목표보다 <Text style={[styles.afterTitle, styles.afterOverNum]}>{formatNumber(a.alreadyOver)}kcal</Text> 더 드셨어요
-          </Text>
-          <Text variant="captionMedium" color="ink2">
-            먹으면{' '}
-            <Text variant="captionMedium" color="over" style={styles.bold}>
-              +{formatNumber(a.adds)}kcal
-            </Text>
-          </Text>
-        </View>
-      )}
-      <View style={styles.afterTrack}>
-        <View style={[styles.afterEaten, { width: `${(eatenIn / total) * 100}%` }]} />
-        {eatenOver > 0 ? <View style={[styles.afterEaten, styles.afterEatenOver, { width: `${(eatenOver / total) * 100}%` }]} /> : null}
-        <Animated.View style={[styles.afterMenuWrap, { width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}>
-          {menuIn > 0 ? <View style={[styles.afterMenu, { flex: menuIn }]} /> : null}
-          {menuOver > 0 ? <View style={[styles.afterMenu, styles.afterMenuOver, { flex: menuOver }]} /> : null}
-        </Animated.View>
+    <View style={styles.nRow} accessibilityLabel={`${meta.label} ${has ? `${formatNutrient(nutrient, v)}${meta.unit}` : '정보 없음'}. ${copy?.text ?? ''}`}>
+      <View style={[styles.nIcon, { backgroundColor: colors[icon.bg] }]}>
+        <Ionicons name={icon.name} size={18} color={colors[icon.fg]} />
       </View>
-      <View style={styles.afterLegend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: menuIn > 0 ? colors.primary : colors.over }]} />
-          <Text variant="small" color="ink2">
-            이 메뉴 {formatNumber(menuKcal)}kcal
-          </Text>
-        </View>
-        {consumed > 0 ? (
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.border }]} />
-            <Text variant="small" color="ink3">
-              먹은 양 {formatNumber(consumed)}kcal
-            </Text>
-          </View>
-        ) : null}
-        {isOver ? (
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.over }]} />
-            <Text variant="small" color="over">
-              목표보다 넘는 양
-            </Text>
-          </View>
-        ) : null}
-        <Text variant="small" color="ink3" style={styles.legendRight}>
-          하루 {formatNumber(target)}kcal
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-/**
- * 영양소 한 줄: 라벨 · 이 메뉴 값 · 바(남은 양 대비) · "먹으면 N 남아요".
- * 목표를 넘기면 "먹으면 목표보다 N 넘어요"(빨강). 단백질은 많을수록 좋은 쪽이라 넘어도 빨강이 아니다
- */
-function afterCopy(k: NutrientKey, value: number, left: number, overNow: number): { text: string; over: boolean } {
-  const unit = NUTRIENT_META[k].unit;
-  if (k === 'protein') return { text: value >= left ? '오늘 필요한 만큼 채워요' : `먹고 나서 ${formatNutrient(k, left - value)}${unit} 더 채우면 돼요`, over: false };
-  const after = left - overNow - value;
-  if (after >= 0) return { text: `먹으면 ${formatNutrient(k, after)}${unit} 남아요`, over: false };
-  return { text: `먹으면 목표보다 ${formatNutrient(k, -after)}${unit} 넘어요`, over: true };
-}
-
-function CompareRow({ nutrient, nutrients, remaining, over }: { nutrient: NutrientKey; nutrients: Nutrients; remaining: DailyTargets; over?: DaySummary['over'] }) {
-  const meta = NUTRIENT_META[nutrient];
-  const value = nutrients[nutrient];
-  const left = Math.max(0, remaining[nutrient]);
-  const overNow = nutrient === 'protein' ? 0 : (over?.[nutrient] ?? 0);
-  const copy = typeof value === 'number' ? afterCopy(nutrient, value, left, overNow) : null;
-  const share = typeof value === 'number' ? (left > 0 ? Math.min(1, value / left) : value > 0 ? 1 : 0) : 0;
-  // 넘기면 바를 꽉 채우고 남은 양 밖으로 나가는 쪽을 빨강
-  const inW = copy?.over && typeof value === 'number' && value > 0 ? Math.min(1, left / value) : share;
-
-  return (
-    <View style={styles.cmpRow}>
-      <View style={styles.cmpTop}>
-        <Text variant="small" color="ink3" style={styles.cmpLabel}>
+      <View style={styles.nValueCol}>
+        <Text variant="small" color="ink3">
           {meta.label}
         </Text>
-        {typeof value === 'number' ? (
-          <Text variant="caption" color="ink2" style={styles.cmpValueWrap}>
-            <Text style={styles.cmpValue}>{formatNutrient(nutrient, value)}</Text> {meta.unit}
+        {has ? (
+          <Text variant="caption" color="ink2" numberOfLines={1}>
+            <Text style={styles.nValue}>{formatNutrient(nutrient, v)}</Text> {meta.unit}
           </Text>
         ) : (
-          <Text variant="small" color="ink3" style={styles.cmpValueWrap}>
+          <Text variant="small" color="ink3">
             정보 없음
           </Text>
         )}
+      </View>
+      <View style={styles.nMain}>
+        <View style={styles.nBarRow}>
+          <View style={styles.nTrack}>
+            {eatenIn > 0 ? <View style={[styles.nEaten, { width: `${(eatenIn / total) * 100}%` }]} /> : null}
+            {eatenOver > 0 ? <View style={[styles.nEaten, styles.nEatenOver, { width: `${(eatenOver / total) * 100}%` }]} /> : null}
+            {v > 0 ? (
+              <Animated.View style={[styles.nMenuWrap, { width: anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}>
+                {menuIn > 0 ? <View style={[styles.nMenu, { flex: menuIn }]} /> : null}
+                {menuOver > 0 ? <View style={[styles.nMenu, styles.nMenuOver, { flex: menuOver }]} /> : null}
+              </Animated.View>
+            ) : null}
+          </View>
+          <Text variant="small" color="ink3" numberOfLines={1} style={styles.nTotal}>
+            <Text variant="small" color={eatenOver > 0 ? 'over' : 'ink'} style={styles.bold}>
+              {formatNutrient(nutrient, consumed)}
+            </Text>{' '}
+            / {formatNutrient(nutrient, target)} {meta.unit}
+          </Text>
+        </View>
         {copy ? (
-          <Text variant="small" color={copy.over ? 'over' : 'ink3'} numberOfLines={1} style={styles.cmpRight}>
+          <Text variant="small" color={copy.over ? 'over' : 'ink3'} numberOfLines={1} style={styles.nCopy}>
             {copy.text}
           </Text>
         ) : null}
       </View>
-      <View style={[styles.cmpTrack, styles.row]}>
-        {typeof value === 'number' ? (
-          <>
-            {inW > 0 ? <View style={[styles.cmpFill, copy?.over ? styles.flat : null, { width: `${inW * 100}%` }]} /> : null}
-            {copy?.over ? <View style={[styles.cmpFill, styles.cmpFillOver, { width: `${(1 - inW) * 100}%` }]} /> : null}
-          </>
-        ) : null}
-      </View>
     </View>
   );
 }
 
+const HERO_PHOTO = 132;
+const ALL_NUTRIENTS: NutrientKey[] = ['kcal', 'carbs', 'protein', 'fat', 'sugar', 'sodium'];
+type IonName = ComponentProps<typeof Ionicons>['name'];
+/** 영양소 아이콘 — 원 바탕 + 아이콘 (색은 theme 토큰만) */
+const NUTRIENT_ICON: Record<NutrientKey, { name: IonName; fg: ColorKey; bg: ColorKey }> = {
+  kcal: { name: 'flame', fg: 'ok', bg: 'okBg' },
+  carbs: { name: 'nutrition', fg: 'primaryText', bg: 'primaryTint' },
+  protein: { name: 'egg', fg: 'primaryText', bg: 'primaryTint' },
+  fat: { name: 'water', fg: 'ink2', bg: 'line' },
+  sugar: { name: 'cube', fg: 'ink2', bg: 'line' },
+  sodium: { name: 'flask', fg: 'ink2', bg: 'line' },
+};
+
 const styles = StyleSheet.create({
-  aiPhoto: { marginTop: 4 },
-  servingNote: { marginTop: 8 },
   root: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: spacing.page },
   scroll: { paddingHorizontal: spacing.page, paddingBottom: spacing.xxl },
   pressed: { opacity: 0.7 },
-  top: { alignItems: 'flex-start', paddingTop: spacing.sm },
-  category: { marginTop: spacing.lg },
-  name: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 30, letterSpacing: -0.4, color: colors.ink, marginTop: 2 },
+  bold: { fontFamily: fonts.bold },
+
+  // 1. 사진 + 정보
+  hero: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.lg, paddingTop: spacing.sm },
+  heroMedia: { alignItems: 'center' },
+  heroPhoto: { borderRadius: radius.card },
+  aiPhoto: { marginTop: 6 },
+  heroBody: { flex: 1, minWidth: 0, paddingTop: 2 },
+  name: { fontFamily: fonts.bold, fontSize: 21, lineHeight: 28, letterSpacing: -0.4, color: colors.ink, marginTop: 2 },
   price: { marginTop: 2 },
-  badges: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
-  reason: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.sm },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: spacing.sm },
+  blurb: { marginTop: spacing.sm },
+
+  // 카드 공통
+  card: { marginTop: spacing.lg },
+  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32, marginBottom: spacing.xs },
+  cardHeadLeft: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm, flexShrink: 1 },
+
+  // 2. 영양 vs 여유
+  nRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  nIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  nValueCol: { width: 64 },
+  nValue: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 22, color: colors.ink },
+  nMain: { flex: 1, minWidth: 0 },
+  nBarRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  nTotal: { flexShrink: 0 },
+  nTrack: { flex: 1, minWidth: 40, flexDirection: 'row', height: 6, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
+  nEaten: { height: 6, backgroundColor: colors.border },
+  nEatenOver: { backgroundColor: colors.over, opacity: 0.45 },
+  nMenuWrap: { flexDirection: 'row', height: 6 },
+  nMenu: { height: 6, backgroundColor: colors.primary },
+  nMenuOver: { backgroundColor: colors.over },
+  nCopy: { marginTop: 4, textAlign: 'right' },
+  servingNote: { marginTop: spacing.xs },
+  reason: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primaryTint },
+  reasonIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   reasonText: { flex: 1 },
   reasonSub: { marginTop: 2 },
-  blurb: { marginTop: spacing.md },
-  card: { marginTop: spacing.lg },
-  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
-  after: { marginTop: spacing.sm, gap: spacing.sm },
-  afterTitle: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 28, letterSpacing: -0.4, color: colors.ink },
-  afterNum: { color: colors.primaryText },
-  afterOverNum: { color: colors.over },
-  bold: { fontFamily: fonts.bold },
-  row: { flexDirection: 'row' },
-  flat: { borderRadius: 0 },
-  afterTrack: { flexDirection: 'row', height: 10, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
-  afterEaten: { height: 10, backgroundColor: colors.border },
-  afterEatenOver: { backgroundColor: colors.over, opacity: 0.45 },
-  afterMenuWrap: { flexDirection: 'row', height: 10 },
-  afterMenu: { height: 10, backgroundColor: colors.primary },
-  afterMenuOver: { backgroundColor: colors.over },
-  afterLegend: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.md },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendRight: { marginLeft: 'auto' },
-  detailToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, marginTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.line },
-  cmpRow: { paddingVertical: spacing.sm, gap: 6 },
-  cmpTop: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
-  cmpLabel: { width: 52 },
-  cmpValueWrap: { flexShrink: 0, minWidth: 64 },
-  cmpValue: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 22, color: colors.ink },
-  cmpRight: { flex: 1, textAlign: 'right' },
-  cmpTrack: { height: 6, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
-  cmpFill: { height: 6, borderRadius: radius.pill, backgroundColor: colors.primary },
-  cmpFillOver: { borderRadius: 0, backgroundColor: colors.over },
+
+  // 3. 옵션
   guide: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 5 },
   guideText: { fontFamily: fonts.semibold },
   optRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
   optLabel: { width: 56 },
   optChips: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  more: { minHeight: 32, justifyContent: 'center' },
-  alts: { marginTop: spacing.xs },
-  alt: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+
+  // 4. 대안 추천
+  more: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 32 },
+  alts: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  alt: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line },
+  altPhoto: { borderRadius: radius.md },
   altBody: { flex: 1, minWidth: 0 },
+  altBadge: { alignSelf: 'flex-start', marginTop: 4 },
+
   footer: { paddingHorizontal: spacing.page, paddingTop: spacing.md, paddingBottom: spacing.lg, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
 });
